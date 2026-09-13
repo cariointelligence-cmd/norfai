@@ -47,18 +47,28 @@ export function shouldBlockRequest(kind: string): boolean {
 }
 
 /** Keep the isolate alive after the HTTP response (Vercel waitUntil). */
-export function scheduleBackground(task: () => Promise<unknown>): void {
-  const run = () => task().catch((err) => console.error("[norf] background", err instanceof Error ? err.message : err));
+function vercelWaitUntil(): ((p: Promise<unknown>) => void) | null {
   try {
-    const get = (globalThis as Record<string, unknown>)[Symbol.for("@vercel/request-context") as unknown as string] as
+    const bag = (globalThis as Record<string, unknown>)[Symbol.for("@vercel/request-context") as unknown as string] as
       | { get?: () => { waitUntil?: (p: Promise<unknown>) => void } }
       | undefined;
-    const waitUntil = get?.get?.()?.waitUntil;
-    if (typeof waitUntil === "function") {
-      waitUntil(run());
-      return;
-    }
-  } catch { /* no vercel context */ }
+    const fn = bag?.get?.()?.waitUntil;
+    if (typeof fn === "function") return fn.bind(bag.get?.());
+  } catch { /* no request context */ }
+  return null;
+}
+
+export function scheduleBackground(task: () => Promise<unknown>): void {
+  const run = () => task().catch((err) => console.error("[norf] background", err instanceof Error ? err.message : err));
+  const waitUntil = vercelWaitUntil();
+  if (waitUntil) {
+    waitUntil(run());
+    return;
+  }
+  // On Vercel, void-running a drain keeps the inbound request open until the
+  // drain finishes. That froze Start Search and Overview. Cron + tickSearch
+  // recover jobs when waitUntil is unavailable.
+  if (process.env.VERCEL) return;
   void run();
 }
 

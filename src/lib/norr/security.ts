@@ -452,6 +452,15 @@ export function classifyRisk(score: number): SecurityRisk {
 }
 
 export async function ensureSecuritySchema(sql: Sql): Promise<void> {
+  const g = globalThis as typeof globalThis & { __norfSecuritySchema__?: Promise<void> };
+  g.__norfSecuritySchema__ ??= applySecuritySchema(sql).catch((err) => {
+    g.__norfSecuritySchema__ = undefined;
+    throw err;
+  });
+  await g.__norfSecuritySchema__;
+}
+
+async function applySecuritySchema(sql: Sql): Promise<void> {
   await sql.query(`create table if not exists security_events (
     id text primary key,
     user_id text,

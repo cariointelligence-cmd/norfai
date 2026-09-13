@@ -312,7 +312,6 @@ export const getBootstrap = createServerFn({ method: "GET" }).middleware([authMi
       hasStripeCustomer,
       stripeReady: stripeCheckoutReady()
     };
-    dispatchVercelExecution({ userId: context.userId, reason: "overview" });
     return payload;
   } catch (err) {
     console.error("[norf] bootstrap", err);
@@ -535,8 +534,8 @@ export const tickSearch = createServerFn({ method: "POST" }).middleware([authMid
   };
   try { await drainStuckUserWork(sql, context.userId); } catch { /* keep */ }
   const processed = await processJobsFor(sql, context.userId, data.runId, {
-    maxMs: data.runId ? 15e3 : 18e3,
-    concurrency: data.runId ? 6 : 8,
+    maxMs: data.runId ? 8e3 : 10e3,
+    concurrency: data.runId ? 4 : 6,
   });
   if (data.runId) {
     try { await resumeDiscoverIfStarved(sql, context.userId, data.runId); } catch { /* optional */ }
@@ -577,11 +576,6 @@ export const getRun = createServerFn({ method: "GET" }).middleware([authMiddlewa
       query_fingerprint, ranking_version, name, new_leads_count, previously_seen_count, excluded_count, search_exhaustion_score
     from search_runs where id = ${data.runId} and user_id = ${context.userId}`)?.[0];
   if (!run) return { ok: false, error: "Not found" };
-  try {
-    await freezeRunRanking(sql, context.userId, data.runId, run.criteria);
-  } catch {
-    /* ranking columns may still be migrating */
-  }
   let jobs = await sql`
     select id, type, status, last_error, company_id, updated_at from jobs where user_id = ${context.userId} and run_id = ${data.runId} order by created_at asc`;
   if (run.status === "running" || run.status === "queued") {
@@ -589,10 +583,15 @@ export const getRun = createServerFn({ method: "GET" }).middleware([authMiddlewa
       (j.type === "discover" || j.type === "email" || j.type === "enrich") &&
       (j.status === "queued" || j.status === "running"));
     if (starved) {
-      dispatchVercelExecution({ userId: context.userId, runId: data.runId, reason: "poll.starved" });
-      try { await kickSearchExecution(sql, context.userId, data.runId, { maxMs: 7_000 }); } catch { /* poll must return */ }
+      try { await kickSearchExecution(sql, context.userId, data.runId, { maxMs: 4_500 }); } catch { /* poll must return */ }
       jobs = await sql`select id, type, status, last_error, company_id, updated_at from jobs where user_id = ${context.userId} and run_id = ${data.runId} order by created_at asc`;
     }
+  }
+  try {
+    const [n] = await sql`select count(*)::int as n from run_companies where user_id = ${context.userId} and run_id = ${data.runId}`;
+    if (Number(n?.n ?? 0) > 0) await freezeRunRanking(sql, context.userId, data.runId, run.criteria);
+  } catch {
+    /* ranking columns may still be migrating */
   }
   const limit = clampInt(data.limit, 1, listPageCap(), 100);
   const cursor = decodeRunCursor(data.cursor);

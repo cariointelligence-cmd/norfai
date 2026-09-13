@@ -163,7 +163,7 @@ function NewSearch() {
         }
         return;
       }
-      nav({ to: "/search/$runId", params: { runId: res.runId } });
+      window.location.assign(`/search/${res.runId}`);
     } catch (err) {
       toast.error(friendlyError(err, "Search failed"));
     } finally {

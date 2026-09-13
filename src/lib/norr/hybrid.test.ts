@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { classifyWorkload, interactiveBudgetMs, shouldBlockRequest, EXECUTION_TARGETS, vercelRuntimeInfo } from "./hybrid.ts";
+import { classifyWorkload, interactiveBudgetMs, shouldBlockRequest, EXECUTION_TARGETS, vercelRuntimeInfo, scheduleBackground } from "./hybrid.ts";
 import { cacheGet, cacheSet, cacheCoalesce, cacheStats, resetIntelCacheForTests, CACHE_TTL } from "./intel-cache.ts";
 
 describe("vercel hybrid", () => {
@@ -17,6 +17,19 @@ describe("vercel hybrid", () => {
     assert.equal(EXECUTION_TARGETS.FINANCIAL.target, "VERCEL_FUNCTION");
     assert.equal(EXECUTION_TARGETS.APIFY_LEADS.blocking, false);
     assert.equal(vercelRuntimeInfo().legacyBackend, "retired");
+  });
+
+  it("does not void-run a drain on Vercel without waitUntil", async () => {
+    const prev = process.env.VERCEL;
+    process.env.VERCEL = "1";
+    let ran = false;
+    scheduleBackground(async () => {
+      ran = true;
+    });
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal(ran, false);
+    if (prev === undefined) delete process.env.VERCEL;
+    else process.env.VERCEL = prev;
   });
 
   it("caches public intelligence and coalesces inflight work", async () => {
