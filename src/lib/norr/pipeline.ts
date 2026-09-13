@@ -1566,7 +1566,9 @@ export async function resumeDiscoverIfStarved(sql, userId, runId) {
 }
 
 export async function processJobsFor(sql, userId, runId, opts) {
-	try { await ensureOpsSchema(sql); } catch { /* */ }
+	if (!opts?.skipSchema) {
+		try { await ensureOpsSchema(sql); } catch { /* */ }
+	}
 	try { if (runId) await resumeDiscoverIfStarved(sql, userId, runId); } catch { /* */ }
 	const maxMs = opts?.maxMs ?? RUNTIME.workerMaxMs;
 	const concurrency = clampConcurrency(opts?.concurrency);
@@ -1606,6 +1608,17 @@ export async function processJobsFor(sql, userId, runId, opts) {
 		]);
 	}
 	return processed;
+}
+
+/** Run-page pump: no schema DDL. Steal stale locks, then process this run. */
+export async function pumpSearch(sql, userId, runId) {
+	if (!runId || !userId) return 0;
+	try {
+		await sql`update jobs set status = ${"queued"}, locked_at = null, run_after = now(), last_error = ${"stale lock released"}, updated_at = now()
+      where user_id = ${userId} and run_id = ${runId} and status = ${"running"}
+        and (locked_at is null or locked_at < now() - interval '8 seconds')`;
+	} catch { /* */ }
+	return processJobsFor(sql, userId, runId, { maxMs: 8_000, concurrency: 2, skipSchema: true });
 }
 
 const kickLocks = new Map();

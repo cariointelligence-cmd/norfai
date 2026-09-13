@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-run-read-v1";
+export const NORF_BUILD = "2026-09-14-pump-v1";
 
 export function vercelDeployProbe() {
   const env = process.env;

@@ -86,6 +86,7 @@ import { Route as ApiInternalWorkerRouteImport } from './routes/api/internal/wor
 import { Route as ApiJobsDrainRouteImport } from './routes/api/jobs/drain'
 import { Route as ApiSearchRunRouteImport } from './routes/api/search/run'
 import { Route as ApiSearchStartRouteImport } from './routes/api/search/start'
+import { Route as ApiSearchTickRouteImport } from './routes/api/search/tick'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe/webhook'
 import { Route as SupportTTokenRouteImport } from './routes/support/t/$token'
 
@@ -473,6 +474,11 @@ const ApiSearchStartRoute = ApiSearchStartRouteImport.update({
   path: '/api/search/start',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSearchTickRoute = ApiSearchTickRouteImport.update({
+  id: '/api/search/tick',
+  path: '/api/search/tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
   id: '/api/stripe/webhook',
   path: '/api/stripe/webhook',
@@ -557,6 +563,7 @@ export interface FileRoutesByFullPath {
   '/api/jobs/drain': typeof ApiJobsDrainRoute
   '/api/search/run': typeof ApiSearchRunRoute
   '/api/search/start': typeof ApiSearchStartRoute
+  '/api/search/tick': typeof ApiSearchTickRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/support/t/$token': typeof SupportTTokenRoute
   '/companies/': typeof AppCompaniesIndexRoute
@@ -636,6 +643,7 @@ export interface FileRoutesByTo {
   '/api/jobs/drain': typeof ApiJobsDrainRoute
   '/api/search/run': typeof ApiSearchRunRoute
   '/api/search/start': typeof ApiSearchStartRoute
+  '/api/search/tick': typeof ApiSearchTickRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/support/t/$token': typeof SupportTTokenRoute
   '/companies': typeof AppCompaniesIndexRoute
@@ -718,6 +726,7 @@ export interface FileRoutesById {
   '/api/jobs/drain': typeof ApiJobsDrainRoute
   '/api/search/run': typeof ApiSearchRunRoute
   '/api/search/start': typeof ApiSearchStartRoute
+  '/api/search/tick': typeof ApiSearchTickRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/support/t/$token': typeof SupportTTokenRoute
   '/_app/companies/': typeof AppCompaniesIndexRoute
@@ -800,6 +809,7 @@ export interface FileRouteTypes {
     | '/api/jobs/drain'
     | '/api/search/run'
     | '/api/search/start'
+    | '/api/search/tick'
     | '/api/stripe/webhook'
     | '/support/t/$token'
     | '/companies/'
@@ -879,6 +889,7 @@ export interface FileRouteTypes {
     | '/api/jobs/drain'
     | '/api/search/run'
     | '/api/search/start'
+    | '/api/search/tick'
     | '/api/stripe/webhook'
     | '/support/t/$token'
     | '/companies'
@@ -960,6 +971,7 @@ export interface FileRouteTypes {
     | '/api/jobs/drain'
     | '/api/search/run'
     | '/api/search/start'
+    | '/api/search/tick'
     | '/api/stripe/webhook'
     | '/support/t/$token'
     | '/_app/companies/'
@@ -1007,6 +1019,7 @@ export interface RootRouteChildren {
   ApiJobsDrainRoute: typeof ApiJobsDrainRoute
   ApiSearchRunRoute: typeof ApiSearchRunRoute
   ApiSearchStartRoute: typeof ApiSearchStartRoute
+  ApiSearchTickRoute: typeof ApiSearchTickRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
 }
 
@@ -1551,6 +1564,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSearchStartRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/search/tick': {
+      id: '/api/search/tick'
+      path: '/api/search/tick'
+      fullPath: '/api/search/tick'
+      preLoaderRoute: typeof ApiSearchTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/stripe/webhook': {
       id: '/api/stripe/webhook'
       path: '/api/stripe/webhook'
@@ -1712,6 +1732,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiJobsDrainRoute: ApiJobsDrainRoute,
   ApiSearchRunRoute: ApiSearchRunRoute,
   ApiSearchStartRoute: ApiSearchStartRoute,
+  ApiSearchTickRoute: ApiSearchTickRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
 }
 export const routeTree = rootRouteImport

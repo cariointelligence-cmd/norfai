@@ -3,7 +3,6 @@ import { runProgress } from "./progress.ts";
 
 export async function readSearchRun(userId: string, runId: string, cursor?: string | null) {
   const sql = await getSql();
-  try { await sql.query("SET statement_timeout TO 2500"); } catch { /* */ }
 
   let run;
   try {
@@ -22,15 +21,20 @@ export async function readSearchRun(userId: string, runId: string, cursor?: stri
     from jobs where user_id = ${userId} and run_id = ${runId}
     order by created_at asc`;
 
-  const companies = await sql`
-    select c.id, c.name, c.business_id, c.municipality, c.industry_code, c.industry_label,
-      c.website, c.overall_confidence, c.record_status, c.general_email, c.phone,
-      c.match_score, coalesce(rc.seen_before, false) as seen_before
-    from run_companies rc
-    join companies c on c.id = rc.company_id
-    where rc.user_id = ${userId} and rc.run_id = ${runId}
-    order by coalesce(rc.rank_position, 999999) asc, c.id asc
-    limit 100`;
+  let companies = [];
+  try {
+    companies = await sql`
+      select c.id, c.name, c.business_id, c.municipality, c.industry_code, c.industry_label,
+        c.website, c.overall_confidence, c.record_status, c.general_email, c.phone,
+        c.match_score, coalesce(rc.seen_before, false) as seen_before
+      from run_companies rc
+      join companies c on c.id = rc.company_id
+      where rc.user_id = ${userId} and rc.run_id = ${runId}
+      order by coalesce(rc.rank_position, 999999) asc, c.id asc
+      limit 100`;
+  } catch {
+    companies = [];
+  }
 
   const unique = companies.map((c) => ({ ...c, website: c.website ?? null }));
   const jobsLive = jobs.some((j: { status?: string }) => j.status === "running" || j.status === "queued");

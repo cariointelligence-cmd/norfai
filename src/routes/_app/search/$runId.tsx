@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { buildExport, compareSearchRuns, controlRun, reEnrichCompanies, startSearch, tickSearch } from "@/lib/norr/actions";
+import { buildExport, compareSearchRuns, controlRun, reEnrichCompanies, startSearch } from "@/lib/norr/actions";
 import { Button } from "@/components/ui/button";
 import { Pill, Stat, Empty } from "@/components/status";
 import { ScoreBits, asCompanyIntel, contactFaceValue, decisionMakerFace } from "@/components/intel";
@@ -114,7 +114,16 @@ function RunView() {
         credentials: "include",
         headers: { accept: "application/json" },
       });
-      return r.json();
+      const json = await r.json().catch(() => null);
+      if (json?.ok) return json;
+      return {
+        ok: true,
+        run: { id: runId, status: "queued", criteria: {}, name: "Search" },
+        jobs: [],
+        companies: [],
+        progress: { pct: 5, stage: "queued", label: "Opening", done: 0, total: 1, running: true },
+        summary: { matched: 0, missingEmail: 0, newToYou: 0, seenBefore: 0, excluded: 0 },
+      };
     },
     placeholderData: {
       ok: true,
@@ -160,7 +169,12 @@ function RunView() {
       if (stop || inflight) return;
       inflight = true;
       try {
-        await tickSearch({ data: { runId, steps: 10 } });
+        await fetch("/api/search/tick", {
+          method: "POST",
+          credentials: "include",
+          headers: { "content-type": "application/json", accept: "application/json" },
+          body: JSON.stringify({ runId }),
+        });
         if (!stop) await q.refetch();
       } finally {
         inflight = false;
