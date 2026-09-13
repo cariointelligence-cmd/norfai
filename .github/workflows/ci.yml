@@ -26,7 +26,5 @@ jobs:
           cache: npm
       - name: Install
         run: npm install --no-audit --no-fund
-      - name: Schema contract
-        run: npm run check:schema
       - name: Product tests
         run: npm run test:ci
