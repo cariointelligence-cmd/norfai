@@ -1,7 +1,7 @@
 /**
  * PRH YTJ open data v3. Official Finnish trade register.
  * mainBusinessLine is a substring match. 2-digit divisions are queried as-is;
- * 5-digit children run first for denser pages. Local prefix filter drops
+ * 2-digit divisions are queried first (first companies fast), then 5-digit children.
  * substring false positives (47770 from "70", 46692 from "69").
  *
  * `status` is STATUS3 (1 pending, 2 valid Y-tunnus, 5 invalidated) — not
@@ -349,9 +349,9 @@ export function buildYtjQueries(criteria: SearchCriteria): Query[] {
       push({ mainBusinessLine: code, location });
       continue;
     }
+    push({ mainBusinessLine: code, location });
     const kids = expandIndustryQueryCodes([code]).filter((c) => c.length >= 4 && c !== code);
     for (const kid of kids.slice(0, 20)) push({ mainBusinessLine: kid, location });
-    push({ mainBusinessLine: code, location });
   }
   }
   for (const name of keywords.slice(0, 4)) {
@@ -377,7 +377,7 @@ async function ytjSearchQuery(
   page = 0,
 ): Promise<AdapterResult<DiscoveredCompany[]> & { total?: number; sourceUrl?: string; rawCount?: number }> {
   const url = queryUrl(q, page, size);
-  const r = await getJson<{ totalResults?: number; companies?: YtjRaw[] }>(url, { timeoutMs: 4000 });
+  const r = await getJson<{ totalResults?: number; companies?: YtjRaw[] }>(url, { timeoutMs: 5500 });
   if (!r.ok) {
     const state = r.status === 429 ? "rate_limited" as const : r.status >= 500 ? "temporarily_unavailable" as const : undefined;
     return { ok: false, error: r.error || `YTJ HTTP ${r.status}`, state };

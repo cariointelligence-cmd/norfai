@@ -1470,7 +1470,7 @@ async function processNextJob(sql, userId, runId, opts) {
 				const disc = await Promise.race([
 					runDiscover(sql, userId, job.run_id, run.criteria, { cursor: payload.ytjCursor ?? null }),
 					new Promise<{ complete: false; cursor: unknown; discovered: number; timedOut: true }>((resolve) => {
-						setTimeout(() => resolve({ complete: false, cursor: payload.ytjCursor ?? null, discovered: 0, timedOut: true }), Math.max(4_000, RUNTIME.discoverBudgetMs + 800));
+						setTimeout(() => resolve({ complete: false, cursor: payload.ytjCursor ?? null, discovered: 0, timedOut: true }), Math.max(16_000, RUNTIME.discoverBudgetMs + 4_000));
 					}),
 				]);
 				if (!disc.complete) {
@@ -1615,10 +1615,10 @@ export async function pumpSearch(sql, userId, runId) {
 	if (!runId || !userId) return 0;
 	try {
 		await sql`update jobs set status = ${"queued"}, locked_at = null, run_after = now(), last_error = ${"stale lock released"}, updated_at = now()
-      where user_id = ${userId} and run_id = ${runId} and status = ${"running"}
+      where user_id = ${userId} and status = ${"running"}
         and (locked_at is null or locked_at < now() - interval '8 seconds')`;
 	} catch { /* */ }
-	return processJobsFor(sql, userId, runId, { maxMs: 8_000, concurrency: 2, skipSchema: true });
+	return processJobsFor(sql, userId, runId, { maxMs: 16_000, concurrency: 1, skipSchema: true });
 }
 
 const kickLocks = new Map();

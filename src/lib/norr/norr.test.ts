@@ -378,7 +378,7 @@ describe("YTJ query planner", () => {
     assert.ok(qs.some((q) => q.mainBusinessLine === "73"));
     const i73 = qs.findIndex((q) => q.mainBusinessLine === "73");
     const iAgency = qs.findIndex((q) => q.mainBusinessLine === "73111");
-    assert.ok(iAgency >= 0 && i73 > iAgency);
+    assert.ok(i73 >= 0 && iAgency > i73);
     assert.equal(qs.some((q) => q.name && q.mainBusinessLine), false);
     assert.equal(qs.some((q) => q.location && !q.mainBusinessLine && !q.name), false);
   });
