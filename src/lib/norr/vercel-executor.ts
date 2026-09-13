@@ -122,7 +122,11 @@ export async function invokeVercelDrain(opts: DrainRequest): Promise<{ ok: boole
     const ac = new AbortController();
     const t = setTimeout(() => ac.abort(), 25_000);
     try {
-      await fetch(`${origin}${DRAIN_PATH}`, { method: "POST", headers, body, signal: ac.signal });
+      const res = await fetch(`${origin}${DRAIN_PATH}`, { method: "POST", headers, body, signal: ac.signal });
+      if (!res.ok) {
+        console.warn("[norf] vercel drain http", res.status);
+        return { ok: false, mode: "http" };
+      }
     } catch (err) {
       console.warn("[norf] vercel drain invoke", err instanceof Error ? err.message : err);
       return { ok: false, mode: "http" };
@@ -146,12 +150,9 @@ export async function runVercelDrain(opts: DrainRequest): Promise<DrainResult> {
   return { processed, remaining, depth, chained, plane: "vercel", reason };
 }
 
-/** Fire-and-forget from a user request. Prefer HTTP so the user isolate is not the worker. */
+/** Fire-and-forget. In-process drain on waitUntil is the Nerve; HTTP is the chain. */
 export function dispatchVercelExecution(opts: DrainRequest): void {
-  scheduleBackground(async () => {
-    const http = await invokeVercelDrain({ ...opts, depth: opts.depth ?? 0, reason: opts.reason ?? "dispatch" });
-    if (!http.ok) await runVercelDrain({ ...opts, depth: opts.depth ?? 0, reason: `${opts.reason ?? "dispatch"}.local` });
-  });
+  scheduleBackground(() => runVercelDrain({ ...opts, depth: opts.depth ?? 0, reason: opts.reason ?? "dispatch" }));
 }
 
 export function executionPlane() {

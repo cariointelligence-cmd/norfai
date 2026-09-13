@@ -377,7 +377,7 @@ async function ytjSearchQuery(
   page = 0,
 ): Promise<AdapterResult<DiscoveredCompany[]> & { total?: number; sourceUrl?: string; rawCount?: number }> {
   const url = queryUrl(q, page, size);
-  const r = await getJson<{ totalResults?: number; companies?: YtjRaw[] }>(url, { timeoutMs: 18000 });
+  const r = await getJson<{ totalResults?: number; companies?: YtjRaw[] }>(url, { timeoutMs: 4000 });
   if (!r.ok) {
     const state = r.status === 429 ? "rate_limited" as const : r.status >= 500 ? "temporarily_unavailable" as const : undefined;
     return { ok: false, error: r.error || `YTJ HTTP ${r.status}`, state };
@@ -398,7 +398,8 @@ async function ytjSearchQuery(
 async function ytjSearchQueryRetry(q: Query, size = YTJ_PAGE_SIZE, page = 0) {
   const first = await ytjSearchQuery(q, size, page);
   if (first.ok) return first;
-  await sleep(first.state === "rate_limited" ? 800 : 400);
+  if (first.state !== "rate_limited") return first;
+  await sleep(400);
   return ytjSearchQuery(q, size, page);
 }
 

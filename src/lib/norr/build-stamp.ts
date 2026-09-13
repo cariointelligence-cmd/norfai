@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-13-unstick-v1";
+export const NORF_BUILD = "2026-09-13-hive-exec-v1";
 
 export function vercelDeployProbe() {
   const env = process.env;

@@ -658,9 +658,9 @@ describe("production runtime", () => {
     assert.equal(RUNTIME.hydrateConcurrency, 6);
     assert.ok(RUNTIME.tickMaxMs >= RUNTIME.discoverBudgetMs);
     assert.ok(RUNTIME.discoverBudgetMs <= 12_000);
-    assert.ok(jobLeaseSeconds("discover") <= 30);
-    assert.ok(jobLeaseSeconds("discover") >= 15);
-    assert.ok(jobLeaseSeconds("enrich") <= 60);
+    assert.ok(jobLeaseSeconds("discover") <= 12);
+    assert.ok(jobLeaseSeconds("discover") >= 8);
+    assert.ok(jobLeaseSeconds("enrich") <= 30);
   });
 });
 
