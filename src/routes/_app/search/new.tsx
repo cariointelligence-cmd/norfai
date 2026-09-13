@@ -139,18 +139,17 @@ function NewSearch() {
       let next = { ...criteria, prompt: prompt.trim() || criteria.prompt };
       if (prompt.trim()) {
         try {
-          const r = await interpretPrompt({ data: { prompt: prompt.trim(), country: criteria.country } });
+          const r = await Promise.race([
+            interpretPrompt({ data: { prompt: prompt.trim(), country: criteria.country } }),
+            new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("timed out")), 4000)),
+          ]);
           if (r.ok) {
             next = { ...r.criteria, maxResults: criteria.maxResults || r.criteria.maxResults, prompt: prompt.trim() };
             setCriteria(next);
             setSummary(r.summary);
-          } else {
-            toast.error(r.error ?? "Add a place or pick an industry (Kaikki toimialat is allowed).");
-            return;
           }
-        } catch (err) {
-          toast.error(friendlyError(err, "Could not read the brief"));
-          return;
+        } catch {
+          /* brief is optional — start with the form filters */
         }
       }
       const saved = await saveProfile({ data: { name, criteria: next, scheduleEnabled: schedule, scheduleCron: schedule ? "daily" : null } });
@@ -158,19 +157,17 @@ function NewSearch() {
         toast.error(saved.error);
         return;
       }
-      const res = await startSearch({ data: { criteria: next, profileId: saved.id, name } });
-      if (!res.ok) {
-        toast.error(res.error);
+      const res = await Promise.race([
+        startSearch({ data: { criteria: next, profileId: saved.id, name } }),
+        new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("timed out")), 10000)),
+      ]);
+      if (!res.ok || !res.runId) {
+        toast.error(res.error || "Search could not start. Try again.");
         if (res.upgrade) {
           toast.message("Quota reached. Open Plan to upgrade, or Support to send feedback.");
         }
         return;
       }
-      toast.message(
-        res.discovered
-          ? `Discovery stored ${res.discovered} companies. Scores fill in as pages are crawled.`
-          : "Search started. Register matches appear as pages are read.",
-      );
       nav({ to: "/search/$runId", params: { runId: res.runId } });
     } catch (err) {
       toast.error(friendlyError(err, "Search failed"));
@@ -207,7 +204,7 @@ function NewSearch() {
           </p>
         </div>
         <Button className="w-full sm:w-auto" onClick={() => void run()} disabled={busy}>
-          {busy ? "Finding companies" : `Find ${criteria.maxResults} companies`}
+          {busy ? "Starting search…" : `Find ${criteria.maxResults} companies`}
         </Button>
       </div>
 

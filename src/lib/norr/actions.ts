@@ -401,7 +401,8 @@ export const startSearch = createServerFn({ method: "POST" }).middleware([authMi
         and status in ('queued','running')
       order by created_at desc limit 1`;
     if (recent[0]) {
-      return { ok: true, runId: recent[0].id, discovered: 0, reused: true };
+      dispatchVercelExecution({ userId: context.userId, runId: recent[0].id, reason: "search.reuse" });
+      return { ok: true, runId: recent[0].id, discovered: 0, reused: true, state: "QUEUED" };
     }
     const cost = deep ? queryCost("search_deep") : queryCost("search");
     const quota = await assertSearchQuota(sql, context.userId, cost);
@@ -421,10 +422,10 @@ export const startSearch = createServerFn({ method: "POST" }).middleware([authMi
     endStage(parseStage, { recordCount: 1 });
     try {
       await sql`insert into search_runs (id, user_id, profile_id, status, criteria, query_fingerprint, ranking_version, name, created_by_user_id, correlation_id)
-        values (${runId}, ${context.userId}, ${data.profileId ?? null}, ${"running"}, ${JSON.stringify(compiled.criteria)}::jsonb, ${fp}, ${RANKING_VERSION}, ${label}, ${actorId}, ${trace.correlationId})`;
+        values (${runId}, ${context.userId}, ${data.profileId ?? null}, ${"queued"}, ${JSON.stringify(compiled.criteria)}::jsonb, ${fp}, ${RANKING_VERSION}, ${label}, ${actorId}, ${trace.correlationId})`;
     } catch {
       await sql`insert into search_runs (id, user_id, profile_id, status, criteria)
-        values (${runId}, ${context.userId}, ${data.profileId ?? null}, ${"running"}, ${JSON.stringify(compiled.criteria)}::jsonb)`;
+        values (${runId}, ${context.userId}, ${data.profileId ?? null}, ${"queued"}, ${JSON.stringify(compiled.criteria)}::jsonb)`;
     }
     await enqueueJob(sql, context.userId, "discover", { runId });
     try {
@@ -439,86 +440,10 @@ export const startSearch = createServerFn({ method: "POST" }).middleware([authMi
     } catch { /* report optional */ }
     await audit(sql, context.userId, "search.start", "search_run", runId, { name: label, fingerprint: fp });
     noteExtraction(context.userId, "search");
-    await persistExtractionCounters(sql, context.userId, { searches: 1, ip: g.ip });
-    let discovered = 0;
-    const discoverStage = markStage(trace, "discover");
-    try {
-      const disc = await runDiscover(sql, context.userId, runId, compiled.criteria);
-      discovered = disc.discovered ?? 0;
-      endStage(discoverStage, { recordCount: discovered });
-      if (disc.complete) {
-        await sql`update jobs set status = ${"done"}, updated_at = now()
-          where user_id = ${context.userId} and run_id = ${runId} and type = ${"discover"} and status in ('queued','running')`;
-      } else {
-        await sql`update jobs set payload = ${JSON.stringify({ ytjCursor: disc.cursor ?? null, discoverExhausted: Boolean(disc.exhausted) })}::jsonb, status = ${"queued"}, run_after = now(), locked_at = null, updated_at = now()
-          where user_id = ${context.userId} and run_id = ${runId} and type = ${"discover"}`;
-      }
-    } catch (err) {
-      endStage(discoverStage, { error: err instanceof Error ? err.message : "discover" });
-      console.error("[norf] discover", err);
-    }
-    const enrichStage = markStage(trace, "source");
-    try {
-      await processJobsFor(sql, context.userId, runId, {
-        maxMs: interactiveBudgetMs("enrich"),
-        concurrency: 8,
-        skipDiscover: true,
-      });
-      endStage(enrichStage);
-    } catch (err) {
-      endStage(enrichStage, { error: err instanceof Error ? err.message : "enrich" });
-      console.error("[norf] enrich tick", err);
-    }
-    discovered = (await sql`select count(*)::int as n from run_companies where user_id = ${context.userId} and run_id = ${runId}`)[0]?.n ?? discovered;
-    try {
-      const [emailRow] = await sql`select count(*)::int as n from run_companies rc
-        join companies c on c.id = rc.company_id
-        where rc.user_id = ${context.userId} and rc.run_id = ${runId} and c.general_email is not null`;
-      const decision = decideLeadsFinder({
-        configured: apifyConfigured(),
-        discovered,
-        emails: Number(emailRow?.n ?? 0),
-        want: compiled.criteria.maxResults ?? 30,
-        requireEmail: Boolean(compiled.criteria.requireEmail),
-        requireRole: Boolean(compiled.criteria.target?.hiring?.roles?.length),
-        requireRevenue: Boolean(compiled.criteria.target?.financial?.revenue?.min || compiled.criteria.target?.financial?.revenue?.max),
-        searchId: runId,
-      });
-      try {
-        await sql`update search_runs set source_report = coalesce(source_report, '[]'::jsonb) || ${JSON.stringify([leadsFinderSourceReport(decision.reason)])}::jsonb
-          where id = ${runId} and user_id = ${context.userId}`;
-      } catch { /* report optional */ }
-    } catch (err) {
-      console.warn("[norf] leads-finder plan", err instanceof Error ? err.message : "skip");
-    }
-    await updateRunStats(sql, context.userId, runId);
-    try {
-      const ranking = await freezeRunRanking(sql, context.userId, runId, compiled.criteria);
-      await writeSearchHealth(sql, {
-        userId: context.userId,
-        runId,
-        queryFingerprint: fp,
-        durationMs: Date.now() - t0,
-        candidateCount: discovered,
-        finalCount: ranking.newCount + ranking.seenCount,
-        newLeads: ranking.newCount,
-        seenCount: ranking.seenCount,
-        noveltyAvg: ranking.noveltyAvg,
-        exhausted: ranking.exhaustion >= 80,
-        status: "running",
-      });
-    } catch (err) {
-      console.warn("[norf] ranking freeze", err);
-    }
-    try {
-      await sql`insert into search_traces (id, user_id, run_id, correlation_id, stages, started_at, finished_at)
-        values (${nid()}, ${context.userId}, ${runId}, ${trace.correlationId}, ${JSON.stringify(trace.stages)}::jsonb, to_timestamp(${trace.startedAt / 1000.0}), now())`;
-    } catch {
-      /* traces optional */
-    }
-    const userId = context.userId;
-    dispatchVercelExecution({ userId, runId, reason: "search.start" });
-    return { ok: true, runId, discovered, correlationId: trace.correlationId };
+    try { await persistExtractionCounters(sql, context.userId, { searches: 1, ip: g.ip }); } catch { /* quota counter best-effort */ }
+    dispatchVercelExecution({ userId: context.userId, runId, reason: "search.start" });
+    return { ok: true, runId, discovered: 0, state: "QUEUED", correlationId: trace.correlationId, createdMs: Date.now() - t0 };
+
   } catch (err) {
     console.error("[norf] startSearch", err);
     if (charged > 0) {

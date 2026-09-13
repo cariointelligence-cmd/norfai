@@ -227,7 +227,7 @@ export function AppShell() {
             <NorfMark className="h-7 w-auto max-w-[96px] object-contain object-left lg:hidden" />
             <div className="hidden truncate text-xs uppercase tracking-[0.14em] text-faint sm:block">
               {boot.data?.counts.jobsRunning ? `${boot.data.counts.jobsRunning} ${ta("jobsRunning")}` : ta("idle")}
-              {boot.data ? ` · ${quotaLabel}` : boot.isFetching ? ` · ${ta("loading")}` : ""}
+              {boot.data ? ` · ${quotaLabel}` : ""}
             </div>
           </div>
           <div className="flex items-center gap-1 sm:gap-3">
