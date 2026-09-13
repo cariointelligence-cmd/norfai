@@ -26,8 +26,6 @@ export async function createQueuedSearch(opts: {
   if (!compiled.ok) return { ok: false, error: compiled.error, runId: "", discovered: 0 };
 
   const sql = await getSql();
-  try { await sql.query("SET statement_timeout TO 2500"); } catch { /* driver may not allow */ }
-  try { await sql.query("SET lock_timeout TO 800"); } catch { /* */ }
 
   const userId = opts.userId;
   const fp = queryFingerprint(compiled.criteria);

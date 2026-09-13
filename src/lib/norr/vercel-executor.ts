@@ -72,7 +72,8 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
   if (opts.userId) {
     processed = await processJobsFor(sql, opts.userId, opts.runId ?? null, {
       maxMs,
-      concurrency: RUNTIME.workerJobConcurrency,
+      concurrency: 2,
+      skipSchema: true,
     });
     try { await processDueSchedules(sql, opts.userId); } catch { /* schedules optional */ }
   } else {
@@ -83,7 +84,8 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
     for (const u of users) {
       processed += await processJobsFor(sql, u.user_id, null, {
         maxMs: Math.min(8_000, maxMs),
-        concurrency: RUNTIME.workerJobConcurrency,
+        concurrency: 2,
+        skipSchema: true,
       });
       try { await processDueSchedules(sql, u.user_id); } catch { /* */ }
     }

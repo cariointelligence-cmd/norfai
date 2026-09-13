@@ -229,7 +229,7 @@ async function attachDiscovered(
     returning company_id`;
   if (!inserted[0]) return "duplicate";
   await enqueueJob(sql, userId, "enrich", { runId, companyId });
-  await ensureScrapeJob(sql, userId, runId, companyId);
+  if (row.website) await ensureScrapeJob(sql, userId, runId, companyId);
   return "kept";
 }
 
@@ -237,8 +237,7 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
   const t0 = Date.now();
   const deadline = t0 + DISCOVER_BUDGET_MS;
   const report: Array<Record<string, unknown>> = [];
-  const identity = await ensurePlatformIdentity(sql, userId);
-  const planCap = perSearchLimitFor(identity.plan, identity.isAdmin);
+  const planCap = ENGINE_SEARCH_CEILING;
   const want = clampRequestedLeads(criteria.maxResults, planCap);
   const pool = Math.min(discoverPoolSize({ ...criteria, maxResults: want }), ENGINE_SEARCH_CEILING);
   const depth = criteria.depth === "deep" ? "deep" : "normal";
@@ -275,8 +274,7 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
     }
   }
   const flags = await (async () => {
-    try { await seedSourceHealth(sql, userId); } catch { /* health table optional on first boot */ }
-    return loadSourceFlags(sql, userId);
+    try { return await loadSourceFlags(sql, userId); } catch { return []; }
   })();
   const disabled = disabledSourceIds(flags);
   const searchPlan = hivePlan({ criteria, depth, country });
@@ -1613,6 +1611,9 @@ export async function processJobsFor(sql, userId, runId, opts) {
 /** Run-page pump: no schema DDL. Steal stale locks, then process this run. */
 export async function pumpSearch(sql, userId, runId) {
 	if (!runId || !userId) return 0;
+	try {
+		await sql.query("SET statement_timeout TO 20000");
+	} catch { /* */ }
 	try {
 		await sql`update jobs set status = ${"queued"}, locked_at = null, run_after = now(), last_error = ${"stale lock released"}, updated_at = now()
       where user_id = ${userId} and status = ${"running"}

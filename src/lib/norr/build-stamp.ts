@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-ytj-firstpage";
+export const NORF_BUILD = "2026-09-14-quality-discover";
 
 export function vercelDeployProbe() {
   const env = process.env;
