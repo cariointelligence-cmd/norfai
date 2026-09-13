@@ -7,6 +7,9 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    error: typeof s.error === "string" ? s.error.slice(0, 80) : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Sign in | Norf" },
@@ -24,6 +27,10 @@ function sameOriginPath(path: string): string {
 
 function Login() {
   const { user, isPending } = useCurrentUserState();
+  const { error: authError } = Route.useSearch();
+  if (typeof window !== "undefined" && window.location.hostname.endsWith(".vercel.app")) {
+    window.location.replace(`https://www.norfai.com/login${window.location.search}`);
+  }
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"in" | "up">("in");
@@ -72,6 +79,13 @@ function Login() {
         <p className="mb-6 text-sm text-mute">
           Signed-in workspaces query official registers and company websites. Empty means not found. Nothing is invented.
         </p>
+        {authError ? (
+          <div className="mb-4 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+            {authError === "state_mismatch"
+              ? "Sign-in was interrupted (wrong host mid-login). Use https://www.norfai.com/login and try Google again."
+              : `Sign-in failed (${authError}). Try again from https://www.norfai.com/login.`}
+          </div>
+        ) : null}
         {authEnabled ? (
           <div className="space-y-3">
             {GROK_PROVIDERS.map((p) => (

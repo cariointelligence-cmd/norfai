@@ -268,10 +268,12 @@ export async function provisionCarioNorfai(): Promise<VercelProvisionResult> {
       created: false,
     };
     if (empty.deployment.id) {
-      await vercelApi(
-        `/v2/deployments/${encodeURIComponent(empty.deployment.id)}/aliases?teamId=${encodeURIComponent(cario.id)}`,
-        { method: "POST", body: JSON.stringify({ alias: "www.norfai.com" }) },
-      );
+      for (const alias of ["www.norfai.com", "norfai.com"]) {
+        await vercelApi(
+          `/v2/deployments/${encodeURIComponent(empty.deployment.id)}/aliases?teamId=${encodeURIComponent(cario.id)}`,
+          { method: "POST", body: JSON.stringify({ alias }) },
+        );
+      }
     }
   } else if (inFlight) {
     empty.deployment = {

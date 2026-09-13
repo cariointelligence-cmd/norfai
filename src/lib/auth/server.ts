@@ -119,7 +119,6 @@ function collectDeployHosts(): string[] {
     for (const part of raw.split(/[\s,]+/)) {
       const host = hostFromUrlOrHost(part);
       if (!host || SKIP_HOST.test(host)) continue;
-      if (host.endsWith(".vercel.app")) continue;
       hosts.add(host);
       if (host.startsWith("www.")) hosts.add(host.slice(4));
       else if (host.includes(".")) hosts.add(`www.${host}`);
@@ -146,6 +145,11 @@ function collectDeployHosts(): string[] {
     if (!/(DOMAIN|HOSTNAME|APP_URL|SITE_URL|AUTH_URL|BETTER_AUTH)/i.test(key)) continue;
     consider(value);
   }
+  hosts.add("www.norfai.com");
+  hosts.add("norfai.com");
+  const vercelUrl = hostFromUrlOrHost(env("VERCEL_URL") ?? env("VERCEL_PROJECT_PRODUCTION_URL"));
+  if (vercelUrl) hosts.add(vercelUrl);
+  hosts.add("norfai.vercel.app");
   return [...hosts];
 }
 
@@ -230,7 +234,7 @@ export function registerInboundAuthHost(request: Request): void {
   } catch {
     return;
   }
-  if (!host || SKIP_HOST.test(host) || host.endsWith(".vercel.app")) return;
+  if (!host || SKIP_HOST.test(host)) return;
   if (host === "localhost" || host === "127.0.0.1" || host === "[::1]") return;
   if (!host.includes(".")) return;
   if (!baseURL.allowedHosts.includes(host)) baseURL.allowedHosts.push(host);
