@@ -31,6 +31,10 @@ function friendlyError(err: unknown, fallback: string): string {
 }
 
 async function startViaHttp(criteria: SearchCriteria, name: string): Promise<{ ok: boolean; runId: string; error?: string; upgrade?: boolean }> {
+  if (window.location.hostname.toLowerCase() === "norfai.com") {
+    window.location.replace(`https://www.norfai.com${window.location.pathname}${window.location.search}`);
+    return { ok: false, runId: "", error: "Continue on www.norfai.com" };
+  }
   const ac = new AbortController();
   const timer = window.setTimeout(() => ac.abort(), 20_000);
   try {
