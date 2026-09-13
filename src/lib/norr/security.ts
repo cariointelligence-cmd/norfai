@@ -345,7 +345,7 @@ export function securityHeaderMap(opts?: { embedders?: string[]; origin?: string
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https:",
-    "connect-src 'self' https://grok.com ws: wss:",
+    "connect-src 'self' https://www.norfai.com https://norfai.com https://grok.com ws: wss:",
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

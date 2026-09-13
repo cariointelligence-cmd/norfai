@@ -30,20 +30,28 @@ function friendlyError(err: unknown, fallback: string): string {
   return raw || fallback;
 }
 
-async function startViaHttp(criteria: SearchCriteria, name: string): Promise<{ ok: boolean; runId: string; error?: string; upgrade?: boolean }> {
-  if (window.location.hostname.toLowerCase() === "norfai.com") {
-    window.location.replace(`https://www.norfai.com${window.location.pathname}${window.location.search}`);
-    return { ok: false, runId: "", error: "Continue on www.norfai.com" };
+async function recoverLatestRun(): Promise<string> {
+  try {
+    const r = await fetch("/api/search/start", { credentials: "include", headers: { accept: "application/json" } });
+    const j = (await r.json()) as { ok?: boolean; runId?: string };
+    return j?.ok && j.runId ? j.runId : "";
+  } catch {
+    return "";
   }
-  const ac = new AbortController();
-  const timer = window.setTimeout(() => ac.abort(), 20_000);
+}
+
+async function startViaHttp(criteria: SearchCriteria, name: string): Promise<{ ok: boolean; runId: string; error?: string; upgrade?: boolean }> {
+  const host = window.location.hostname.toLowerCase();
+  if (host === "norfai.com" || host.endsWith(".vercel.app")) {
+    window.location.replace(`https://www.norfai.com${window.location.pathname}${window.location.search}`);
+    return { ok: false, runId: "", error: "" };
+  }
   try {
     const res = await fetch("/api/search/start", {
       method: "POST",
       credentials: "include",
       headers: { "content-type": "application/json", accept: "application/json" },
       body: JSON.stringify({ criteria, name }),
-      signal: ac.signal,
     });
     if (res.status === 401) {
       window.location.assign("/login");
@@ -51,17 +59,13 @@ async function startViaHttp(criteria: SearchCriteria, name: string): Promise<{ o
     }
     const json = (await res.json().catch(() => null)) as { ok?: boolean; runId?: string; error?: string } | null;
     if (json?.ok && json.runId) return { ok: true, runId: json.runId };
-    if (!res.ok && !json?.runId) {
-      const latest = await fetch("/api/search/start", { credentials: "include" }).then((r) => r.json()).catch(() => null);
-      if (latest?.ok && latest.runId) return { ok: true, runId: latest.runId };
-    }
-    return { ok: false, runId: json?.runId ?? "", error: json?.error || `Search failed (${res.status})` };
-  } catch (err) {
-    const latest = await fetch("/api/search/start", { credentials: "include" }).then((r) => r.json()).catch(() => null);
-    if (latest?.ok && latest.runId) return { ok: true, runId: latest.runId };
-    throw err;
-  } finally {
-    window.clearTimeout(timer);
+    const recovered = await recoverLatestRun();
+    if (recovered) return { ok: true, runId: recovered };
+    return { ok: false, runId: "", error: json?.error || `Search failed (${res.status})` };
+  } catch {
+    const recovered = await recoverLatestRun();
+    if (recovered) return { ok: true, runId: recovered };
+    return { ok: false, runId: "", error: "Search did not return an id. Open Previous searches." };
   }
 }
 
@@ -189,10 +193,7 @@ function NewSearch() {
       }
       const res = await startViaHttp(next, name);
       if (!res.ok || !res.runId) {
-        toast.error(res.error || "Search could not start. Try again.");
-        if (res.upgrade) {
-          toast.message("Quota reached. Open Plan to upgrade, or Support to send feedback.");
-        }
+        if (res.error) toast.error(res.error);
         return;
       }
       window.location.assign(`/search/${res.runId}`);

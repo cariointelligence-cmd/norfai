@@ -33,6 +33,12 @@ export const Route = createRootRoute({
         href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap",
       },
     ],
+    scripts: [
+      {
+        children:
+          "try{var h=location.hostname.toLowerCase();if(h==='norfai.com'||h.endsWith('.vercel.app'))location.replace('https://www.norfai.com'+location.pathname+location.search+location.hash)}catch(e){}",
+      },
+    ],
   }),
   component: () => (
     <html lang="fi" className="antialiased" suppressHydrationWarning>

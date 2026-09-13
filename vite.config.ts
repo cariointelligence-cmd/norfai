@@ -153,7 +153,7 @@ function securityHeadersPlugin(): Plugin {
         res.setHeader("X-DNS-Prefetch-Control", "off");
         res.setHeader(
           "Content-Security-Policy",
-          "default-src 'self'; script-src 'self' 'unsafe-inline' https://grok.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' ws: wss: https://grok.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self' https://grok.com https://*.grok.com https://*.grok-sandbox.com",
+          "default-src 'self'; script-src 'self' 'unsafe-inline' https://grok.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://www.norfai.com https://norfai.com ws: wss: https://grok.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self' https://grok.com https://*.grok.com https://*.grok-sandbox.com",
         );
         next();
       });

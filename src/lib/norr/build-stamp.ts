@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-13-search-www-v1";
+export const NORF_BUILD = "2026-09-14-search-csp-v1";
 
 export function vercelDeployProbe() {
   const env = process.env;
