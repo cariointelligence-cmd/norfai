@@ -1,0 +1,67 @@
+version: 1
+project_name: Norf
+purpose: >
+  Norf is a Nordic B2B company intelligence engine. It discovers real companies
+  from official registers, enriches them from public pages, keeps field-level
+  provenance, scores them against the user's criteria, and never invents a
+  company, person, email, phone or statistic.
+primary_user: Finnish and Nordic B2B sellers who need real prospect lists, not demo data
+success_metric: >
+  A search returns the requested number of real register companies (or honest
+  exhaustion), each with provenance, after scrape has actually run. Empty
+  workspace shows zeros, not placeholders.
+hard_constraints:
+  - Zero mock data. Missing values are null / Not found.
+  - Official register first (PRH YTJ v3 for FI). Homemade directories hydrate via official id.
+  - robots.txt honoured. No login-wall scrape. No proprietary copy.
+  - Scrape is a hard gate before score.
+  - Kill-switch per source must stop that Sensor without crashing Face.
+  - Do not store secrets in the repo.
+existing_stack:
+  language: TypeScript / Node 22 / React 19 / TanStack Start
+  repo: /workspace
+  datastore: Postgres (Neon in production, PGLite in preview)
+  deploy: Vercel + norfai.com
+out_of_scope:
+  - Invented companies or fabricated contacts
+  - Asiakastieto / Bisnode commercial ratings without a contract
+  - Työmarkkinatori retrieval API (requires KEHA credentials)
+  - PRH BIS v1 (superseded by YTJ v3)
+  - Bulk CRM gold-plating
+  - Mirroring foreign GitHub clients as a second truth
+layers:
+  sensors:
+    - src/lib/norr/sources (YTJ, Brreg, CVR, GLEIF, VIES, Finder, Kauppalehti, North Data, Proff, Asiakastieto cards, Wikidata, OSM, websites, TED, Hilma, Apify named Actors)
+    - src/lib/norr/sources/apify.ts
+    - src/lib/norr/sources/register-gate.ts
+  memory:
+    - src/lib/db.ts
+    - src/lib/norr/repo.ts
+    - migrations/0002_norr.sql
+  cortex:
+    - src/lib/norr/scoring.ts
+    - src/lib/norr/targeting
+    - src/lib/norr/engines.ts
+    - src/lib/norr/sources/register-plan.ts
+  nerve:
+    - src/lib/norr/pipeline.ts
+    - src/lib/norr/worker.ts
+    - src/lib/norr/runtime.ts
+  immune:
+    - src/lib/norr/immune
+    - src/lib/norr/scrape-gate.ts
+    - source_health.enabled kill-switch
+  face:
+    - src/routes/_app
+    - src/routes/_app/search/$runId.tsx
+    - src/lib/norr/face-diagnosis.ts
+    - src/routes/admin/data-network.tsx
+    - src/routes/tools
+awakening: live
+live_path: Sensor ytj (PRH YTJ v3 Nokia 0112038-9) → Memory companies/observations → Cortex scoreCompany → Face /sources and company page
+risks:
+  - YTJ schema-drift on registeredEntries / companySituations
+  - PRH iXBRL is called from runEnrich when a Finnish business ID exists. Empty filings stay UNAVAILABLE.
+  - publicHiringSearch is called when hiring is requested or the search is deep. Website keywords are hiring_indicated, not growth.
+  - Directory HTML (Finder, Kauppalehti) can change; official hydrate is the filter
+  - Kill-switch was previously written but not honoured by the pipeline

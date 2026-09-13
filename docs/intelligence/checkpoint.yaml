@@ -1,0 +1,16 @@
+schema_version: "2.0"
+project: Norf
+updated: "2026-09-13"
+status: search-speed-queue-hygiene
+next_action: Deploy so production worker cancels leftover jobs on finished runs
+blocked_on:
+  - production_build_mismatch
+notes: >
+  Production showed 507 jobs in flight while searches were completed.
+  Cause: jobs for finished runs kept running; score waited forever
+  (attempts decremented); enrich harvested 6 pages then enqueued crawl
+  again; Finder called twice; LinkedIn always. Face counted every
+  queued job including corpses. 21/100 emails because infer+score never
+  ran behind the queue. This build sweeps finished-run jobs, skips crawl
+  when a mailbox exists, infers MX-backed emails during enrich, and
+  shortens harvest.

@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Norf | Find Companies by Revenue, Growth and Digital Signals",
+      "hasCanvas": false,
+      "bodyTextLen": 3780,
+      "bodyTextHash": "7f0e408af9347a1728ba5d29245e900b135539259c117cbbd9e91e4c7531266c",
+      "bodyTextPrefix": "Käyttö Hinnasto Työkalut UKK Tietoa FI EN SV Hae yrityksiä YRITY",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/ui-home.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Norf | Find Companies by Revenue, Growth and Digital Signals",
+      "hasCanvas": false,
+      "bodyTextLen": 3690,
+      "bodyTextHash": "a549a176aa819ac05933b01ae828473eda416ab9d097c3a7fac3e694eaa347d2",
+      "bodyTextPrefix": "Find companies COMPANY SEARCH FOR PEOPLE WHO SELL Find the compa",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/ui-home-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/ui-home.json"
+}

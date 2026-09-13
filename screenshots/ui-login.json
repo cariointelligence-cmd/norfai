@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/login",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Sign in | Norf",
+      "hasCanvas": false,
+      "bodyTextLen": 239,
+      "bodyTextHash": "b6c155995cb9f8b37e612b045aa66c60c36d7e552820159ebae5015212869183",
+      "bodyTextPrefix": "FIND COMPANIES WORTH CONTACTING Signed-in workspaces query offic",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/ui-login.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Sign in | Norf",
+      "hasCanvas": false,
+      "bodyTextLen": 239,
+      "bodyTextHash": "b6c155995cb9f8b37e612b045aa66c60c36d7e552820159ebae5015212869183",
+      "bodyTextPrefix": "FIND COMPANIES WORTH CONTACTING Signed-in workspaces query offic",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/ui-login-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/ui-login.json"
+}

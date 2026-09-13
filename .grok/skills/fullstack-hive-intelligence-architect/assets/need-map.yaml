@@ -1,0 +1,11 @@
+schema_version: "2.1"
+project: ""
+needs: []
+# - id: company-legal-status
+#   user_question: ""
+#   decision_supported: ""
+#   required_fields: []
+#   freshness_target: ""
+#   acceptable_unknown: []
+#   license_or_auth_required: false
+#   candidate_families: []

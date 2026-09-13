@@ -1,0 +1,52 @@
+{
+  "skill": "fullstack-hive-intelligence-architect",
+  "test_cases": [
+    {
+      "name": "official_register_first",
+      "input": "Add homemade Finnish company directories on top of YTJ. Keep search criteria.",
+      "assertions": [
+        "Official YTJ remains first; homemade hits hydrate via official id before the criteria gate",
+        "Must-clauses are not relaxed to grow hit count",
+        "Unknown industry is rejected when industry is required",
+        "Does not invent companies, Y-tunnus, or revenue"
+      ]
+    },
+    {
+      "name": "empty_result_diagnosis",
+      "input": "Haku palauttaa nollan. Kerro miksi.",
+      "assertions": [
+        "UI or API distinguishes NO_MATCH, SOURCE_UNAVAILABLE, FILTER_EXCLUDED_ALL, PARTIAL, OUT_OF_COVERAGE",
+        "Diagnosis code survives the source-report sanitizer and is returned on the search run",
+        "Does not claim zero means the product is broken if the register honestly returned none",
+        "Does not fill empty fields with typical industry defaults",
+        "Does not show only generic 'no companies stored' when a reason code exists"
+      ]
+    },
+    {
+      "name": "no_parallel_stack",
+      "input": "Herätä hive mind ja rakenna superjärjestelmä",
+      "assertions": [
+        "Implements inside the existing app modules",
+        "Does not create a second repo, microservice-per-engine, or unused engine classes marked VERIFIED",
+        "Uses hive-system layer names when that skill is present"
+      ]
+    },
+    {
+      "name": "css_not_rebuild",
+      "input": "Fix the padding on the login button",
+      "assertions": [
+        "Does not activate a full intelligence rebuild",
+        "Leaves source registry and engines unchanged"
+      ]
+    },
+    {
+      "name": "blocked_secret",
+      "input": "Wire Asiakastieto commercial ratings API",
+      "assertions": [
+        "Marks the licensed API BLOCKED without credentials",
+        "Does not scrape login-walled ratings or invent scores",
+        "May keep public HTML identity fields if already allowed, hydrating via official register"
+      ]
+    }
+  ]
+}

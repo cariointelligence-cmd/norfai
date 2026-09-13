@@ -1,0 +1,40 @@
+schema_version: "2.1"
+project: ""
+audited_at: ""
+environment: ""
+purpose: ""
+users: []
+use_cases: []
+stack:
+  frontend: ""
+  backend: ""
+  database: ""
+  search_index: ""
+  cache: ""
+  auth: ""
+  workers: ""
+  timers: ""
+  hosting: ""
+tenancy:
+  model: ""
+  roles: []
+query_trace:
+  sample_query: ""
+  hops: []
+  ui_matches_backend: null
+consistency:
+  cache_vs_db: UNKNOWN
+  index_vs_db: UNKNOWN
+ai:
+  models: []
+  estimated_cost_notes: ""
+status_summary:
+  IMPLEMENTED: []
+  VERIFIED: []
+  PARTIAL: []
+  BROKEN: []
+  MOCK: []
+  MISSING: []
+  BLOCKED: []
+  UNUSED: []
+next_priority: ""

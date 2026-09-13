@@ -1,0 +1,53 @@
+schema_version: "2.1"
+project: ""
+counts:
+  DISCOVERED: 0
+  DOCUMENTED: 0
+  IMPLEMENTED: 0
+  VERIFIED: 0
+  HEALTHY: 0
+  DEGRADED: 0
+  BLOCKED: 0
+  RETIRED: 0
+sources: []
+# - source_id: prh-bis
+#   name: PRH BIS API
+#   source_family: official-register
+#   organization: ""
+#   dataset: ""
+#   interface: rest
+#   base_url: ""
+#   documentation_url: ""
+#   supported_queries: []
+#   geographic_coverage: ["FI"]
+#   entity_types: ["organization"]
+#   available_fields: []
+#   authentication_type: none
+#   secret_reference: ""
+#   license_or_usage_constraints: ""
+#   rate_limits: ""
+#   pagination_strategy: ""
+#   incremental_sync_strategy: ""
+#   freshness_target: ""
+#   last_success_at: ""
+#   last_error_at: ""
+#   health_state: UNKNOWN
+#   parser_version: "1"
+#   estimated_cost: ""
+#   observed_latency: ""
+#   provenance_policy: retain-url-and-timestamp
+#   derived_from: ""
+#   independence_group: ""
+#   value_demonstrated: false
+#   status: discovered
+repos: []
+# - repo: org/name
+#   license: ""
+#   problem: ""
+#   decision: reject
+#   reason: ""
+independence_groups: []
+# - group_id: fi-business-register
+#   primary_dataset: ""
+#   members: []
+#   note: republishers are not independent confirmations

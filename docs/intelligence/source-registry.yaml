@@ -1,0 +1,198 @@
+schema_version: "2.0"
+project: Norf
+counts:
+  DISCOVERED: 29
+  DOCUMENTED: 29
+  IMPLEMENTED: 23
+  VERIFIED: 8
+  HEALTHY: 0
+  DEGRADED: 0
+  BLOCKED: 3
+  RETIRED: 2
+sources:
+  - source_id: ytj
+    name: PRH YTJ v3
+    source_family: official-register
+    base_url: https://avoindata.prh.fi/opendata-ytj-api/v3/companies
+    documentation_url: https://avoindata.prh.fi/en
+    supported_queries: [businessId, mainBusinessLine, name, location]
+    geographic_coverage: [FI]
+    entity_types: [organization]
+    available_fields: [name, businessId, industryCode, municipality, legalForm, registeredEntries]
+    authentication_type: none
+    secret_reference: ""
+    license_or_usage_constraints: CC-BY-4.0
+    rate_limits: "polite; page size 100"
+    pagination_strategy: page/size ignored-size-always-100
+    incremental_sync_strategy: slice-cursor qi/page
+    freshness_target: 1d
+    last_success_at: ""
+    last_error_at: ""
+    health_state: UNKNOWN
+    parser_version: ytj_v3
+    estimated_cost: "0"
+    observed_latency: ""
+    provenance_policy: retain-url-and-timestamp
+    status: verified
+    lifecycle: production
+  - source_id: proff
+    name: Proff.fi public directory
+    source_family: directory-html
+    base_url: https://www.proff.fi/
+    documentation_url: https://www.proff.fi/robots.txt
+    supported_queries: [name, industry_label]
+    geographic_coverage: [FI]
+    entity_types: [organization]
+    available_fields: [name, businessId]
+    authentication_type: none
+    secret_reference: ""
+    license_or_usage_constraints: public HTML; robots forbid /segmentointi?* and paginated qs
+    rate_limits: first-page only
+    pagination_strategy: none
+    incremental_sync_strategy: none
+    freshness_target: 1d
+    last_success_at: ""
+    last_error_at: ""
+    health_state: UNKNOWN
+    parser_version: "1"
+    estimated_cost: "0"
+    observed_latency: ""
+    provenance_policy: hydrate-via-ytj
+    status: implemented
+    lifecycle: trial
+  - source_id: asiakastieto
+    name: Asiakastieto public company cards
+    source_family: directory-html
+    base_url: https://www.asiakastieto.fi/yritykset
+    documentation_url: https://www.asiakastieto.fi/
+    supported_queries: [name]
+    geographic_coverage: [FI]
+    entity_types: [organization]
+    available_fields: [name, businessId]
+    authentication_type: none
+    secret_reference: ""
+    license_or_usage_constraints: public card URLs only; commercial REST unwired
+    rate_limits: via web search
+    pagination_strategy: none
+    incremental_sync_strategy: none
+    freshness_target: 1d
+    last_success_at: ""
+    last_error_at: ""
+    health_state: UNKNOWN
+    parser_version: "1"
+    estimated_cost: "0"
+    observed_latency: ""
+    provenance_policy: hydrate-via-ytj
+    status: implemented
+    lifecycle: trial
+  - source_id: finder
+    name: Fonecta Finder
+    source_family: directory-html
+    base_url: https://www.finder.fi/
+    documentation_url: https://www.finder.fi/
+    supported_queries: [name, keyword]
+    geographic_coverage: [FI]
+    entity_types: [organization]
+    available_fields: [name, businessId, municipality]
+    authentication_type: none
+    secret_reference: ""
+    license_or_usage_constraints: public HTML
+    rate_limits: polite
+    pagination_strategy: search pages
+    incremental_sync_strategy: none
+    freshness_target: 1d
+    last_success_at: ""
+    last_error_at: ""
+    health_state: UNKNOWN
+    parser_version: "1"
+    estimated_cost: "0"
+    observed_latency: ""
+    provenance_policy: hydrate-via-ytj
+    status: implemented
+    lifecycle: production
+  - source_id: wikidata
+    name: Wikidata SPARQL
+    source_family: open-knowledge
+    base_url: https://query.wikidata.org/sparql
+    documentation_url: https://www.wikidata.org/
+    supported_queries: [name]
+    geographic_coverage: [FI, SE, NO, DK, GB]
+    entity_types: [organization]
+    available_fields: [name, vatId, lei, website]
+    authentication_type: none
+    secret_reference: ""
+    license_or_usage_constraints: CC0
+    rate_limits: SPARQL etiquette
+    pagination_strategy: LIMIT
+    incremental_sync_strategy: none
+    freshness_target: 7d
+    last_success_at: ""
+    last_error_at: ""
+    health_state: UNKNOWN
+    parser_version: p3608
+    estimated_cost: "0"
+    observed_latency: ""
+    provenance_policy: hydrate-via-official
+    status: implemented
+    lifecycle: trial
+  - source_id: apify
+    name: Apify collection platform
+    source_family: licensed-api
+    base_url: https://api.apify.com/v2
+    documentation_url: https://docs.apify.com/api/v2
+    supported_queries: [approved-actor, approved-task, dataset-items, health]
+    geographic_coverage: [FI, SE, NO, DK, EU]
+    entity_types: [organization]
+    available_fields: [name, businessId, website, email, phone]
+    authentication_type: bearer
+    secret_reference: APIFY_API
+    license_or_usage_constraints: Apify platform. Named Actors only. Never a register of record. Gap-fill after free stack.
+    rate_limits: "hourly run budget 24; concurrency 2; circuit after 5 failures; max 3 Finder rows; Maps max 1 place"
+    pagination_strategy: dataset limit/offset max 5 pages
+    incremental_sync_strategy: input-hash cache
+    freshness_target: 24h
+    last_success_at: ""
+    last_error_at: ""
+    health_state: UNKNOWN
+    parser_version: apify_platform_v1
+    estimated_cost: "paid per approved run"
+    observed_latency: ""
+    provenance_policy: retain-connector-and-timestamp; official-wins-conflicts
+    status: implemented
+    lifecycle: trial
+  - source_id: prh-bis-v1
+    name: PRH BIS v1
+    source_family: official-register
+    base_url: https://avoindata.prh.fi/bis/v1
+    documentation_url: https://avoindata.prh.fi/en
+    supported_queries: []
+    geographic_coverage: [FI]
+    entity_types: [organization]
+    available_fields: []
+    authentication_type: none
+    secret_reference: ""
+    license_or_usage_constraints: CC-BY-4.0
+    rate_limits: ""
+    pagination_strategy: ""
+    incremental_sync_strategy: ""
+    freshness_target: 1d
+    last_success_at: ""
+    last_error_at: ""
+    health_state: UNKNOWN
+    parser_version: "0"
+    estimated_cost: "0"
+    observed_latency: ""
+    provenance_policy: none
+    status: rejected
+    lifecycle: retired
+repos:
+  - repo: pexxi/prh-ytj
+    license: MIT
+    problem: Parallel YTJ v3 client
+    decision: reject
+    reason: One contract, one implementation (src/lib/norr/sources/ytj.ts)
+  - repo: Miksus/finnish_business_portal
+    license: MIT
+    problem: BIS v1 Python client
+    decision: reject
+    reason: Superseded by homemade YTJ v3

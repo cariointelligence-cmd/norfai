@@ -1,0 +1,17 @@
+node_modules/
+.vercel/
+dist/
+.output/
+coverage/
+tmp/
+artifacts/
+*.log
+.env
+.env.*
+!.env.example
+.grok/app-env.json
+attachments/
+engines/bin/
+engines/target/
+__pycache__/
+.DS_Store

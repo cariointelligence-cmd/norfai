@@ -1,0 +1,35 @@
+schema_version: "2.1"
+project: ""
+environment: ""
+dataset_size: 0
+held_out_size: 0
+baseline_ref: ""
+cases: []
+# - id: E001
+#   type: known-hit | same-name-other-entity | missing | conflict | zero | slow-source | pagination | language | tenant-isolation | split-entity | stale | cancel | duplicate-delivery
+#   query: ""
+#   tenant_id: ""
+#   must: []
+#   expected_entity_ids: []
+#   forbidden_entity_ids: []
+#   expected_reason_code: ""
+#   notes: ""
+metrics_last_run:
+  ran_at: ""
+  definitions_ref: ""
+  precision_at_k: null
+  recall_on_labeled_dataset: null
+  field_accuracy: null
+  incorrect_merge_rate: null
+  duplicate_rate: null
+  evidence_coverage: null
+  freshness_compliance: null
+  successful_task_rate: null
+  p50_latency: null
+  p95_latency: null
+  cost_per_successful_task: null
+  n: null
+  preliminary: true
+ablations: []
+# - name: without-new-source
+#   result: ""

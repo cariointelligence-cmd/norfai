@@ -1,0 +1,20 @@
+schema_version: "2.1"
+source_id: ""
+family: rest-json
+# rest-json | graphql | rss-atom | dump | bulk | html | pdf
+supported_queries: []
+supported_fields: []
+empty_vs_error: ""
+login_wall_detection: ""
+pagination: ""
+resume_checkpoint: ""
+field_drop_detection: ""
+disable_path: ""
+tests:
+  shape: PENDING
+  pagination_resume: PENDING
+  empty_not_error: PENDING
+  http200_trap: PENDING
+  provenance: PENDING
+  disable: PENDING
+status: documented

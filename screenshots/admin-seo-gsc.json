@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/admin/seo",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "SEO and GEO",
+      "hasCanvas": false,
+      "bodyTextLen": 8,
+      "bodyTextHash": "ba3bbbe10d8bef66441c88536ce7b8e724e2829b59a3da658654f4961cd61ae5",
+      "bodyTextPrefix": "Loading…",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/admin-seo-gsc.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "SEO and GEO",
+      "hasCanvas": false,
+      "bodyTextLen": 8,
+      "bodyTextHash": "ba3bbbe10d8bef66441c88536ce7b8e724e2829b59a3da658654f4961cd61ae5",
+      "bodyTextPrefix": "Loading…",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/admin-seo-gsc-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/admin-seo-gsc.json"
+}

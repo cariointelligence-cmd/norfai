@@ -1,0 +1,532 @@
+version: 1
+project: Norf
+updated: 2026-09-12
+sources:
+  - id: ytj
+    type: api
+    locator: https://avoindata.prh.fi/opendata-ytj-api/v3/companies
+    license: CC-BY-4.0
+    terms_url: https://www.prh.fi/en/presentation_and_duties/uutislistaus/announcements/2024/open-data-revamped.html
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: high
+    reliability_note: Official Finnish Trade Register / YTJ. Page size 100. 5-digit TOL.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/ytj.ts
+    notes: Official first. mainBusinessLine is substring so always 5-digit children. Maps registeredEntries (VAT, employer, prepayment).
+  - id: apify
+    type: api
+    locator: https://api.apify.com/v2
+    license: Apify platform terms
+    terms_url: https://docs.apify.com/platform
+    auth: bearer
+    secret_env: APIFY_API
+    freshness:
+      mode: on-demand
+      interval: 6h
+    schema_ref: hive/contracts/company.yaml
+    reliability: low
+    reliability_note: Additional collection layer only. Never a register of record. Official YTJ wins conflicts. Named Actors: Finder.fi gap-fill, Finder fallback on technical failure, Google Maps last-resort website.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/apify.ts
+    notes: Platform adapter. APIFY_TOOLS = finder-fi-scraper, finnish-business-finder-scraper, crawler-google-places. Cost-capped. Kill-switch source_id=apify.
+  - id: ytj-postcodes
+    type: api
+    locator: https://avoindata.prh.fi/opendata-ytj-api/v3/post_codes?lang=1
+    license: CC-BY-4.0
+    terms_url: https://avoindata.prh.fi/en
+    auth: none
+    freshness:
+      mode: poll
+      interval: 7d
+    schema_ref: hive/contracts/company.yaml
+    reliability: high
+    reliability_note: Official post code / municipality list. Used for health and location quality, not company invention.
+    layer: sensors
+    status: accepted
+    code_origin: src/lib/norr/sources/ytj.ts
+    notes: Live 200 JSON. Folded into ytj Sensor, not a parallel company source.
+  - id: prh-xbrl
+    type: api
+    locator: https://avoindata.prh.fi/opendata-xbrl-api/v3/financials
+    license: CC-BY-4.0
+    terms_url: https://avoindata.prh.fi/en
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: medium
+    reliability_note: Empty financials stay UNAVAILABLE. Nokia returns totalResults 0.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/homemade.ts
+    notes: Honest empty. Never invent revenue.
+  - id: prh-krek
+    type: api
+    locator: https://avoindata.prh.fi/en/krek/swagger-ui
+    license: CC-BY-4.0
+    terms_url: https://avoindata.prh.fi/en
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: medium
+    reliability_note: Registered notifications UI exists. Working JSON path not confirmed (404 on guessed URLs).
+    layer: sensors
+    status: candidate
+    code_origin: null
+    notes: Do not wire a 404 adapter. Revisit when swagger exposes a live path.
+  - id: prh-bis-v1
+    type: api
+    locator: https://avoindata.prh.fi/bis/v1
+    license: CC-BY-4.0
+    terms_url: https://avoindata.prh.fi/en
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: low
+    reliability_note: Superseded by YTJ v3. Adapter exists but is unused.
+    layer: sensors
+    status: rejected
+    code_origin: src/lib/norr/sources/prh-bis.ts
+    notes: Rejected as a parallel truth. YTJ v3 is the official FI register.
+  - id: brreg
+    type: api
+    locator: https://data.brreg.no/enhetsregisteret/api/enheter
+    license: NLOD-2.0
+    terms_url: https://data.brreg.no/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: high
+    reliability_note: Official Norwegian register. NACE search plus orgnr hydrate.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/open.ts
+    notes: Industry via naeringskode. Municipality filtered client-side as poststed.
+  - id: cvr
+    type: api
+    locator: https://cvrapi.dk/api
+    license: CVR-open
+    terms_url: https://cvrapi.dk/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: medium
+    reliability_note: Erhvervsstyrelsen via cvrapi.dk. User-Agent required.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/open.ts
+    notes: Name search only unless a distinctive company name is in criteria.
+  - id: gleif
+    type: api
+    locator: https://api.gleif.org/api/v1/lei-records
+    license: GLEIF-attribution
+    terms_url: https://www.gleif.org/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: high
+    reliability_note: Official LEI. Name search only for distinctive company names.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/open.ts
+    notes: Never query GLEIF with an industry label like rakentaminen.
+  - id: vies
+    type: api
+    locator: https://ec.europa.eu/taxation_customs/vies/
+    license: EC-VIES
+    terms_url: https://ec.europa.eu/taxation_customs/vies/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 7d
+    schema_ref: hive/contracts/company.yaml
+    reliability: high
+    reliability_note: VAT validation only.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/open.ts
+    notes: Does not discover companies.
+  - id: ted
+    type: api
+    locator: https://api.ted.europa.eu/v3
+    license: EU-OP
+    terms_url: https://ted.europa.eu/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: high
+    reliability_note: EU Publications Office procurement notices.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/open.ts
+    notes: Signal, not a company inventor.
+  - id: hilma
+    type: api
+    locator: https://www.hankintailmoitukset.fi/
+    license: Hansel-open
+    terms_url: https://www.hankintailmoitukset.fi/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: high
+    reliability_note: Finnish public procurement notices.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/open.ts
+    notes: Signal.
+  - id: wikidata
+    type: api
+    locator: https://query.wikidata.org/sparql
+    license: CC0
+    terms_url: https://www.wikidata.org/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 7d
+    schema_ref: hive/contracts/company.yaml
+    reliability: medium
+    reliability_note: Supporting entity resolution only.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/open.ts
+    notes: Never sole source for contacts. Distinctive names only. P3608 EU VAT maps to Y-tunnus; P3228 STEL is not a Finnish id.
+  - id: nominatim
+    type: api
+    locator: https://nominatim.openstreetmap.org/
+    license: ODbL-1.0
+    terms_url: https://operations.osmfoundation.org/policies/nominatim/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 7d
+    schema_ref: hive/contracts/company.yaml
+    reliability: medium
+    reliability_note: 1 req/s usage policy.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/open.ts
+    notes: Geocode and company POI search. Names hydrate via YTJ before the industry gate.
+  - id: finder
+    type: docs
+    locator: https://www.finder.fi/
+    license: public-html
+    terms_url: https://www.finder.fi/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: medium
+    reliability_note: Public Finder/Fonecta HTML. Y-tunnus extracted then hydrated via YTJ.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/finder.ts
+    notes: Category in URL is not TOL. robots.txt honoured.
+  - id: kauppalehti
+    type: docs
+    locator: https://www.kauppalehti.fi/
+    license: public-html
+    terms_url: https://www.kauppalehti.fi/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: medium
+    reliability_note: Public company cards and JSON-LD.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/kauppalehti.ts
+    notes: Hydrate via Y-tunnus.
+  - id: northdata
+    type: docs
+    locator: https://www.northdata.com/
+    license: public-html
+    terms_url: https://www.northdata.com/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: medium
+    reliability_note: Public cards / JSON-LD. Officers and register facts.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/northdata.ts
+    notes: No API key.
+  - id: proff
+    type: docs
+    locator: https://www.proff.fi/
+    license: public-html
+    terms_url: https://www.proff.fi/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: medium
+    reliability_note: Enento/Asiakastieto public HTML. robots.txt forbids /segmentointi?* and paginated query strings.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/proff.ts
+    notes: First-page name and industry search only. Y-tunnus extracted, YTJ hydrates. Not a credit rating.
+  - id: asiakastieto
+    type: docs
+    locator: https://www.asiakastieto.fi/yritykset
+    license: public-html
+    terms_url: https://www.asiakastieto.fi/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: medium
+    reliability_note: Public company-card URLs via web search. 8-digit path is Y-tunnus without hyphen.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/proff.ts
+    notes: Commercial REST report API stays optional/unwired. Directory hits hydrate via YTJ.
+  - id: website
+    type: docs
+    locator: company-controlled-http
+    license: public-html
+    terms_url: ""
+    auth: none
+    freshness:
+      mode: poll
+      interval: 7d
+    schema_ref: hive/contracts/company.yaml
+    reliability: high
+    reliability_note: robots.txt honoured. First-party pages for people and contacts.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/webdiscover.ts
+    notes: Scrape is a hard gate before score.
+  - id: duckduckgo
+    type: docs
+    locator: https://html.duckduckgo.com/html/
+    license: public-html
+    terms_url: https://duckduckgo.com/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1h
+    schema_ref: hive/contracts/company.yaml
+    reliability: medium
+    reliability_note: HTML search. Empty HTML is empty list, never invented hits.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/webdiscover.ts
+    notes: Parallel with Bing/Brave/Google gbv=1 in websearch.ts.
+  - id: opencorporates
+    type: docs
+    locator: https://opencorporates.com/
+    license: public-html
+    terms_url: https://opencorporates.com/legal/terms
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: medium
+    reliability_note: Public HTML / unauthenticated JSON. Name seeds only.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/homemade.ts
+    notes: Optional OPENCORPORATES_API_KEY is an upgrade, not required.
+  - id: companies-house
+    type: docs
+    locator: https://find-and-update.company-information.service.gov.uk/
+    license: OGL-3.0
+    terms_url: https://www.gov.uk/government/publications/companies-house-data-products/companies-house-data-products
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: high
+    reliability_note: UK public search. Name seeds only unless API key.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/homemade.ts
+    notes: Optional COMPANIES_HOUSE_API_KEY.
+  - id: bolagsverket
+    type: docs
+    locator: https://www.allabolag.se/
+    license: public-html
+    terms_url: https://www.allabolag.se/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: medium
+    reliability_note: Allabolag public cards. Bolagsverket has no bulk open API without a contract.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/homemade.ts
+    notes: Honest naming in Face. Not a Bolagsverket dump.
+  - id: duunitori
+    type: docs
+    locator: https://duunitori.fi/
+    license: public-html
+    terms_url: https://duunitori.fi/
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: medium
+    reliability_note: Public job-board snippets via web search. Not a job-board API contract.
+    layer: sensors
+    status: wired
+    code_origin: src/lib/norr/sources/homemade.ts
+    notes: Hiring signal only.
+  - id: tyomarkkinatori-api
+    type: api
+    locator: https://tyomarkkinatori.fi/en/instructions-and-support/interfaces/interfaces-for-job-postings
+    license: KEHA-terms
+    terms_url: https://tyomarkkinatori.fi/en/instructions-and-support/interfaces/interfaces-for-job-postings
+    auth: key
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: high
+    reliability_note: Official job postings API requires KEHA activation and business ID credentials.
+    layer: sensors
+    status: rejected
+    code_origin: null
+    notes: No credentials. Public HTML snippets remain via duunitori Sensor.
+  - id: avoimuusrekisteri
+    type: api
+    locator: https://www.avoindata.fi/data/en_GB/apiset/avoimuusrekisterin-tietoaineisto
+    license: CC-BY-4.0
+    terms_url: https://www.avoimuusrekisteri.fi/en
+    auth: none
+    freshness:
+      mode: poll
+      interval: 7d
+    schema_ref: hive/contracts/company.yaml
+    reliability: medium
+    reliability_note: Finnish Transparency Register. Lobbying, not a company register.
+    layer: sensors
+    status: candidate
+    code_origin: null
+    notes: Relevance below 4 for ICP discovery. Keep as candidate.
+  - id: ytj-all-companies-zip
+    type: dataset
+    locator: https://avoindata.prh.fi/opendata-ytj-api/v3/all_companies
+    license: CC-BY-4.0
+    terms_url: https://avoindata.prh.fi/en
+    auth: none
+    freshness:
+      mode: poll
+      interval: 1d
+    schema_ref: hive/contracts/company.yaml
+    reliability: high
+    reliability_note: Official bulk ZIP of valid companies. ~96MB. Too heavy for request-time discover.
+    layer: memory
+    status: candidate
+    code_origin: null
+    notes: Future local cache. Do not download per search.
+  - id: stripe
+    type: connector
+    locator: stripe
+    license: Stripe-ToS
+    terms_url: https://stripe.com/legal
+    auth: key
+    freshness:
+      mode: push
+      interval: 0s
+    schema_ref: hive/contracts/company.yaml
+    reliability: high
+    reliability_note: Billing only. Not a company data Sensor.
+    layer: face
+    status: wired
+    code_origin: src/lib/norr/stripe-webhook.ts
+    notes: Connected service. Kill-switch does not apply.
+  - id: finnish-business-portal
+    type: repo
+    locator: https://github.com/Miksus/finnish_business_portal
+    license: MIT
+    terms_url: https://github.com/Miksus/finnish_business_portal/blob/master/LICENSE
+    auth: none
+    freshness:
+      mode: poll
+      interval: 7d
+    schema_ref: null
+    reliability: low
+    reliability_note: Python BIS v1 client. We already have homemade YTJ v3.
+    layer: sensors
+    status: rejected
+    code_origin: null
+    notes: Do not vendor. Attribution only if a snippet is copied later.
+  - id: pexxi-prh-ytj
+    type: repo
+    locator: https://github.com/pexxi/prh-ytj
+    license: MIT
+    terms_url: https://github.com/pexxi/prh-ytj
+    auth: none
+    freshness:
+      mode: poll
+      interval: 7d
+    schema_ref: null
+    reliability: medium
+    reliability_note: TS YTJ v3 client. Parallel implementation, not adopted.
+    layer: sensors
+    status: rejected
+    code_origin: null
+    notes: One contract, one implementation. Ours is src/lib/norr/sources/ytj.ts.
+queries:
+  - query: PRH YTJ open data API v3 companies avoindata.prh.fi
+    where: web
+    date: 2026-09-12
+    kept: [ytj, ytj-postcodes, prh-xbrl, ytj-all-companies-zip]
+    rejected: [prh-bis-v1]
+  - query: API Registered notifications PRH krek swagger
+    where: web
+    date: 2026-09-12
+    kept: [prh-krek]
+    rejected: []
+  - query: Työmarkkinatori API avoin data työpaikat
+    where: web
+    date: 2026-09-12
+    kept: []
+    rejected: [tyomarkkinatori-api]
+  - query: avoindata.fi yritykset rekisteri Transparency Register
+    where: catalog
+    date: 2026-09-12
+    kept: [avoimuusrekisteri]
+    rejected: []
+  - query: site:github.com YTJ PRH opendata client MIT
+    where: github
+    date: 2026-09-12
+    kept: []
+    rejected: [finnish-business-portal, pexxi-prh-ytj]
+  - query: site:proff.fi Y-tunnus toimialahaku robots.txt segmentointi
+    where: web
+    date: 2026-09-12
+    kept: [proff, asiakastieto]
+    rejected: [proff-segmentointi]

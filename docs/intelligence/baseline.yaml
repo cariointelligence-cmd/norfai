@@ -1,0 +1,58 @@
+schema_version: "2.0"
+project: Norf
+audited_at: "2026-09-12"
+environment: preview
+purpose: >
+  Nordic B2B company intelligence. Discover real companies from official
+  registers, enrich from public pages, keep field-level provenance, score
+  against user criteria. Never invent a company, person, email, phone or statistic.
+users:
+  - Finnish and Nordic B2B sellers
+use_cases:
+  - Find Finnish industrial companies by 5-digit TOL and municipality
+  - Skip previously shown companies when skip-seen is on
+  - Fill a requested count from official register then homemade directories
+stack:
+  frontend: React 19 / TanStack Start
+  backend: Node 22 / TanStack Start server functions
+  database: Postgres (Neon prod, PGLite preview)
+  auth: Better Auth, per-user rows
+  workers: src/lib/norr/worker.ts + jobs table
+  hosting: Vercel + norfai.com
+tenancy:
+  model: user_id on companies, jobs, observations
+  roles: [user, admin]
+query_trace:
+  sample_query: "Tampere talonrakentaminen 41200, 100 firms, skip seen"
+  hops:
+    - { name: "UI criteria", status: VERIFIED, evidence: "src/components/criteria-builder.tsx" }
+    - { name: "YTJ v3 discover 5-digit + page 100", status: VERIFIED, evidence: "src/lib/norr/sources/ytj.ts ytjDiscover" }
+    - { name: "homemade directories + hydrate", status: VERIFIED, evidence: "src/lib/norr/sources/directories.ts" }
+    - { name: "criteria gate", status: VERIFIED, evidence: "src/lib/norr/sources/register-gate.ts acceptDiscovered" }
+    - { name: "Face empty-result diagnosis", status: IMPLEMENTED, evidence: "src/lib/norr/face-diagnosis.ts + search $runId" }
+    - { name: "scrape gate before score", status: VERIFIED, evidence: "src/lib/norr/scrape-gate.ts" }
+ai:
+  models: []
+  estimated_cost_notes: "Deterministic register path. Grok web search is capped last resort."
+status_summary:
+  IMPLEMENTED:
+    - register query plan
+    - homemade routing
+    - proff/asiakastieto/wikidata/osm collectors
+    - official name hydrate
+    - Face empty-result codes on search run
+  VERIFIED:
+    - YTJ 5-digit industry
+    - acceptDiscovered industry-unknown reject
+    - Proff robots path rules
+    - VAT P3608 → Y-tunnus
+  PARTIAL:
+    - Face empty-result codes (unit + sanitizer; live UI not measured this slice)
+  BROKEN: []
+  MOCK: []
+  MISSING: []
+  BLOCKED:
+    - Työmarkkinatori API (KEHA credentials)
+    - Asiakastieto commercial REST
+    - PRH krek JSON path
+next_priority: "Keep YTJ pagination filling the requested count. Homemade only after official ingest in the same slice."

@@ -1,0 +1,78 @@
+schema_version: "2.0"
+project: Norf
+environment: preview
+cases:
+  - id: E001
+    type: known-hit
+    query: "YTJ Nokia 0112038-9"
+    tenant_id: "eval"
+    must: [businessId=0112038-9, country=FI]
+    expected_entity_ids: ["0112038-9"]
+    forbidden_entity_ids: []
+    expected_reason_code: ""
+    notes: "Official register smoke. Revenue must stay UNKNOWN if XBRL empty."
+  - id: E002
+    type: pagination
+    query: "FI industry 41200 municipality Tampere max 100"
+    tenant_id: "eval"
+    must: [industry=41200]
+    expected_entity_ids: []
+    forbidden_entity_ids: []
+    expected_reason_code: "PARTIAL"
+    notes: "YTJ page size 100. Slice continues. No substring 62/73."
+  - id: E003
+    type: zero
+    query: "keyword yritys"
+    tenant_id: "eval"
+    must: []
+    expected_entity_ids: []
+    forbidden_entity_ids: []
+    expected_reason_code: "NO_MATCH"
+    notes: "Generic query never sent to GLEIF or directories."
+  - id: E004
+    type: missing
+    query: "Finder hit without YTJ hydrate, industry required"
+    tenant_id: "eval"
+    must: [industry=41200]
+    expected_entity_ids: []
+    forbidden_entity_ids: []
+    expected_reason_code: "FILTER_EXCLUDED_ALL"
+    notes: "acceptDiscovered rejects industry unknown."
+  - id: E005
+    type: same-name-other-entity
+    query: "Name hydrate Consti vs Nokia"
+    tenant_id: "eval"
+    must: []
+    expected_entity_ids: []
+    forbidden_entity_ids: ["0112038-9"]
+    expected_reason_code: ""
+    notes: "namesCompatible must fail Consti vs Nokia Oyj."
+  - id: E006
+    type: zero
+    query: "Completed search with zero companies, register_plan note present"
+    tenant_id: "eval"
+    must: []
+    expected_entity_ids: []
+    forbidden_entity_ids: []
+    expected_reason_code: "NO_MATCH"
+    notes: "Face must render diagnosis title, not generic no companies stored."
+  - id: E006
+    type: language
+    query: "TOL 41200 vs NACE 41.200"
+    tenant_id: "eval"
+    must: [industry=41200]
+    expected_entity_ids: []
+    forbidden_entity_ids: []
+    expected_reason_code: ""
+    notes: "industryMatches digits-only. naceFromTol 41200 → 41.200."
+metrics_last_run:
+  ran_at: "2026-09-12"
+  precision: null
+  recall: null
+  field_accuracy: null
+  false_merges: null
+  duplicates: null
+  evidence_coverage: null
+  p50_ms: null
+  p95_ms: null
+  cost_per_success: null

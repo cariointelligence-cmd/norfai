@@ -1,0 +1,333 @@
+schema_version: "1.0"
+project: Norf
+title: NORFAI AUDIT FIX REGISTER
+updated: "2026-09-13"
+source: ORIGINAL TOTAL AUDIT + AUDIT ADDENDUM
+status_vocab: [OPEN, IN_PROGRESS, IMPLEMENTED, TEST_FAILED, VERIFIED, BLOCKED]
+
+items:
+  - id: P0-01
+    priority: P0
+    problem: Fake numeric fillers (website 42, SEO 30, digital 28, match 50/40, sourceReliability 50)
+    root_cause: analyzeWebsite and matchTarget seed mid-scale defaults so Face shows a precise score without evidence
+    affected_files: [src/lib/norr/targeting/website.ts, src/lib/norr/targeting/scores.ts, src/lib/norr/scoring.ts, src/lib/norr/pipeline.ts, src/components/intel.tsx]
+    affected_runtime_paths: [runScore, IntelligencePanel, ScoreBits]
+    proposed_implementation: Score only after evaluation. Null / NOT_EVALUATED when inputs missing. Start website/SEO/digital from 0 using observed features.
+    dependencies: []
+    tests_required: [targeting.test.ts, audit-remediation.test.ts]
+    status: IMPLEMENTED
+
+  - id: P0-02
+    priority: P0
+    problem: Unknown revenue satisfies a requested revenue filter (unknown:allow default)
+    root_cause: parser always sets unknown allow; rangeCheck treats unknown as not-missed
+    affected_files: [src/lib/norr/targeting/parser.ts, src/lib/norr/targeting/scores.ts, src/lib/norr/targeting/filter.ts]
+    affected_runtime_paths: [interpretTargetPrompt, matchTarget, shouldRejectForTarget]
+    proposed_implementation: Strict numeric filters default to unknown=exclude unless user says if published. Three-state TRUE/FALSE/UNKNOWN.
+    dependencies: [P0-01]
+    tests_required: [targeting.test.ts]
+    status: IMPLEMENTED
+
+  - id: P0-03
+    priority: P0
+    problem: Growth band growing comes from hiring keywords
+    root_cause: hydrate.ts sets growthBand from hiring/expansion language
+    affected_files: [src/lib/norr/targeting/hydrate.ts, src/lib/norr/hiring-signal.ts]
+    affected_runtime_paths: [buildCompanyIntel, Face growth chip]
+    proposed_implementation: Split FINANCIAL_GROWTH, HIRING_ACTIVITY, EXPANSION_SIGNAL. Never call hiring company growth.
+    dependencies: [P1-11]
+    tests_required: [audit-remediation.test.ts]
+    status: IMPLEMENTED
+
+  - id: P0-04
+    priority: P0
+    problem: Team members cannot see shared searches/companies
+    root_cause: startSearch/getCompany/getRun use session userId instead of scoped tenant owner
+    affected_files: [src/lib/norr/actions.ts, src/lib/norr/tenant.ts]
+    affected_runtime_paths: [ctxSql, startSearch, getRun, getCompany, buildExport]
+    proposed_implementation: ctxSql resolves workspace owner via scoped() so all data queries share the workspace.
+    dependencies: []
+    tests_required: [tenant-scope.test.ts]
+    status: IMPLEMENTED
+
+  - id: P0-05
+    priority: P0
+    problem: Export consumes 8-20 search units; failed/reused searches still charged
+    root_cause: assertSearchQuota commits immediately; export billed as search; reuse charged before fingerprint check
+    affected_files: [src/lib/norr/security.ts, src/lib/norr/platform.ts, src/lib/norr/actions.ts, src/lib/norr/quota-ledger.ts]
+    affected_runtime_paths: [startSearch, buildExport]
+    proposed_implementation: Export uses row/day caps only. Search reserve/commit/refund. Reuse before charge. Infra failure refunds.
+    dependencies: []
+    tests_required: [quota.test.ts, quota-ledger.test.ts]
+    status: IMPLEMENTED
+
+  - id: P1-11
+    priority: P1
+    problem: prhXbrlLookup and publicHiringSearch imported but never called
+    root_cause: Dead adapters marked implemented in catalog
+    affected_files: [src/lib/norr/pipeline.ts, src/lib/norr/sources/homemade.ts, src/lib/norr/source-planner.ts, src/lib/norr/source-runtime.ts]
+    affected_runtime_paths: [runEnrich]
+    proposed_implementation: Query-aware source planner. XBRL for FI+businessId when financials missing or requested. Hiring boards when hiring requested or deep.
+    dependencies: [P0-02]
+    tests_required: [source-planner.test.ts, homemade XBRL parse]
+    status: IMPLEMENTED
+
+  - id: P1-01
+    priority: P1
+    problem: equityRatio hardcoded null; HTML finance can beat official
+    root_cause: hydrate ignores assets/equity; persist uses coalesce so first writer wins
+    affected_files: [src/lib/norr/financials.ts, src/lib/norr/targeting/hydrate.ts, src/lib/norr/pipeline.ts]
+    affected_runtime_paths: [runEnrich, persistCrawledPage, runScore]
+    proposed_implementation: Official XBRL > structured third party > HTML > inference. Derive equity ratio only from official equity/assets.
+    dependencies: [P1-11]
+    tests_required: [financials.test.ts]
+    status: IMPLEMENTED
+
+  - id: P1-02
+    priority: P1
+    problem: Website hiring keywords scored as confirmed hiring
+    root_cause: crawl inserts kind=hiring from page language; scoreCompany treats it equal to job listings
+    affected_files: [src/lib/norr/hiring-signal.ts, src/lib/norr/pipeline.ts, src/lib/norr/scoring.ts]
+    affected_runtime_paths: [persistCrawledPage, runScore, publicHiringSearch]
+    proposed_implementation: HIRING_CONFIRMED / INDICATED / HISTORICAL / UNKNOWN with different weights.
+    dependencies: [P1-11]
+    tests_required: [hiring-signal.test.ts]
+    status: IMPLEMENTED
+
+  - id: P1-03
+    priority: P1
+    problem: commercialOpportunity 65 from company age alone
+    root_cause: compoundScores pushes 65 when age>=5 even with no other evidence
+    affected_files: [src/lib/norr/targeting/scores.ts]
+    affected_runtime_paths: [compoundScores]
+    proposed_implementation: Age is a weak supplement only when other commercial evidence exists.
+    dependencies: [P0-01]
+    tests_required: [targeting.test.ts]
+    status: IMPLEMENTED
+
+  - id: P1-04
+    priority: P1
+    problem: Native score engine disconnected; trafficScore always null
+    root_cause: scoreNative never called; no traffic source
+    affected_files: [src/lib/norr/engines.ts, src/lib/norr/source-runtime.ts, src/components/intel.tsx]
+    affected_runtime_paths: [product scoring]
+    proposed_implementation: Retire scoreNative from product path (explainable TS scores win). Remove traffic as a product capability.
+    dependencies: [P0-01]
+    tests_required: [source-runtime.test.ts]
+    status: IMPLEMENTED
+
+  - id: P1-05
+    priority: P1
+    problem: TED/Hilma attached by weak name search
+    root_cause: No identifier join; no match confidence gate
+    affected_files: [src/lib/norr/sources/open.ts, src/lib/norr/pipeline.ts]
+    affected_runtime_paths: [runSignals]
+    proposed_implementation: Controlled name match with stored confidence; skip weak matches.
+    dependencies: []
+    tests_required: [procurement-match.test.ts]
+    status: IMPLEMENTED
+
+  - id: P1-06
+    priority: P1
+    problem: NL query silently drops unsupported criteria (traffic, team size)
+    root_cause: parser has no diagnostic channel
+    affected_files: [src/lib/norr/targeting/parser.ts, src/lib/norr/actions.ts, src/routes/_app/search/new.tsx]
+    affected_runtime_paths: [interpretPrompt]
+    proposed_implementation: Return parsed/supported/unsupported/unknown diagnostics. Face shows them.
+    dependencies: [P0-02]
+    tests_required: [targeting.test.ts]
+    status: IMPLEMENTED
+
+  - id: P1-07
+    priority: P1
+    problem: Results do not explain WHY / WHO / WHY NOW
+    root_cause: Face shows scores without grounded sales brief
+    affected_files: [src/lib/norr/sales-brief.ts, src/components/intel.tsx, src/lib/norr/actions.ts]
+    affected_runtime_paths: [getCompany, IntelligencePanel]
+    proposed_implementation: Grounded sales brief from facts/signals only. Inference labelled.
+    dependencies: [P0-01, P1-02]
+    tests_required: [sales-brief.test.ts]
+    status: IMPLEMENTED
+
+  - id: P1-08
+    priority: P1
+    problem: Catalog says implemented for unwired adapters
+    root_cause: implemented=file exists
+    affected_files: [src/lib/norr/source-runtime.ts, src/lib/norr/sources/catalog.ts]
+    affected_runtime_paths: [/sources, admin data-network]
+    proposed_implementation: Runtime registry ACTIVE only with a real call site.
+    dependencies: [P1-11]
+    tests_required: [source-runtime.test.ts]
+    status: IMPLEMENTED
+
+  - id: P2-01
+    priority: P2
+    problem: Identity engine already mostly correct; keep Y-tunnus dedupe
+    root_cause: none
+    affected_files: [src/lib/norr/identity.ts]
+    affected_runtime_paths: [insertCompany]
+    proposed_implementation: Preserve. Add tests only.
+    dependencies: []
+    tests_required: [existing norr.test.ts]
+    status: VERIFIED
+
+  - id: P2-10
+    priority: P2
+    problem: Production norfai.com served pre-remediation copy and unwired financial/hiring paths
+    root_cause: Deploy lag; Face copy claimed dozens of signals and hiring-as-growth
+    affected_files: [src/lib/content/landing.ts, src/lib/norr/build-stamp.ts, src/lib/norr/public.ts]
+    affected_runtime_paths: [/, hivePulse]
+    proposed_implementation: Honest landing; build stamp; deploy this build; smoke public copy
+    dependencies: []
+    tests_required: [phase2.test.ts landing truth]
+    status: IMPLEMENTED
+
+  - id: P2-11
+    priority: P1
+    problem: PRH iXBRL often empty; listed-company filings unused
+    root_cause: Only PRH open iXBRL (~5% of filings); ESEF JSON capped at 1.5MB
+    affected_files: [src/lib/norr/sources/filings-xbrl.ts, src/lib/norr/http.ts, src/lib/norr/pipeline.ts]
+    affected_runtime_paths: [runEnrich esefLookup]
+    proposed_implementation: ESEF via LEI with 12MB cap; fusion with conflict metadata; empty stays empty
+    dependencies: [P1-11]
+    tests_required: [phase2.test.ts live ESEF]
+    status: VERIFIED
+
+  - id: P2-12
+    priority: P1
+    problem: DDG job-board search returned zero hits and looked like "not hiring"
+    root_cause: html.duckduckgo.com HTTP 202 challenge parsed as empty success
+    affected_files: [src/lib/norr/sources/webdiscover.ts, src/lib/norr/sources/homemade.ts, src/lib/norr/pipeline.ts, src/lib/norr/targeting/scores.ts]
+    affected_runtime_paths: [publicHiringSearch, runEnrich, matchTarget]
+    proposed_implementation: Treat 202/challenge as source_failed; required hiring excludes as unverified, not as confirmed absence
+    dependencies: [P1-02]
+    tests_required: [phase2.test.ts hiring source failed]
+    status: IMPLEMENTED
+
+  - id: P2-13
+    priority: P2
+    problem: Decision-maker ranking used the company's industry instead of the user's offer
+    root_cause: getCompany offerFamilyFromText(industry_label)
+    affected_files: [src/lib/norr/actions.ts, src/lib/norr/role-relevance.ts]
+    affected_runtime_paths: [getCompany]
+    proposed_implementation: Offer from the search run prompt that found the company
+    dependencies: []
+    tests_required: [phase2.test.ts role relevance]
+    status: IMPLEMENTED
+
+  - id: P2-14
+    priority: P2
+    problem: Ranking mixed commercial opportunity into fit; no query-aware weights; no evidence completeness
+    root_cause: freezeRunRanking used match ?? confidence ?? commercialOpportunity
+    affected_files: [src/lib/norr/ranking-v2.ts, src/lib/norr/exposure.ts, src/lib/norr/targeting/hydrate.ts]
+    affected_runtime_paths: [freezeRunRanking, IntelligencePanel]
+    proposed_implementation: Eligible-only rank; offer-family boost among eligible; completeness meter separate from fit
+    dependencies: [P0-01]
+    tests_required: [phase2.test.ts query-aware ranking]
+    status: IMPLEMENTED
+
+  - id: P2-15
+    priority: P1
+    problem: Required hiring searches treated DDG 202 / Duunitori 403 as empty boards; career pages skipped once an email existed
+    root_cause: publicHiringSearch only uses DDG; enqueueCrawl skipped when contactsSatisfied; fan-out never followed /careers; JSON-LD JobPosting unused
+    affected_files: [src/lib/norr/extract.ts, src/lib/norr/hiring-signal.ts, src/lib/norr/pipeline.ts, src/lib/norr/job-budget.ts, src/components/intel.tsx]
+    affected_runtime_paths: [runCrawl, persistCrawledPage, enqueueCrawl, IntelligencePanel]
+    proposed_implementation: First-party schema.org JobPosting is hiring_confirmed. Career paths followed when hiring requested even if contacts already found. Face shows Confirmed/Indicated/Unknown/Source failed — never Not hiring from a failed board.
+    dependencies: [P1-02, P2-12]
+    tests_required: [phase2.test.ts first-party JobPosting, job-budget.test.ts wantHiring]
+    status: IMPLEMENTED
+
+  - id: FPR-01
+    priority: P0
+    problem: Wrong-country, wrong-industry and inactive companies were inserted and enriched
+    root_cause: attachDiscovered only ran local name filters after YTJ ingest; industry/country/inactive checked too late
+    affected_files: [src/lib/norr/cheap-filter.ts, src/lib/norr/pipeline.ts]
+    affected_runtime_paths: [attachDiscovered, runDiscover]
+    proposed_implementation: cheapDiscoverReject before insert/enrich. UNKNOWN stays UNKNOWN; reject is not a match.
+    dependencies: [P0-02]
+    tests_required: [lead-quality.test.ts]
+    status: IMPLEMENTED
+
+  - id: FPR-02
+    priority: P0
+    problem: Every enrich re-hit Wikidata, GLEIF, VIES, Nominatim, harvest, LinkedIn, Grok even when contacts were fresh
+    root_cause: runEnrich had no skip policy or negative cache on the hot path
+    affected_files: [src/lib/norr/enrich-policy.ts, src/lib/norr/pipeline.ts, src/lib/norr/cache-policy.ts]
+    affected_runtime_paths: [runEnrich]
+    proposed_implementation: planEnrichSkip. Fresh published contacts + website skip identity/harvest/LLM. Financial-required searches still run XBRL.
+    dependencies: [FPR-01]
+    tests_required: [lead-quality.test.ts]
+    status: IMPLEMENTED
+
+  - id: FPR-03
+    priority: P0
+    problem: No measured lead quality index; 5x/10x claims would be ungrounded
+    root_cause: No labeled dataset or frozen formula
+    affected_files: [src/lib/norr/lead-quality.ts, src/lib/norr/lead-quality.test.ts]
+    affected_runtime_paths: [benchmark only]
+    proposed_implementation: Frozen LQI formula. Same 10 labeled rows under legacy vs current policy. Do not retune after measuring.
+    dependencies: [P0-01, P0-02, FPR-01]
+    tests_required: [lead-quality.test.ts]
+    status: VERIFIED
+    verification_evidence: "LQI 24.9 → 82.2 (3.30x). Precision 0.50 → 0.83. FP rate 0.40 → 0.00. Mandatory pass 0.33 → 1.00. 5x impossible from this baseline (ceiling 4.0x)."
+
+  - id: FPR-04
+    priority: P0
+    problem: valmistava teollisuus only mapped to TOL 28; industry codes truncated to 6
+    root_cause: INDUSTRY_ALIASES + inferIndustryCodes slice(0,6)
+    affected_files: [src/lib/norr/finland.ts]
+    affected_runtime_paths: [interpretTargetPrompt, ytjDiscover]
+    proposed_implementation: Manufacturing alias starts 25/28/33; slice 12.
+    tests_required: [lead-quality.test.ts]
+    status: VERIFIED
+    verification_evidence: "Prompt maps to 25 and 28."
+
+  - id: FPR-05
+    priority: P0
+    problem: First useful lead waited for Wikidata+GLEIF+harvest
+    root_cause: enqueueScore only at end of runEnrich
+    affected_files: [src/lib/norr/pipeline.ts, src/lib/norr/enrich-policy.ts]
+    affected_runtime_paths: [runEnrich]
+    proposed_implementation: Early enqueueScore after collectFastContacts. Skip identity/harvest when fresh.
+    tests_required: [lead-quality.test.ts]
+    status: IMPLEMENTED
+
+  - id: CORE-01
+    priority: P0
+    problem: Find missing emails crashed — search_runs.updated_at missing in production
+    root_cause: Application wrote a column never declared in migrations
+    affected_files: [migrations/0015_core_recovery.sql, scripts/schema-contract.mjs, src/lib/norr/actions.ts, src/lib/norr/tenant.ts]
+    affected_runtime_paths: [reEnrichCompanies]
+    proposed_implementation: Add column via migration + runtime ALTER. Schema contract CI fails undeclared writes.
+    tests_required: [scripts/schema-contract.test.mjs, e2e/p0-find-missing.test.ts]
+    status: IMPLEMENTED
+
+  - id: CORE-02
+    priority: P0
+    problem: enqueueJob returned DONE enrich jobs without re-queue; 21/100 emails stuck
+    root_cause: Job identity ignored freshness and missing contacts
+    affected_files: [src/lib/norr/repo.ts, src/lib/norr/pipeline.ts]
+    affected_runtime_paths: [enqueueJob, stealStaleJobs, reEnrichCompanies]
+    proposed_implementation: Requeue done/failed/cancelled enrich with generation++. Job lease_until. Capability-level company_capabilities.
+    tests_required: [e2e/p0-find-missing.test.ts]
+    status: IMPLEMENTED
+
+  - id: CORE-03
+    priority: P0
+    problem: Contact harvest waited on directories; brand-domain emails rejected
+    root_cause: emailBelongsToCompany short-circuited on website mismatch; inferGeneralMailbox required a named person
+    affected_files: [src/lib/norr/contacts.ts, src/lib/norr/pipeline.ts, src/lib/norr/contact-plan.ts]
+    affected_runtime_paths: [persistHits, maybeInferMailboxEmails, collectFastContacts]
+    proposed_implementation: Name-token brand match; MX-checked inferred role mailbox labelled inferred; contact-first harvest.
+    tests_required: [src/lib/norr/orchestrator.test.ts, src/lib/norr/contact-plan.test.ts]
+    status: IMPLEMENTED
+
+  - id: CORE-04
+    priority: P1
+    problem: Engines ran as islands; lists treated not-rejected as matched
+    root_cause: No orchestrator; fillList matchedOnly ignored match_score
+    affected_files: [src/lib/norr/search-orchestrator.ts, src/lib/norr/engine-contract.ts, src/lib/norr/actions.ts, src/lib/content/landing.ts]
+    affected_runtime_paths: [planSearch, fillList, buildExport]
+    proposed_implementation: planSearch required/skip engines. eligibleMatch requires match_score>0. Export email_state UNKNOWN. Landing copy without fake quality scores.
+    tests_required: [src/lib/norr/orchestrator.test.ts]
+    status: IMPLEMENTED

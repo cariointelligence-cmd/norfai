@@ -1,0 +1,21 @@
+schema_version: "2.1"
+project: ""
+updated_at: ""
+gaps: []
+# - id: G001
+#   use_case: ""
+#   user_question: ""
+#   required_fields: []
+#   current_sources: []
+#   observed_coverage: ""
+#   missing_fields: []
+#   incorrect_or_ambiguous_hits: []
+#   freshness_need: ""
+#   current_cost_and_latency: ""
+#   estimate: true
+#   user_impact: ""
+#   root_cause: SOURCE_GAP
+#   # SOURCE_GAP | ROUTING_GAP | COLLECTION_GAP | PARSING_GAP | IDENTITY_GAP
+#   # INDEXING_GAP | REASONING_GAP | FRESHNESS_GAP | PERMISSION_GAP | PRESENTATION_GAP
+#   priority: ""
+#   status: open

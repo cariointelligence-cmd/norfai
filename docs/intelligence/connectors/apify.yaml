@@ -1,0 +1,41 @@
+schema_version: "2.1"
+source_id: apify
+family: rest-json
+supported_queries: [approved-actor-run, approved-task-run, dataset-items, health]
+supported_fields: [name, businessId, website, email, phone]
+empty_vs_error: "No gap → skip, not an error. Empty dataset → empty list. HTTP 401 → optional_offline."
+login_wall_detection: "HTTP 401/403 on /users/me"
+pagination: "dataset items limit/offset, max 5 pages"
+resume_checkpoint: "in-memory cache keyed by connectorId+input hash"
+field_drop_detection: "normalizeApifyItem returns null when no identity or contact field is present"
+disable_path: "source_health.enabled kill-switch plus APIFY_TOOLS.enabled"
+tests:
+  shape: PASS
+  pagination_resume: PASS
+  empty_not_error: PASS
+  http200_trap: PENDING
+  provenance: PASS
+  disable: PASS
+status: implemented
+notes: >
+  Named Actors only: solidcode/finder-fi-scraper, agenscrape/finnish-business-finder-scraper,
+  compass/crawler-google-places. Free Norf stack runs first. Paid Finder is one-company
+  lookup (max 3 rows). Second Finder Actor runs only after a technical failure.
+  Google Maps runs only when website is still missing; reviews/leads/social stay off;
+  maxCrawledPlacesPerSearch=1. Official YTJ facts win conflicts. Secret APIFY_API is
+  server-only and never returned to Face.
+approved_tools:
+  - connector_id: finder-fi-scraper
+    actor: solidcode~finder-fi-scraper
+    cost: medium
+    max_items: 3
+  - connector_id: finnish-business-finder-scraper
+    actor: agenscrape~finnish-business-finder-scraper
+    cost: medium
+    max_items: 3
+    note: fallback on primary failure only
+  - connector_id: crawler-google-places
+    actor: compass~crawler-google-places
+    cost: high
+    max_items: 2
+    note: last-resort missing website

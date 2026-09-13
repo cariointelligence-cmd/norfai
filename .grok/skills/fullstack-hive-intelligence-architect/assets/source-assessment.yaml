@@ -1,0 +1,20 @@
+schema_version: "2.1"
+source_id: ""
+organization: ""
+dataset: ""
+interface: ""
+endpoint: ""
+gap_ids: []
+new_entities: false
+new_correct_fields: []
+newer_observations: false
+new_coverage: ""
+conflicts_resolved: []
+added_latency: ""
+added_cost: ""
+new_errors_or_duplicates: ""
+independence_group: ""
+decision: trial
+# trial | promote | reject | blocked
+reason: ""
+evidence: ""

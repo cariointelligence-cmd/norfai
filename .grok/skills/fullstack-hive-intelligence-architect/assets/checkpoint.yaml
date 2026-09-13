@@ -1,0 +1,16 @@
+schema_version: "2.1"
+project: ""
+updated_at: ""
+level: 2
+cycle: AUDIT
+completed:
+  - ""
+in_progress: ""
+next_action: ""
+blocked: []
+files_touched: []
+unverified_claims: []
+capability_matrix_ref: ""
+gap_map_ref: ""
+eval_ref: ""
+notes: ""

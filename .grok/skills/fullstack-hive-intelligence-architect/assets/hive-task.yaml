@@ -1,0 +1,23 @@
+schema_version: "2.1"
+task_id: ""
+run_id: ""
+tenant_id: ""
+role: ""
+# PLANNER | SOURCE_SCOUT | COLLECTOR | PARSER | IDENTITY_RESOLVER
+# EVIDENCE_REVIEWER | CONTRADICTION_REVIEWER | SYNTHESIZER | QUALITY_AUDITOR
+input_references: []
+output_references: []
+evidence_references: []
+status: PLANNED
+# PLANNED | QUEUED | RUNNING | PARTIAL | SUCCEEDED | FAILED | CANCELLED
+uncertainties: []
+cost: ""
+duration: ""
+next_action: ""
+owner: ""
+lease_until: ""
+heartbeat_at: ""
+attempt: 0
+idempotency_key: ""
+workspace_bucket: observations
+# observations | claims | derived | hypotheses | open_tasks | rejected

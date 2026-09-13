@@ -1,0 +1,17 @@
+{
+  "skill": "fullstack-hive-intelligence-architect",
+  "test_cases": [
+    { "input": "herätä hive henkiin", "should_trigger": true },
+    { "input": "add official company register sources and homemade directories", "should_trigger": true },
+    { "input": "korjaa heikot hakutulokset ja lähderekisteri", "should_trigger": true },
+    { "input": "entity resolution and provenance for search", "should_trigger": true },
+    { "input": "datapisteet ja intelligence-kerros", "should_trigger": true },
+    { "input": "production readiness of the search pipeline", "should_trigger": true },
+    { "input": "miksi haku on tyhjä, näytä diagnoosi", "should_trigger": true },
+    { "input": "empty-result diagnosis for register search", "should_trigger": true },
+    { "input": "fix the padding on the login button", "should_trigger": false },
+    { "input": "change the hero font to serif", "should_trigger": false },
+    { "input": "add WASD tank controls", "should_trigger": false },
+    { "input": "draw a tetris board with CSS", "should_trigger": false }
+  ]
+}

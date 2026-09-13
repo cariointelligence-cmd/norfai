@@ -1,0 +1,49 @@
+# Canonical company contract. Adapters map vendor JSON here.
+# Versioned. Cortex and Face never read vendor payloads.
+version: 1
+entity: Company
+fields:
+  name: { type: string, required: true, source: official_or_directory }
+  businessId: { type: string, required: false, note: Y-tunnus FI / orgnr NO / CVR DK }
+  vatId: { type: string, required: false }
+  euId: { type: string, required: false, note: YTJ euId e.g. FIFPRO.0112038-9 }
+  lei: { type: string, required: false }
+  country: { type: string, required: true }
+  legalForm: { type: string }
+  legalFormCode: { type: string }
+  registrationDate: { type: string, format: date }
+  endDate: { type: string, format: date }
+  businessStatus: { type: string }
+  tradeRegisterStatus: { type: string }
+  industryCode: { type: string, note: TOL 5-digit for FI }
+  industryLabel: { type: string }
+  street: { type: string }
+  postalCode: { type: string }
+  municipality: { type: string }
+  municipalityCode: { type: string }
+  website: { type: string }
+  lat: { type: number }
+  lng: { type: number }
+  lastModified: { type: string, format: datetime }
+  tradeRegistered: { type: boolean, note: YTJ register 1 }
+  prepaymentRegistered: { type: boolean, note: YTJ register 4 Ennakkoperintä }
+  employerRegistered: { type: boolean, note: YTJ register 5 Työnantaja. Not an employee count. }
+  vatRegistered: { type: boolean, note: YTJ register 6 ALV }
+  situations: { type: array, items: string, note: bankruptcy / liquidation if published }
+provenance:
+  - source_id
+  - sourceUrl
+  - ingested_at
+  - confidence
+  - licence
+errors:
+  - SourceUnavailable
+  - SchemaDrift
+  - AuthFailed
+  - RateLimited
+  - ValidationFailed
+  - Conflict
+rules:
+  - Official register fields win over directory HTML.
+  - Missing = null. Never invent revenue, employees, emails or phones.
+  - Finder category in a URL is not a TOL code.

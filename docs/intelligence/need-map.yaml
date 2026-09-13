@@ -1,0 +1,51 @@
+schema_version: "2.0"
+project: Norf
+needs:
+  - id: legal-identity
+    user_question: "Onko tämä oikea suomalainen yritys tällä Y-tunnuksella?"
+    decision_supported: "Prospect list membership"
+    required_fields: [name, businessId, country, legalForm]
+    freshness_target: 1d
+    acceptable_unknown: [website, lei]
+    license_or_auth_required: false
+    candidate_families: [official-register]
+  - id: industry-fit
+    user_question: "Onko päätoimiala täsmälleen pyydetty 5-numeroinen TOL?"
+    decision_supported: "Keep or drop from search"
+    required_fields: [industryCode]
+    freshness_target: 1d
+    acceptable_unknown: []
+    license_or_auth_required: false
+    candidate_families: [official-register]
+  - id: location-fit
+    user_question: "Onko kotipaikka pyydetty kunta?"
+    decision_supported: "Geographic targeting"
+    required_fields: [municipality]
+    freshness_target: 1d
+    acceptable_unknown: [street, postalCode]
+    license_or_auth_required: false
+    candidate_families: [official-register]
+  - id: not-housing
+    user_question: "Onko tämä asunto-osakeyhtiö?"
+    decision_supported: "Exclude housing unless asked"
+    required_fields: [legalFormCode, industryCode, name]
+    freshness_target: 1d
+    acceptable_unknown: []
+    license_or_auth_required: false
+    candidate_families: [official-register]
+  - id: novelty
+    user_question: "Onko tämä yritys näytetty aiemmin?"
+    decision_supported: "Skip-seen"
+    required_fields: [businessId, name]
+    freshness_target: 0s
+    acceptable_unknown: []
+    license_or_auth_required: false
+    candidate_families: [workspace-memory]
+  - id: empty-result-explanation
+    user_question: "Miksi haku ei palauttanut yrityksiä?"
+    decision_supported: "Change filters vs wait vs retry later"
+    required_fields: [reasonCode, reasonText]
+    freshness_target: 0s
+    acceptable_unknown: []
+    license_or_auth_required: false
+    candidate_families: [workspace-memory]

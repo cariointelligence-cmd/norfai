@@ -1,0 +1,40 @@
+{
+  "url": "http://127.0.0.1:8081/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Norf",
+      "hasCanvas": false,
+      "bodyTextLen": 1240,
+      "bodyTextHash": "141e1a9fbfdd0367c330d3c81392d54430c7a52c4468a53c1a0d22ab44547534",
+      "bodyTextPrefix": "Hinnasto Tietoa Ajankohtaista Asiakaspalvelu fi en sv Kirjaudu Y",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Norf",
+      "hasCanvas": false,
+      "bodyTextLen": 1105,
+      "bodyTextHash": "428ba6f82216c825195a27735a85e1a305fc053f55e47a2b9c144b012511135b",
+      "bodyTextPrefix": "fi en sv Sign in YTJ · FINDER · PUBLISHED CONTACTS The right com",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-built-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-built.json",
+  "divergesFromBaseline": true,
+  "baselineReasons": [
+    "mobile: body text replaced (similar length, page start changed)"
+  ]
+}

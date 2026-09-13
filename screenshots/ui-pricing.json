@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/pricing",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "Pricing | Norf",
+      "hasCanvas": false,
+      "bodyTextLen": 1013,
+      "bodyTextHash": "759168a2610deee4c4f3927fe04de7a7b6e5e1d17316ee5a3255d35fcbae0243",
+      "bodyTextPrefix": "Use cases Pricing Tools FAQ About FI EN SV Find companies Pricin",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/ui-pricing.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "Pricing | Norf",
+      "hasCanvas": false,
+      "bodyTextLen": 970,
+      "bodyTextHash": "a01088395cb6b199a0790bf665b9f1d40fe7082b278505e4e8655ba82ea4b2f6",
+      "bodyTextPrefix": "Find companies Pricing Find better targets without spending hour",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/ui-pricing-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/ui-pricing.json"
+}
