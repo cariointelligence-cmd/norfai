@@ -83,6 +83,79 @@ export function vercelTokenPresent(): boolean {
   return Boolean(token());
 }
 
+const SECRET_ENV = new Set([
+  "DATABASE_URL",
+  "BETTER_AUTH_SECRET",
+  "CRON_SECRET",
+  "INTERNAL_SERVICE_SECRET",
+  "APIFY_API",
+  "APIFY_API_TOKEN",
+  "RESEND_API_KEY",
+  "XAI_API_KEY",
+  "GROK_AUTH_CLIENT_SECRET",
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+]);
+
+async function syncProjectEnv(projectId: string, teamId: string): Promise<string[]> {
+  const copied: string[] = [];
+  const listed = await vercelApi(
+    `/v9/projects/${encodeURIComponent(projectId)}/env?teamId=${encodeURIComponent(teamId)}`,
+  );
+  const existing: any[] = listed.json?.envs ?? [];
+  const byKey = new Map<string, any>();
+  for (const row of existing) {
+    if (row?.key && !byKey.has(row.key)) byKey.set(row.key, row);
+  }
+
+  const wanted: Record<string, string> = {};
+  for (const key of ENV_COPY) {
+    if (key === "PUBLIC_SITE_URL" || key === "BETTER_AUTH_URL") {
+      wanted[key] = "https://www.norfai.com";
+      continue;
+    }
+    const value = process.env[key]?.trim();
+    if (value) wanted[key] = value;
+  }
+  wanted.VITE_AUTH_ENABLED = "true";
+  if (!wanted.CRON_SECRET && !byKey.has("CRON_SECRET")) {
+    wanted.CRON_SECRET = `nrf_cron_${crypto.randomUUID().replace(/-/g, "")}`;
+  }
+
+  for (const [key, value] of Object.entries(wanted)) {
+    const type = SECRET_ENV.has(key) ? "sensitive" : "plain";
+    const cur = byKey.get(key);
+    if (cur?.id && cur.type === type && type === "sensitive") {
+      copied.push(`${key}(kept)`);
+      continue;
+    }
+    if (cur?.id && type === "plain" && cur.value === value && cur.type === "plain") {
+      copied.push(`${key}(kept)`);
+      continue;
+    }
+    if (cur?.id) {
+      await vercelApi(
+        `/v9/projects/${encodeURIComponent(projectId)}/env/${encodeURIComponent(cur.id)}?teamId=${encodeURIComponent(teamId)}`,
+        { method: "DELETE" },
+      );
+    }
+    const put = await vercelApi(
+      `/v10/projects/${encodeURIComponent(projectId)}/env?teamId=${encodeURIComponent(teamId)}&upsert=true`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          key,
+          value,
+          type,
+          target: ["production", "preview", "development"],
+        }),
+      },
+    );
+    if (put.ok) copied.push(type === "sensitive" ? `${key}(sensitive)` : key);
+  }
+  return copied;
+}
+
 async function attachDomain(projectId: string, teamId: string, name: string, redirect?: string): Promise<DomainAttach> {
   const body: Record<string, unknown> = { name };
   if (redirect) {
@@ -200,44 +273,7 @@ export async function provisionCarioNorfai(): Promise<VercelProvisionResult> {
     }),
   });
 
-  const copied: string[] = [];
-  for (const key of ENV_COPY) {
-    const value =
-      key === "PUBLIC_SITE_URL" || key === "BETTER_AUTH_URL"
-        ? "https://www.norfai.com"
-        : process.env[key]?.trim();
-    if (!value) continue;
-    const put = await vercelApi(
-      `/v10/projects/${encodeURIComponent(empty.projectId)}/env?teamId=${encodeURIComponent(cario.id)}&upsert=true`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          key,
-          value,
-          type: "encrypted",
-          target: ["production", "preview", "development"],
-        }),
-      },
-    );
-    if (put.ok) copied.push(key);
-  }
-  if (!process.env.CRON_SECRET?.trim()) {
-    const generated = `nrf_cron_${crypto.randomUUID().replace(/-/g, "")}`;
-    const put = await vercelApi(
-      `/v10/projects/${encodeURIComponent(empty.projectId)}/env?teamId=${encodeURIComponent(cario.id)}&upsert=true`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          key: "CRON_SECRET",
-          value: generated,
-          type: "encrypted",
-          target: ["production", "preview", "development"],
-        }),
-      },
-    );
-    if (put.ok) copied.push("CRON_SECRET(generated)");
-  }
-  empty.envCopied = copied;
+  empty.envCopied = await syncProjectEnv(empty.projectId, cario.id);
 
   empty.domains.push(await attachDomain(empty.projectId, cario.id, "www.norfai.com"));
   empty.domains.push(await attachDomain(empty.projectId, cario.id, "norfai.com", "www.norfai.com"));

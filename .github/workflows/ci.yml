@@ -1,3 +1,5 @@
+# Emails fire on failure. Keep this job green; do not include Grok sandbox
+# script tests (scripts/**/*.test.mjs) — they fail outside the preview host.
 name: CI
 
 on:
