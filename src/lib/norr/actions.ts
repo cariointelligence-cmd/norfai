@@ -102,6 +102,7 @@ import { resolveRoute } from "./route-registry.ts";
 import { interactiveBudgetMs, vercelRuntimeInfo } from "./hybrid.ts";
 import { cacheStats } from "./intel-cache.ts";
 import { dispatchVercelExecution, executionPlane } from "./vercel-executor.ts";
+import { createQueuedSearch } from "./search-intake.ts";
 import { apifyConfigured } from "./sources/apify.ts";
 import {
   decideLeadsFinder,
@@ -356,89 +357,15 @@ export const previewScope = createServerFn({ method: "POST" }).middleware([authM
 });
 
 export const startSearch = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d).handler(async ({ context, data }) => {
-  let charged = 0;
   try {
-    const compiled = compileCriteria(data.criteria);
-    if (!compiled.ok) return { ok: false, error: compiled.error, runId: "", discovered: 0 };
-    const icpGate = compiled.criteria.prompt
-      ? blockingIssue(compileIcp(compiled.criteria.prompt, compiled.criteria).issues)
-      : null;
-    if (icpGate) return { ok: false, error: icpGate.message, runId: "", discovered: 0 };
-    const sql = await ctxSql(context);
-    ensureWorker();
-    const g = await gate(sql, context.userId, "search", { max: 40, windowMs: 36e5, capability: "company.search" });
-    if (!g.ok) return { ok: false, error: g.error, runId: "", discovered: 0 };
-    const deep = compiled.criteria.depth === "deep";
-    if (deep && !canDeepSearch(g.role, g.identity.plan, g.identity.isAdmin)) {
-      return { ok: false, error: "Deep search is not included in the current plan.", runId: "", discovered: 0 };
-    }
-    const fabric = compileExecution({
-      criteria: compiled.criteria,
-      depth: compiled.criteria.depth === "deep" ? "deep" : "normal",
-      country: compiled.criteria.country || "FI",
-      pressure: "healthy",
+    return await createQueuedSearch({
+      userId: context.userId,
+      criteria: data.criteria,
+      name: data.name,
+      profileId: data.profileId,
     });
-    const fp = queryFingerprint(compiled.criteria);
-    const label = boundedString(data.name, 80) || searchLabel(compiled.criteria);
-    const recent = await sql`
-      select id, status from search_runs
-      where user_id = ${context.userId}
-        and query_fingerprint = ${fp}
-        and created_at > now() - interval '20 seconds'
-        and status in ('queued','running')
-      order by created_at desc limit 1`;
-    if (recent[0]) {
-      dispatchVercelExecution({ userId: context.userId, runId: recent[0].id, reason: "search.reuse" });
-      return { ok: true, runId: recent[0].id, discovered: 0, reused: true, state: "QUEUED" };
-    }
-    const cost = deep ? queryCost("search_deep") : queryCost("search");
-    const quota = await assertSearchQuota(sql, context.userId, cost);
-    if (!quota.ok) return { ok: false, error: quota.error, runId: "", discovered: 0 };
-    charged = cost;
-    const companiesQuota = await assertCompanyQuota(sql, context.userId);
-    if (!companiesQuota.ok) {
-      await refundSearchQuota(sql, context.userId, charged);
-      charged = 0;
-      return { ok: false, error: companiesQuota.error, runId: "", discovered: 0 };
-    }
-    const t0 = Date.now();
-    const runId = nid();
-    const actorId = context.actorId ?? context.userId;
-    const trace = startTrace(runId);
-    const parseStage = markStage(trace, "parse");
-    endStage(parseStage, { recordCount: 1 });
-    try {
-      await sql`insert into search_runs (id, user_id, profile_id, status, criteria, query_fingerprint, ranking_version, name, created_by_user_id, correlation_id)
-        values (${runId}, ${context.userId}, ${data.profileId ?? null}, ${"queued"}, ${JSON.stringify(compiled.criteria)}::jsonb, ${fp}, ${RANKING_VERSION}, ${label}, ${actorId}, ${trace.correlationId})`;
-    } catch {
-      await sql`insert into search_runs (id, user_id, profile_id, status, criteria)
-        values (${runId}, ${context.userId}, ${data.profileId ?? null}, ${"queued"}, ${JSON.stringify(compiled.criteria)}::jsonb)`;
-    }
-    await enqueueJob(sql, context.userId, "discover", { runId });
-    try {
-      await sql`update search_runs set source_report = coalesce(source_report, '[]'::jsonb) || ${JSON.stringify([{
-        source: "execution_fabric",
-        ok: true,
-        dag: fabric.dag.map((n) => n.id),
-        decisions: fabric.decisions,
-        shed: fabric.shed,
-        budget: fabric.budget,
-      }])}::jsonb where id = ${runId} and user_id = ${context.userId}`;
-    } catch { /* report optional */ }
-    await audit(sql, context.userId, "search.start", "search_run", runId, { name: label, fingerprint: fp });
-    noteExtraction(context.userId, "search");
-    try { await persistExtractionCounters(sql, context.userId, { searches: 1, ip: g.ip }); } catch { /* quota counter best-effort */ }
-    dispatchVercelExecution({ userId: context.userId, runId, reason: "search.start" });
-    return { ok: true, runId, discovered: 0, state: "QUEUED", correlationId: trace.correlationId, createdMs: Date.now() - t0 };
-
   } catch (err) {
     console.error("[norf] startSearch", err);
-    if (charged > 0) {
-      try {
-        const sql = await ctxSql(context);
-        await refundSearchQuota(sql, context.userId, charged);
-      } catch { /* refund is best-effort */ }
-    }
     return { ok: false, error: "Search could not start. Try again.", runId: "", discovered: 0 };
   }
 });

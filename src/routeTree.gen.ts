@@ -84,6 +84,7 @@ import { Route as ApiGscCallbackRouteImport } from './routes/api/gsc/callback'
 import { Route as ApiInternalCanaryRouteImport } from './routes/api/internal/canary'
 import { Route as ApiInternalWorkerRouteImport } from './routes/api/internal/worker'
 import { Route as ApiJobsDrainRouteImport } from './routes/api/jobs/drain'
+import { Route as ApiSearchStartRouteImport } from './routes/api/search/start'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe/webhook'
 import { Route as SupportTTokenRouteImport } from './routes/support/t/$token'
 
@@ -461,6 +462,11 @@ const ApiJobsDrainRoute = ApiJobsDrainRouteImport.update({
   path: '/api/jobs/drain',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSearchStartRoute = ApiSearchStartRouteImport.update({
+  id: '/api/search/start',
+  path: '/api/search/start',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiStripeWebhookRoute = ApiStripeWebhookRouteImport.update({
   id: '/api/stripe/webhook',
   path: '/api/stripe/webhook',
@@ -543,6 +549,7 @@ export interface FileRoutesByFullPath {
   '/api/internal/canary': typeof ApiInternalCanaryRoute
   '/api/internal/worker': typeof ApiInternalWorkerRoute
   '/api/jobs/drain': typeof ApiJobsDrainRoute
+  '/api/search/start': typeof ApiSearchStartRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/support/t/$token': typeof SupportTTokenRoute
   '/companies/': typeof AppCompaniesIndexRoute
@@ -620,6 +627,7 @@ export interface FileRoutesByTo {
   '/api/internal/canary': typeof ApiInternalCanaryRoute
   '/api/internal/worker': typeof ApiInternalWorkerRoute
   '/api/jobs/drain': typeof ApiJobsDrainRoute
+  '/api/search/start': typeof ApiSearchStartRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/support/t/$token': typeof SupportTTokenRoute
   '/companies': typeof AppCompaniesIndexRoute
@@ -700,6 +708,7 @@ export interface FileRoutesById {
   '/api/internal/canary': typeof ApiInternalCanaryRoute
   '/api/internal/worker': typeof ApiInternalWorkerRoute
   '/api/jobs/drain': typeof ApiJobsDrainRoute
+  '/api/search/start': typeof ApiSearchStartRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/support/t/$token': typeof SupportTTokenRoute
   '/_app/companies/': typeof AppCompaniesIndexRoute
@@ -780,6 +789,7 @@ export interface FileRouteTypes {
     | '/api/internal/canary'
     | '/api/internal/worker'
     | '/api/jobs/drain'
+    | '/api/search/start'
     | '/api/stripe/webhook'
     | '/support/t/$token'
     | '/companies/'
@@ -857,6 +867,7 @@ export interface FileRouteTypes {
     | '/api/internal/canary'
     | '/api/internal/worker'
     | '/api/jobs/drain'
+    | '/api/search/start'
     | '/api/stripe/webhook'
     | '/support/t/$token'
     | '/companies'
@@ -936,6 +947,7 @@ export interface FileRouteTypes {
     | '/api/internal/canary'
     | '/api/internal/worker'
     | '/api/jobs/drain'
+    | '/api/search/start'
     | '/api/stripe/webhook'
     | '/support/t/$token'
     | '/_app/companies/'
@@ -981,6 +993,7 @@ export interface RootRouteChildren {
   ApiInternalCanaryRoute: typeof ApiInternalCanaryRoute
   ApiInternalWorkerRoute: typeof ApiInternalWorkerRoute
   ApiJobsDrainRoute: typeof ApiJobsDrainRoute
+  ApiSearchStartRoute: typeof ApiSearchStartRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
 }
 
@@ -1511,6 +1524,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiJobsDrainRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/search/start': {
+      id: '/api/search/start'
+      path: '/api/search/start'
+      fullPath: '/api/search/start'
+      preLoaderRoute: typeof ApiSearchStartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/stripe/webhook': {
       id: '/api/stripe/webhook'
       path: '/api/stripe/webhook'
@@ -1670,6 +1690,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiInternalCanaryRoute: ApiInternalCanaryRoute,
   ApiInternalWorkerRoute: ApiInternalWorkerRoute,
   ApiJobsDrainRoute: ApiJobsDrainRoute,
+  ApiSearchStartRoute: ApiSearchStartRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
 }
 export const routeTree = rootRouteImport

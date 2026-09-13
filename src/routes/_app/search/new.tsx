@@ -4,7 +4,7 @@ import { TargetingBuilder } from "@/components/targeting-builder";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { emptyCriteria, firstValue, valuesOf } from "@/lib/norr/criteria";
-import { applyOpportunityPreset, getBootstrap, importSeeds, interpretPrompt, saveProfile, startSearch } from "@/lib/norr/actions";
+import { applyOpportunityPreset, getBootstrap, importSeeds, interpretPrompt, saveProfile } from "@/lib/norr/actions";
 import { OPPORTUNITY_PRESETS, type OpportunityPresetId } from "@/lib/norr/targeting/spec";
 import { clampRequestedLeads, perSearchFromBoot } from "@/lib/norr/platform";
 import { BEGINNER_QUESTIONS } from "@/lib/norr/icp-compiler";
@@ -28,6 +28,37 @@ function friendlyError(err: unknown, fallback: string): string {
     return "Connection dropped before the search finished. Try again.";
   }
   return raw || fallback;
+}
+
+async function startViaHttp(criteria: SearchCriteria, name: string): Promise<{ ok: boolean; runId: string; error?: string; upgrade?: boolean }> {
+  const ac = new AbortController();
+  const timer = window.setTimeout(() => ac.abort(), 20_000);
+  try {
+    const res = await fetch("/api/search/start", {
+      method: "POST",
+      credentials: "include",
+      headers: { "content-type": "application/json", accept: "application/json" },
+      body: JSON.stringify({ criteria, name }),
+      signal: ac.signal,
+    });
+    if (res.status === 401) {
+      window.location.assign("/login");
+      return { ok: false, runId: "", error: "Sign in again" };
+    }
+    const json = (await res.json().catch(() => null)) as { ok?: boolean; runId?: string; error?: string } | null;
+    if (json?.ok && json.runId) return { ok: true, runId: json.runId };
+    if (!res.ok && !json?.runId) {
+      const latest = await fetch("/api/search/start", { credentials: "include" }).then((r) => r.json()).catch(() => null);
+      if (latest?.ok && latest.runId) return { ok: true, runId: latest.runId };
+    }
+    return { ok: false, runId: json?.runId ?? "", error: json?.error || `Search failed (${res.status})` };
+  } catch (err) {
+    const latest = await fetch("/api/search/start", { credentials: "include" }).then((r) => r.json()).catch(() => null);
+    if (latest?.ok && latest.runId) return { ok: true, runId: latest.runId };
+    throw err;
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
 export const Route = createFileRoute("/_app/search/new")({ component: NewSearch });
@@ -152,10 +183,7 @@ function NewSearch() {
           /* brief is optional — start with the form filters */
         }
       }
-      const res = await Promise.race([
-        startSearch({ data: { criteria: next, name } }),
-        new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("timed out")), 8000)),
-      ]);
+      const res = await startViaHttp(next, name);
       if (!res.ok || !res.runId) {
         toast.error(res.error || "Search could not start. Try again.");
         if (res.upgrade) {

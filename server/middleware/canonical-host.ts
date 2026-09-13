@@ -28,10 +28,12 @@ export default async function canonicalHostMiddleware(
 
   const path = event.url.pathname || "/";
   if (path.startsWith("/api/")) return next();
+  if (path.startsWith("/_server") || path.startsWith("/_tanstack") || path.startsWith("/_build")) return next();
+  const method = (event.req.method || "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") return next();
 
   const isVercelApp = host.endsWith(".vercel.app");
-  const isApex = host === "norfai.com";
-  if (!isVercelApp && !isApex) return next();
+  if (!isVercelApp) return next();
 
   const dest = `https://${CANONICAL_HOST}${path}${event.url.search}`;
   return Response.redirect(dest, 308);
