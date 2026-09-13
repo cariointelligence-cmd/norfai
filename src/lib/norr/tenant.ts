@@ -13,8 +13,7 @@ export type Tenant = {
   memberRole: "owner" | "admin" | "member";
 };
 
-export async function ensureOpsSchema(sql: Sql): Promise<void> {
-  const stmts = [
+const OPS_STMTS = [
     `create table if not exists workspace_members (
       id text primary key, owner_user_id text not null, member_user_id text, email text not null,
       role text not null default 'member', status text not null default 'invited',
@@ -89,14 +88,23 @@ export async function ensureOpsSchema(sql: Sql): Promise<void> {
       period_end date, revenue numeric, profit numeric, equity numeric, assets numeric,
       liabilities numeric, equity_ratio numeric, currency text not null default 'EUR',
       source_id text not null, source_url text, conflict_state text, observed_at timestamptz not null default now())`,
-  ];
-  for (const stmt of stmts) {
-    try {
-      await sql.query(stmt);
-    } catch {
-      /* idempotent */
+];
+
+export async function ensureOpsSchema(sql: Sql): Promise<void> {
+  const g = globalThis as typeof globalThis & { __norfOpsSchema__?: Promise<void> };
+  g.__norfOpsSchema__ ??= (async () => {
+    for (const stmt of OPS_STMTS) {
+      try {
+        await sql.query(stmt);
+      } catch {
+        /* idempotent */
+      }
     }
-  }
+  })().catch((err) => {
+    g.__norfOpsSchema__ = undefined;
+    throw err;
+  });
+  await g.__norfOpsSchema__;
 }
 
 export async function scoped(context: { userId: string }): Promise<{

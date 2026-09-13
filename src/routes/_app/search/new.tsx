@@ -152,14 +152,9 @@ function NewSearch() {
           /* brief is optional — start with the form filters */
         }
       }
-      const saved = await saveProfile({ data: { name, criteria: next, scheduleEnabled: schedule, scheduleCron: schedule ? "daily" : null } });
-      if (!saved.ok) {
-        toast.error(saved.error);
-        return;
-      }
       const res = await Promise.race([
-        startSearch({ data: { criteria: next, profileId: saved.id, name } }),
-        new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("timed out")), 10000)),
+        startSearch({ data: { criteria: next, name } }),
+        new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("timed out")), 8000)),
       ]);
       if (!res.ok || !res.runId) {
         toast.error(res.error || "Search could not start. Try again.");

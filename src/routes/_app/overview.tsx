@@ -89,7 +89,25 @@ function Dashboard() {
     },
     locale,
   );
-  const q = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap(), retry: 2, staleTime: 8_000 });
+  const q = useQuery({
+    queryKey: ["bootstrap"],
+    queryFn: () => getBootstrap(),
+    retry: 1,
+    staleTime: 8_000,
+    placeholderData: {
+      workspace: { id: "pending", onboarded_at: "pending", name: "Workspace", lawful_basis: null, purpose: null, retention_days: 730, country_allowlist: "FI" },
+      counts: { companies: 0, people: 0, runs: 0, openReview: 0, jobsRunning: 0, contacts: 0, sourcesConnected: 0, sourcesTotal: 0 },
+      recentRuns: [],
+      recentCompanies: [],
+      isAdmin: false,
+      plan: "free",
+      searchesUsed: 0,
+      searchesLimit: 50,
+      seedOpen: true,
+      hasStripeCustomer: false,
+      stripeReady: false,
+    },
+  });
   const qc = useQueryClient();
   const billingFlag = useRouterState({ select: (s) => s.location.searchStr.includes("billing=success") });
   useEffect(() => {

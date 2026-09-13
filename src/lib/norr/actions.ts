@@ -266,7 +266,6 @@ export const getBootstrap = createServerFn({ method: "GET" }).middleware([authMi
   };
   try {
     const sql = await getSql();
-    await ensurePlatformSchema(sql);
     const ws = await ensureWorkspace(sql, context.userId);
     const identity = await ensurePlatformIdentity(sql, context.userId);
     const [companies] = await sql`select count(*)::int as n from companies where user_id = ${context.userId} and deleted_at is null`;
@@ -374,23 +373,12 @@ export const startSearch = createServerFn({ method: "POST" }).middleware([authMi
     if (deep && !canDeepSearch(g.role, g.identity.plan, g.identity.isAdmin)) {
       return { ok: false, error: "Deep search is not included in the current plan.", runId: "", discovered: 0 };
     }
-    let pressure = "healthy";
-    try {
-      pressure = (await snapshotQueueDepth(sql)).pressure;
-    } catch { /* monitor optional */ }
     const fabric = compileExecution({
       criteria: compiled.criteria,
       depth: compiled.criteria.depth === "deep" ? "deep" : "normal",
       country: compiled.criteria.country || "FI",
-      pressure,
+      pressure: "healthy",
     });
-    const enumScore = enumerationRisk(compiled.criteria);
-    if (enumScore >= 40) {
-      noteExtraction(context.userId, "enum");
-      await persistSecurityEvent(sql, { userId: context.userId, action: "search.enumeration", risk: "suspicious", ip: g.ip, detail: { score: enumScore } });
-      await bumpAbuse(sql, context.userId, 8, "suspicious", { reason: "enumeration", ip: g.ip });
-    }
-    await ensureSearchHardeningSchema(sql);
     const fp = queryFingerprint(compiled.criteria);
     const label = boundedString(data.name, 80) || searchLabel(compiled.criteria);
     const recent = await sql`

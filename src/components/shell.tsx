@@ -154,7 +154,7 @@ export function AppShell() {
     );
   }
   const onboarded = Boolean(boot.data?.workspace.onboarded_at);
-  if (boot.data && !onboarded && pathname !== "/onboarding") {
+  if (boot.data?.workspace.id && boot.data.workspace.id !== "pending" && !onboarded && pathname !== "/onboarding") {
     return <Navigate to="/onboarding" />;
   }
 
