@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-13-cario-deploy-v1";
+export const NORF_BUILD = "2026-09-13-cario-alias-v1";
 
 export function vercelDeployProbe() {
   const env = process.env;

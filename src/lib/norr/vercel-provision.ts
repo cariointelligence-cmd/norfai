@@ -267,6 +267,12 @@ export async function provisionCarioNorfai(): Promise<VercelProvisionResult> {
       readyState: ready.readyState || ready.state || null,
       created: false,
     };
+    if (empty.deployment.id) {
+      await vercelApi(
+        `/v2/deployments/${encodeURIComponent(empty.deployment.id)}/aliases?teamId=${encodeURIComponent(cario.id)}`,
+        { method: "POST", body: JSON.stringify({ alias: "www.norfai.com" }) },
+      );
+    }
   } else if (inFlight) {
     empty.deployment = {
       id: inFlight.uid || inFlight.id || null,
