@@ -29,32 +29,52 @@ async function sessionUserId(request: Request): Promise<string | null> {
   return session?.user?.id ?? null;
 }
 
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const t = setTimeout(() => resolve(fallback), ms);
+    p.then((v) => {
+      clearTimeout(t);
+      resolve(v);
+    }).catch(() => {
+      clearTimeout(t);
+      resolve(fallback);
+    });
+  });
+}
+
 async function start({ request }: { request: Request }) {
-  const userId = await sessionUserId(request);
-  if (!userId) return Response.json({ ok: false, error: "Unauthorized", runId: "" }, { status: 401, headers: corsHeaders(request) });
+  const t0 = Date.now();
+  const headers = corsHeaders(request);
+  const json = (status: number, body: Record<string, unknown>) =>
+    Response.json({ ...body, ms: Date.now() - t0 }, { status, headers });
+
+  const userId = await withTimeout(sessionUserId(request), 2000, null);
+  if (!userId) return json(401, { ok: false, error: "Unauthorized", runId: "" });
+
   let body: { criteria?: unknown; name?: string; profileId?: string | null } = {};
   try {
     body = await request.json();
   } catch {
-    return Response.json({ ok: false, error: "Invalid JSON", runId: "" }, { status: 400, headers: corsHeaders(request) });
+    return json(400, { ok: false, error: "Invalid JSON", runId: "" });
   }
   if (!body.criteria || typeof body.criteria !== "object") {
-    return Response.json({ ok: false, error: "Missing criteria", runId: "" }, { status: 400, headers: corsHeaders(request) });
+    return json(400, { ok: false, error: "Missing criteria", runId: "" });
   }
-  try {
-    const result = await createQueuedSearch({
+
+  const result = await withTimeout(
+    createQueuedSearch({
       userId,
       criteria: body.criteria as never,
       name: body.name,
       profileId: body.profileId,
-    });
-    return Response.json(result, { status: result.ok ? 200 : 400, headers: corsHeaders(request) });
-  } catch (err) {
-    console.error("[norf] /api/search/start", err);
-    const recovered = await latestSearchId(userId).catch(() => null);
-    if (recovered) return Response.json({ ok: true, runId: recovered, discovered: 0, state: "QUEUED", reused: true }, { headers: corsHeaders(request) });
-    return Response.json({ ok: false, error: "Search could not start. Try again.", runId: "" }, { status: 500, headers: corsHeaders(request) });
-  }
+    }),
+    4000,
+    { ok: false, error: "Search intake timed out", runId: "", discovered: 0 },
+  );
+  if (result.ok && result.runId) return json(200, result);
+  const recovered = await withTimeout(latestSearchId(userId), 1500, null);
+  if (recovered) return json(200, { ok: true, runId: recovered, discovered: 0, state: "QUEUED", reused: true });
+  return json(result.error === "Search intake timed out" ? 503 : 400, result);
 }
 
 async function latest({ request }: { request: Request }) {

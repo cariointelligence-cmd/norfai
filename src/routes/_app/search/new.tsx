@@ -176,21 +176,6 @@ function NewSearch() {
     setBusy(true);
     try {
       let next = { ...criteria, prompt: prompt.trim() || criteria.prompt };
-      if (prompt.trim()) {
-        try {
-          const r = await Promise.race([
-            interpretPrompt({ data: { prompt: prompt.trim(), country: criteria.country } }),
-            new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("timed out")), 4000)),
-          ]);
-          if (r.ok) {
-            next = { ...r.criteria, maxResults: criteria.maxResults || r.criteria.maxResults, prompt: prompt.trim() };
-            setCriteria(next);
-            setSummary(r.summary);
-          }
-        } catch {
-          /* brief is optional — start with the form filters */
-        }
-      }
       const res = await startViaHttp(next, name);
       if (!res.ok || !res.runId) {
         if (res.error) toast.error(res.error);
@@ -231,7 +216,7 @@ function NewSearch() {
             Six questions. Industry is optional — pick Kaikki toimialat, or leave it open and bound the search with a city. Missing figures stay Not found.
           </p>
         </div>
-        <Button className="w-full sm:w-auto" onClick={() => void run()} disabled={busy}>
+        <Button type="button" className="w-full sm:w-auto" onClick={() => void run()} disabled={busy}>
           {busy ? "Starting search…" : `Find ${criteria.maxResults} companies`}
         </Button>
       </div>

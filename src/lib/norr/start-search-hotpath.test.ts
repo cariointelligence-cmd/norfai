@@ -8,8 +8,10 @@ describe("startSearch hot path", () => {
     assert.doesNotMatch(src, /await runDiscover/);
     assert.doesNotMatch(src, /await processJobsFor/);
     assert.doesNotMatch(src, /await freezeRunRanking/);
+    assert.doesNotMatch(src, /scoped\(/);
+    assert.doesNotMatch(src, /ensureOpsSchema/);
     assert.match(src, /dispatchVercelExecution/);
-    assert.match(src, /enqueueJob/);
+    assert.match(src, /insert into jobs/);
     assert.match(src, /QUEUED/);
   });
 });
