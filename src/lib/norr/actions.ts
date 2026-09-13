@@ -268,9 +268,7 @@ export const getBootstrap = createServerFn({ method: "GET" }).middleware([authMi
     const sql = await getSql();
     await ensurePlatformSchema(sql);
     const ws = await ensureWorkspace(sql, context.userId);
-    dispatchVercelExecution({ userId: context.userId, reason: "overview" });
     const identity = await ensurePlatformIdentity(sql, context.userId);
-    try { await drainStuckUserWork(sql, context.userId); } catch { /* keep */ }
     const [companies] = await sql`select count(*)::int as n from companies where user_id = ${context.userId} and deleted_at is null`;
     const [people] = await sql`select count(*)::int as n from people where user_id = ${context.userId} and deleted_at is null`;
     const [runs] = await sql`select count(*)::int as n from search_runs where user_id = ${context.userId}`;
@@ -293,7 +291,7 @@ export const getBootstrap = createServerFn({ method: "GET" }).middleware([authMi
     } catch {
       hasStripeCustomer = false;
     }
-    return {
+    const payload = {
       workspace: ws,
       counts: {
         companies: companies?.n ?? 0,
@@ -315,6 +313,8 @@ export const getBootstrap = createServerFn({ method: "GET" }).middleware([authMi
       hasStripeCustomer,
       stripeReady: stripeCheckoutReady()
     };
+    dispatchVercelExecution({ userId: context.userId, reason: "overview" });
+    return payload;
   } catch (err) {
     console.error("[norf] bootstrap", err);
     return fallback;
@@ -673,7 +673,8 @@ export const getRun = createServerFn({ method: "GET" }).middleware([authMiddlewa
     select id, type, status, last_error, company_id, updated_at from jobs where user_id = ${context.userId} and run_id = ${data.runId} order by created_at asc`;
   if (run.status === "running" || run.status === "queued") {
     const starved = jobs.some((j: { type?: string; status?: string }) =>
-      (j.type === "discover" || j.type === "email" || j.type === "enrich") && j.status === "queued");
+      (j.type === "discover" || j.type === "email" || j.type === "enrich") &&
+      (j.status === "queued" || j.status === "running"));
     if (starved) {
       dispatchVercelExecution({ userId: context.userId, runId: data.runId, reason: "poll.starved" });
       try { await kickSearchExecution(sql, context.userId, data.runId, { maxMs: 7_000 }); } catch { /* poll must return */ }

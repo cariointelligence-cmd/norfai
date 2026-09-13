@@ -103,7 +103,7 @@ export function AppShell() {
         }),
       ]),
     enabled: Boolean(user),
-    retry: 0,
+    retry: 1,
     staleTime: 8_000,
   });
 

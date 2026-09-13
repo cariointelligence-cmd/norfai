@@ -36,15 +36,15 @@ export const RUNTIME = {
   homemadeDiscoverCap: 40,
   hydrateConcurrency: 6,
 
-  jobStealSeconds: 30,
-  discoverStealMinutes: 20,
+  jobStealSeconds: 20,
+  discoverStealMinutes: 0,
 } as const;
 
 export type RuntimeConfig = typeof RUNTIME;
 
 export function jobLeaseSeconds(type: string, cfg: RuntimeConfig = RUNTIME): number {
-  if (type === "discover") return Math.max(60, cfg.discoverStealMinutes * 60);
-  return Math.max(30, cfg.jobStealSeconds);
+  if (type === "discover") return 20;
+  return Math.max(20, cfg.jobStealSeconds);
 }
 
 export function staleLockSeconds(type: string, cfg: RuntimeConfig = RUNTIME): number {

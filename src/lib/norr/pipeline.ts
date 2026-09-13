@@ -1467,9 +1467,14 @@ async function processNextJob(sql, userId, runId, opts) {
 			const run = (await sql`select criteria from search_runs where id = ${job.run_id} and user_id = ${userId}`)?.[0];
 			if (run) {
 				const payload = job.payload && typeof job.payload === "object" ? job.payload : {};
-				const disc = await runDiscover(sql, userId, job.run_id, run.criteria, { cursor: payload.ytjCursor ?? null });
+				const disc = await Promise.race([
+					runDiscover(sql, userId, job.run_id, run.criteria, { cursor: payload.ytjCursor ?? null }),
+					new Promise<{ complete: false; cursor: unknown; discovered: number; timedOut: true }>((resolve) => {
+						setTimeout(() => resolve({ complete: false, cursor: payload.ytjCursor ?? null, discovered: 0, timedOut: true }), Math.max(4_000, RUNTIME.discoverBudgetMs + 800));
+					}),
+				]);
 				if (!disc.complete) {
-					await sql`update jobs set status = ${"queued"}, attempts = greatest(attempts - 1, 0), run_after = now() + interval '1 second', last_error = ${"discover continue"}, payload = ${JSON.stringify({ ...payload, ytjCursor: disc.cursor ?? null, discoverExhausted: false, ytjScannedAll: false })}::jsonb, updated_at = now()
+					await sql`update jobs set status = ${"queued"}, attempts = greatest(attempts - 1, 0), run_after = now() + interval '1 second', last_error = ${"discover continue"}, locked_at = null, payload = ${JSON.stringify({ ...payload, ytjCursor: disc.cursor ?? null, discoverExhausted: false, ytjScannedAll: false })}::jsonb, updated_at = now()
             where id = ${job.id} and user_id = ${userId}`;
 					return { did: true, type: job.type, incomplete: true };
 				}
@@ -1513,7 +1518,7 @@ async function processNextJob(sql, userId, runId, opts) {
 			return { did: true, type: job.type, incomplete: true };
 		}
 		const jobRow = (await sql`select attempts, max_attempts from jobs where id = ${job.id}`)?.[0];
-		await sql`update jobs set status = ${(jobRow?.attempts ?? 1) >= (jobRow?.max_attempts ?? 3) ? "failed" : "queued"}, last_error = ${msg}, run_after = now() + interval '20 seconds', updated_at = now()
+		await sql`update jobs set status = ${(jobRow?.attempts ?? 1) >= (jobRow?.max_attempts ?? 3) ? "failed" : "queued"}, last_error = ${msg}, run_after = now() + interval '2 seconds', locked_at = null, updated_at = now()
       where id = ${job.id} and user_id = ${userId}`;
 		if (job.run_id) await updateRunStats(sql, userId, job.run_id);
 		return { did: true, type: job.type, error: msg };
@@ -1595,8 +1600,10 @@ export async function processJobsFor(sql, userId, runId, opts) {
 		await new Promise((res) => setTimeout(res, 60));
 	}
 	if (running.size) {
-		const rest = await Promise.all(running);
-		processed += rest.filter((x) => x.did).length;
+		await Promise.race([
+			Promise.all(running),
+			new Promise((res) => setTimeout(res, 250)),
+		]);
 	}
 	return processed;
 }
@@ -1612,7 +1619,7 @@ export async function kickSearchExecution(sql, userId, runId, opts) {
 		const run = (await sql`select status, pause_requested, cancel_requested from search_runs where id = ${runId} and user_id = ${userId}`)?.[0];
 		if (!run || run.pause_requested || run.cancel_requested) return 0;
 		if (run.status !== "running" && run.status !== "queued") return 0;
-		const queued = await sql`select id from jobs where user_id = ${userId} and run_id = ${runId} and status = ${"queued"} and run_after <= now() limit 1`;
+		const queued = await sql`select id from jobs where user_id = ${userId} and run_id = ${runId} and status in (${"queued"}, ${"running"}) and (run_after is null or run_after <= now()) limit 1`;
 		if (!queued[0]) return 0;
 		return await processJobsFor(sql, userId, runId, { maxMs: opts?.maxMs ?? 8_000, concurrency: 8 });
 	} catch (err) {

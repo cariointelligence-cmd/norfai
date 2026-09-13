@@ -89,7 +89,7 @@ function Dashboard() {
     },
     locale,
   );
-  const q = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap(), retry: 0 });
+  const q = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap(), retry: 2, staleTime: 8_000 });
   const qc = useQueryClient();
   const billingFlag = useRouterState({ select: (s) => s.location.searchStr.includes("billing=success") });
   useEffect(() => {

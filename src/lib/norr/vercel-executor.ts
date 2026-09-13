@@ -146,9 +146,12 @@ export async function runVercelDrain(opts: DrainRequest): Promise<DrainResult> {
   return { processed, remaining, depth, chained, plane: "vercel", reason };
 }
 
-/** Fire-and-forget from a user request. Request returns; Vercel continues. */
+/** Fire-and-forget from a user request. Prefer HTTP so the user isolate is not the worker. */
 export function dispatchVercelExecution(opts: DrainRequest): void {
-  scheduleBackground(() => runVercelDrain({ ...opts, depth: opts.depth ?? 0, reason: opts.reason ?? "dispatch" }));
+  scheduleBackground(async () => {
+    const http = await invokeVercelDrain({ ...opts, depth: opts.depth ?? 0, reason: opts.reason ?? "dispatch" });
+    if (!http.ok) await runVercelDrain({ ...opts, depth: opts.depth ?? 0, reason: `${opts.reason ?? "dispatch"}.local` });
+  });
 }
 
 export function executionPlane() {
