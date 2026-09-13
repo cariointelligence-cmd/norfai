@@ -1,0 +1,43 @@
+name: Production smoke
+
+on:
+  deployment_status:
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Base URL to smoke (defaults to https://www.norfai.com)"
+        required: false
+        default: "https://www.norfai.com"
+
+permissions:
+  contents: read
+  deployments: read
+
+jobs:
+  health:
+    if: github.event_name == 'workflow_dispatch' || github.event.deployment_status.state == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe /api/health
+        env:
+          DISPATCH_URL: ${{ github.event.inputs.url }}
+          ENV_URL: ${{ github.event.deployment_status.environment_url }}
+        run: |
+          set -euo pipefail
+          BASE="${DISPATCH_URL:-}"
+          if [ -z "$BASE" ]; then BASE="${ENV_URL:-}"; fi
+          if [ -z "$BASE" ]; then BASE="https://www.norfai.com"; fi
+          BASE="${BASE%/}"
+          echo "smoke $BASE/api/health"
+          curl -fsS --max-time 30 "$BASE/api/health" -o /tmp/health.json
+          cat /tmp/health.json
+          python3 - <<'PY'
+          import json, sys
+          data = json.load(open("/tmp/health.json"))
+          if data.get("ok") is not True or data.get("app") != "norf":
+              print("health gate failed", data)
+              sys.exit(1)
+          deploy = data.get("deploy") or {}
+          print("health ok", "build=", data.get("build"), "region=", deploy.get("region"))
+          PY
