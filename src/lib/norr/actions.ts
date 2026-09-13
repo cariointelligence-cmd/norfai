@@ -505,21 +505,6 @@ export const getRun = createServerFn({ method: "GET" }).middleware([authMiddlewa
   if (!run) return { ok: false, error: "Not found" };
   let jobs = await sql`
     select id, type, status, last_error, company_id, updated_at from jobs where user_id = ${context.userId} and run_id = ${data.runId} order by created_at asc`;
-  if (run.status === "running" || run.status === "queued") {
-    const starved = jobs.some((j: { type?: string; status?: string }) =>
-      (j.type === "discover" || j.type === "email" || j.type === "enrich") &&
-      (j.status === "queued" || j.status === "running"));
-    if (starved) {
-      try { await kickSearchExecution(sql, context.userId, data.runId, { maxMs: 4_500 }); } catch { /* poll must return */ }
-      jobs = await sql`select id, type, status, last_error, company_id, updated_at from jobs where user_id = ${context.userId} and run_id = ${data.runId} order by created_at asc`;
-    }
-  }
-  try {
-    const [n] = await sql`select count(*)::int as n from run_companies where user_id = ${context.userId} and run_id = ${data.runId}`;
-    if (Number(n?.n ?? 0) > 0) await freezeRunRanking(sql, context.userId, data.runId, run.criteria);
-  } catch {
-    /* ranking columns may still be migrating */
-  }
   const limit = clampInt(data.limit, 1, listPageCap(), 100);
   const cursor = decodeRunCursor(data.cursor);
   const companies = await sql`select c.id, c.name, c.business_id, c.municipality, c.industry_code, c.industry_label, c.website, c.overall_confidence,

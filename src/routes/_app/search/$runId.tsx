@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { buildExport, compareSearchRuns, controlRun, getRun, reEnrichCompanies, startSearch, tickSearch } from "@/lib/norr/actions";
+import { buildExport, compareSearchRuns, controlRun, reEnrichCompanies, startSearch, tickSearch } from "@/lib/norr/actions";
 import { Button } from "@/components/ui/button";
 import { Pill, Stat, Empty } from "@/components/status";
 import { ScoreBits, asCompanyIntel, contactFaceValue, decisionMakerFace } from "@/components/intel";
@@ -109,7 +109,21 @@ function RunView() {
   const [diff, setDiff] = useState<null | { added: string[]; removed: string[]; kept: string[]; prevCount: number; nextCount: number }>(null);
   const q = useQuery({
     queryKey: ["run", runId],
-    queryFn: () => getRun({ data: { runId } }),
+    queryFn: async () => {
+      const r = await fetch(`/api/search/run?id=${encodeURIComponent(runId)}`, {
+        credentials: "include",
+        headers: { accept: "application/json" },
+      });
+      return r.json();
+    },
+    placeholderData: {
+      ok: true,
+      run: { id: runId, status: "queued", criteria: {}, name: "Search" },
+      jobs: [],
+      companies: [],
+      progress: { pct: 1, stage: "queued", label: "Queued", done: 0, total: 1, running: true },
+      summary: { matched: 0, missingEmail: 0, newToYou: 0, seenBefore: 0, excluded: 0 },
+    },
     refetchInterval: (query) => {
       const status = query.state.data && query.state.data.ok ? query.state.data.run.status : "";
       return status === "running" || status === "queued" ? 2000 : false;
@@ -223,7 +237,11 @@ function RunView() {
     if (!cursor || loadingMore) return;
     setLoadingMore(true);
     try {
-      const next = await getRun({ data: { runId, cursor } });
+      const r = await fetch(`/api/search/run?id=${encodeURIComponent(runId)}`, {
+        credentials: "include",
+        headers: { accept: "application/json" },
+      });
+      const next = await r.json();
       if (next.ok) {
         setExtra((prev) => [...prev, ...(next.companies as RunCompany[])]);
         setCursor(next.nextCursor ?? null);

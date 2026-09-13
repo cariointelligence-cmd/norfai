@@ -84,6 +84,7 @@ import { Route as ApiGscCallbackRouteImport } from './routes/api/gsc/callback'
 import { Route as ApiInternalCanaryRouteImport } from './routes/api/internal/canary'
 import { Route as ApiInternalWorkerRouteImport } from './routes/api/internal/worker'
 import { Route as ApiJobsDrainRouteImport } from './routes/api/jobs/drain'
+import { Route as ApiSearchRunRouteImport } from './routes/api/search/run'
 import { Route as ApiSearchStartRouteImport } from './routes/api/search/start'
 import { Route as ApiStripeWebhookRouteImport } from './routes/api/stripe/webhook'
 import { Route as SupportTTokenRouteImport } from './routes/support/t/$token'
@@ -462,6 +463,11 @@ const ApiJobsDrainRoute = ApiJobsDrainRouteImport.update({
   path: '/api/jobs/drain',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiSearchRunRoute = ApiSearchRunRouteImport.update({
+  id: '/api/search/run',
+  path: '/api/search/run',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiSearchStartRoute = ApiSearchStartRouteImport.update({
   id: '/api/search/start',
   path: '/api/search/start',
@@ -549,6 +555,7 @@ export interface FileRoutesByFullPath {
   '/api/internal/canary': typeof ApiInternalCanaryRoute
   '/api/internal/worker': typeof ApiInternalWorkerRoute
   '/api/jobs/drain': typeof ApiJobsDrainRoute
+  '/api/search/run': typeof ApiSearchRunRoute
   '/api/search/start': typeof ApiSearchStartRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/support/t/$token': typeof SupportTTokenRoute
@@ -627,6 +634,7 @@ export interface FileRoutesByTo {
   '/api/internal/canary': typeof ApiInternalCanaryRoute
   '/api/internal/worker': typeof ApiInternalWorkerRoute
   '/api/jobs/drain': typeof ApiJobsDrainRoute
+  '/api/search/run': typeof ApiSearchRunRoute
   '/api/search/start': typeof ApiSearchStartRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/support/t/$token': typeof SupportTTokenRoute
@@ -708,6 +716,7 @@ export interface FileRoutesById {
   '/api/internal/canary': typeof ApiInternalCanaryRoute
   '/api/internal/worker': typeof ApiInternalWorkerRoute
   '/api/jobs/drain': typeof ApiJobsDrainRoute
+  '/api/search/run': typeof ApiSearchRunRoute
   '/api/search/start': typeof ApiSearchStartRoute
   '/api/stripe/webhook': typeof ApiStripeWebhookRoute
   '/support/t/$token': typeof SupportTTokenRoute
@@ -789,6 +798,7 @@ export interface FileRouteTypes {
     | '/api/internal/canary'
     | '/api/internal/worker'
     | '/api/jobs/drain'
+    | '/api/search/run'
     | '/api/search/start'
     | '/api/stripe/webhook'
     | '/support/t/$token'
@@ -867,6 +877,7 @@ export interface FileRouteTypes {
     | '/api/internal/canary'
     | '/api/internal/worker'
     | '/api/jobs/drain'
+    | '/api/search/run'
     | '/api/search/start'
     | '/api/stripe/webhook'
     | '/support/t/$token'
@@ -947,6 +958,7 @@ export interface FileRouteTypes {
     | '/api/internal/canary'
     | '/api/internal/worker'
     | '/api/jobs/drain'
+    | '/api/search/run'
     | '/api/search/start'
     | '/api/stripe/webhook'
     | '/support/t/$token'
@@ -993,6 +1005,7 @@ export interface RootRouteChildren {
   ApiInternalCanaryRoute: typeof ApiInternalCanaryRoute
   ApiInternalWorkerRoute: typeof ApiInternalWorkerRoute
   ApiJobsDrainRoute: typeof ApiJobsDrainRoute
+  ApiSearchRunRoute: typeof ApiSearchRunRoute
   ApiSearchStartRoute: typeof ApiSearchStartRoute
   ApiStripeWebhookRoute: typeof ApiStripeWebhookRoute
 }
@@ -1524,6 +1537,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiJobsDrainRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/search/run': {
+      id: '/api/search/run'
+      path: '/api/search/run'
+      fullPath: '/api/search/run'
+      preLoaderRoute: typeof ApiSearchRunRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/search/start': {
       id: '/api/search/start'
       path: '/api/search/start'
@@ -1690,6 +1710,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiInternalCanaryRoute: ApiInternalCanaryRoute,
   ApiInternalWorkerRoute: ApiInternalWorkerRoute,
   ApiJobsDrainRoute: ApiJobsDrainRoute,
+  ApiSearchRunRoute: ApiSearchRunRoute,
   ApiSearchStartRoute: ApiSearchStartRoute,
   ApiStripeWebhookRoute: ApiStripeWebhookRoute,
 }
