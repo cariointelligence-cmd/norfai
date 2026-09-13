@@ -22,13 +22,11 @@ export function vercelFunctionBudgetMs(): number {
 }
 
 export function vercelSelfOrigin(): string | null {
+  const auth = process.env.BETTER_AUTH_URL?.trim() || process.env.PUBLIC_SITE_URL?.trim();
+  if (auth) return auth.replace(/\/$/, "");
   const prod = process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim();
-  if (prod) return prod.startsWith("http") ? prod : `https://${prod}`;
-  const url = process.env.VERCEL_URL?.trim();
-  if (url) return url.startsWith("http") ? url : `https://${url}`;
-  const app = process.env.APP_URL?.trim() || process.env.BETTER_AUTH_URL?.trim();
-  if (app) return app.replace(/\/$/, "");
-  return null;
+  if (prod && !prod.includes(".vercel.app")) return prod.startsWith("http") ? prod : `https://${prod}`;
+  return "https://www.norfai.com";
 }
 
 export type DrainRequest = {

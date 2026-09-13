@@ -118,8 +118,13 @@ async function syncProjectEnv(projectId: string, teamId: string): Promise<string
     if (value) wanted[key] = value;
   }
   wanted.VITE_AUTH_ENABLED = "true";
+  const existingCron = typeof byKey.get("CRON_SECRET")?.value === "string" ? byKey.get("CRON_SECRET").value : null;
   if (!wanted.CRON_SECRET && !byKey.has("CRON_SECRET")) {
     wanted.CRON_SECRET = `nrf_cron_${crypto.randomUUID().replace(/-/g, "")}`;
+  }
+  if (!wanted.INTERNAL_SERVICE_SECRET) {
+    wanted.INTERNAL_SERVICE_SECRET = wanted.CRON_SECRET || existingCron || wanted.BETTER_AUTH_SECRET || "";
+    if (!wanted.INTERNAL_SERVICE_SECRET) delete wanted.INTERNAL_SERVICE_SECRET;
   }
 
   for (const [key, value] of Object.entries(wanted)) {

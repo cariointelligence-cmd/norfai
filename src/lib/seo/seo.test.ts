@@ -61,6 +61,13 @@ describe("robots and sitemap", () => {
     assert.doesNotMatch(xml, /\/admin/);
     assert.doesNotMatch(xml, /\/login/);
   });
+
+  it("accepts Date lastmod without throwing", () => {
+    const xml = renderSitemapXml("https://www.norfai.com", [
+      { path: "/news/x", lastmod: new Date("2026-09-13T12:00:00Z") as unknown as string, changefreq: "weekly", priority: 0.5 },
+    ]);
+    assert.match(xml, /<lastmod>2026-09-13<\/lastmod>/);
+  });
 });
 
 describe("quality gate", () => {

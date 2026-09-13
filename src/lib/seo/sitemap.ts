@@ -31,7 +31,7 @@ export function renderSitemapXml(origin: string, entries: SitemapEntry[]): strin
   const urls = entries
     .map((e) => {
       const loc = absUrl(e.path, origin) || e.path;
-      const last = e.lastmod ? `\n    <lastmod>${e.lastmod.slice(0, 10)}</lastmod>` : "";
+      const last = isoDate(e.lastmod) ? `\n    <lastmod>${isoDate(e.lastmod)}</lastmod>` : "";
       return `  <url>\n    <loc>${escapeXml(loc)}</loc>${last}\n    <changefreq>${e.changefreq}</changefreq>\n    <priority>${e.priority.toFixed(1)}</priority>\n  </url>`;
     })
     .join("\n");
@@ -75,4 +75,13 @@ export function renderRobotsTxt(origin: string): string {
 
 function escapeXml(s: string): string {
   return s.replace(/&/g, "&").replace(/</g, "<").replace(/>/g, ">");
+}
+
+function isoDate(raw?: string | Date | null): string | null {
+  if (raw == null || raw === "") return null;
+  const s = raw instanceof Date ? raw.toISOString() : String(raw);
+  const m = s.match(/\d{4}-\d{2}-\d{2}/);
+  if (m) return m[0];
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10);
 }

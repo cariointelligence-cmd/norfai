@@ -34,6 +34,11 @@ describe("vercel execution plane", () => {
     assert.equal(typeof isVercelRuntime(), "boolean");
     const origin = vercelSelfOrigin();
     if (origin) assert.match(origin, /^https?:\/\//);
+    const prev = process.env.BETTER_AUTH_URL;
+    process.env.BETTER_AUTH_URL = "https://www.norfai.com";
+    assert.equal(vercelSelfOrigin(), "https://www.norfai.com");
+    if (prev === undefined) delete process.env.BETTER_AUTH_URL;
+    else process.env.BETTER_AUTH_URL = prev;
   });
 
   it("authorizes drain as a worker/cron scope", () => {
