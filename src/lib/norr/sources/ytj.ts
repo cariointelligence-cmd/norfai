@@ -13,7 +13,7 @@ import type { AdapterResult, DiscoveredCompany, ObservationInput, SearchCriteria
 import { getJson } from "../http.ts";
 import { normalizeBusinessId, normalizeName, normalizeWebsite, toVatId } from "../normalize.ts";
 import { firstValue, valuesOf, passesLocalFilters } from "../criteria.ts";
-import { expandIndustryQueryCodes, isAllIndustries, isInactiveCompany, INDUSTRIES } from "../finland.ts";
+import { expandIndustryQueryCodes, isAllIndustries, isInactiveCompany, INDUSTRIES, MUNICIPALITIES } from "../finland.ts";
 import { reliability } from "./catalog.ts";
 import { RUNTIME } from "../runtime.ts";
 
@@ -26,6 +26,26 @@ export const YTJ_SCAN_PAGE_CAP = 200;
 
 export function ytjSliceEnd(startPage: number, cap = YTJ_SCAN_PAGE_CAP): number {
   return Math.max(0, startPage) + Math.max(1, cap);
+}
+
+export function ytjCanonicalLocation(raw: string | null | undefined): string | undefined {
+  const s = String(raw ?? "").trim();
+  if (!s) return undefined;
+  const n = s.toLowerCase();
+  const hit = MUNICIPALITIES.find(
+    (m) => m.name.toLowerCase() === n || (m.nameSv && m.nameSv.toLowerCase() === n) || m.code === s,
+  );
+  return hit?.name ?? s;
+}
+
+/** YTJ mainBusinessLine is a substring. Keep only prefix matches for the query code. */
+export function ytjLineBelongsToQuery(companyLine: string | null | undefined, queryLine: string | null | undefined): boolean {
+  const got = String(companyLine ?? "").replace(/\D/g, "");
+  const want = String(queryLine ?? "").replace(/\D/g, "");
+  if (!want) return true;
+  if (!got) return false;
+  if (got.startsWith(want)) return true;
+  return want.length >= 5 && got.length >= 2 && want.startsWith(got);
 }
 
 export type Query = {
@@ -321,7 +341,7 @@ export function buildYtjQueries(criteria: SearchCriteria): Query[] {
     out.push(q);
   };
 
-  const location = String(firstValue(criteria, "municipality") ?? "").trim() || undefined;
+  const location = ytjCanonicalLocation(firstValue(criteria, "municipality"));
   const keywords = valuesOf(criteria, "keyword").map(String).map((s) => s.trim()).filter((s) => s.length >= 2);
   const bids = valuesOf(criteria, "business_id").map(String).map((s) => normalizeBusinessId(s) ?? s.trim()).filter(Boolean);
   const rawIndustry = valuesOf(criteria, "industry").map(String);
@@ -349,7 +369,9 @@ export function buildYtjQueries(criteria: SearchCriteria): Query[] {
       push({ mainBusinessLine: code, location });
       continue;
     }
-    const kids = expandIndustryQueryCodes([code]).filter((c) => c !== code && c.length >= 3);
+    const kids = expandIndustryQueryCodes([code])
+      .filter((c) => c !== code && c.length >= 3)
+      .sort((a, b) => b.length - a.length);
     for (const kid of kids.slice(0, 24)) push({ mainBusinessLine: kid, location });
     if (!kids.length) push({ mainBusinessLine: code, location });
   }
@@ -389,6 +411,7 @@ async function ytjSearchQuery(
     const mapped = mapYtj(raw, url);
     if (!mapped.company.name) continue;
     if (isInactiveCompany(mapped.company)) continue;
+    if (!ytjLineBelongsToQuery(mapped.company.industryCode, q.mainBusinessLine)) continue;
     data.push(mapped.company);
     observations.push(...mapped.observations);
   }
@@ -549,7 +572,7 @@ export async function ytjDiscover(
   attached?: boolean;
 }> {
   const maxWanted = Math.max(1, Number(criteria.maxResults ?? 100));
-  const location = String(firstValue(criteria, "municipality") ?? "").trim();
+  const location = ytjCanonicalLocation(firstValue(criteria, "municipality"));
   let nationwide = Boolean(opts?.cursor?.nationwide);
   const makeQueries = (dropLocation: boolean): Query[] => {
     if (!dropLocation) return buildYtjQueries(criteria);

@@ -9,7 +9,7 @@ import { initialState, SOURCE_CATALOG } from "./sources/catalog.ts";
 import { emptyCriteria, passesLocalFilters, tightenCriteria, validateCriteria } from "./criteria.ts";
 import { industryMatches, inferIndustryCodes, isHousingCompany, expandIndustryQueryCodes, groupForIndustryCodes, INDUSTRY_GROUPS, INDUSTRIES, isInactiveCompany } from "./finland.ts";
 import { scoreCompany } from "./scoring.ts";
-import { mapYtj, buildYtjQueries, YTJ_SCAN_PAGE_CAP, YTJ_PAGE_SIZE, ytjSliceEnd, parseYtjRegisters, ytjFieldObservations, ytjActivityStatus, ytjShouldSkipBarrenQuery } from "./sources/ytj.ts";
+import { mapYtj, buildYtjQueries, YTJ_SCAN_PAGE_CAP, YTJ_PAGE_SIZE, ytjSliceEnd, parseYtjRegisters, ytjFieldObservations, ytjActivityStatus, ytjShouldSkipBarrenQuery, ytjLineBelongsToQuery, ytjCanonicalLocation } from "./sources/ytj.ts";
 import { parseFinderProfileHtml, parseFinderSearchHtml, pickFinderHit, guessedFinderUrls, profileFromSearchHit, discoveredFromFinderHit } from "./sources/finder.ts";
 import { parseKauppalehtiHtml } from "./sources/kauppalehti.ts";
 import { parseNorthdataHtml, northdataUrls } from "./sources/northdata.ts";
@@ -202,6 +202,13 @@ describe("industry matching", () => {
     assert.equal(industryMatches("86220", ["73"]), false);
     assert.equal(industryMatches("73111", ["73"]), true);
     assert.equal(industryMatches("35111", ["73"]), false);
+    assert.equal(ytjLineBelongsToQuery("87301", "73"), false);
+    assert.equal(ytjLineBelongsToQuery("73111", "73"), true);
+    assert.equal(ytjLineBelongsToQuery("73111", "73111"), true);
+    assert.equal(ytjLineBelongsToQuery("86910", "691"), false);
+    assert.equal(ytjLineBelongsToQuery("69101", "691"), true);
+    assert.equal(ytjCanonicalLocation("oulu"), "Oulu");
+    assert.equal(ytjCanonicalLocation("Uleåborg"), "Oulu");
   });
   it("maps marketing language to advertising, not electricity or health", () => {
     const codes = inferIndustryCodes("Find Finnish marketing companies in Tampere");
