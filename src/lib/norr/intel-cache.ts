@@ -7,7 +7,7 @@ type Entry<T> = { at: number; ttl: number; value: T; inflight?: Promise<T> };
 const store = new Map<string, Entry<unknown>>();
 const stats = { hits: 0, misses: 0, stale: 0, coalesced: 0, sets: 0 };
 
-const STORE_CAP = 2_500;
+const STORE_CAP = 8_000;
 
 function pruneStore(now = Date.now()): void {
   if (store.size <= STORE_CAP) return;

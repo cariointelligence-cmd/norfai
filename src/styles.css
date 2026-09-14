@@ -9,8 +9,8 @@
   --color-faint: #5c616c;
   --color-line: rgb(236 232 225 / 0.1);
   --color-line-strong: rgb(236 232 225 / 0.18);
-  --color-accent: #c5ccd6;
-  --color-accent-ink: #0b0c0f;
+  --color-accent: #9be7c4;
+  --color-accent-ink: #07140f;
   --color-good: #7fa98f;
   --color-warn: #c4a574;
   --color-bad: #c57b7b;
@@ -231,9 +231,10 @@
 
 .norr-grid {
   background-image:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgb(155 231 196 / 0.12), transparent 50%),
     linear-gradient(to right, rgb(236 232 225 / 0.035) 1px, transparent 1px),
     linear-gradient(to bottom, rgb(236 232 225 / 0.035) 1px, transparent 1px);
-  background-size: 48px 48px;
+  background-size: auto, 48px 48px, 48px 48px;
 }
 
 .tap { min-height: 44px; min-width: 44px; }

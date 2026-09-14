@@ -47,7 +47,7 @@ export function laneSlots(lane: SearchLane): number {
   return 1;
 }
 
-export const GLOBAL_SEARCH_SLOTS = 3;
+export const GLOBAL_SEARCH_SLOTS = 5;
 
 export function agedRank(rank: number, waitedMs: number): number {
   if (waitedMs >= 180_000) return Math.max(0, rank - 2);

@@ -102,6 +102,10 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
   }
   const remaining = await countDueJobs(targetUser, targetRun);
   try {
+    const { maybeAutoPublishBlogs } = await import("./platform.ts");
+    await maybeAutoPublishBlogs(sql);
+  } catch { /* daily SEO posts */ }
+  try {
     const { processMailOutbox } = await import("./mailer.ts");
     await processMailOutbox(sql, 8);
   } catch { /* mail flush is best-effort */ }

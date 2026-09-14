@@ -1,5 +1,6 @@
 import { Link, Navigate, Outlet, useRouterState } from "@tanstack/react-router";
 import { RedirectToSignIn, UserButton } from "@/lib/auth/gates";
+import { NorfAssistant } from "@/components/norf-assistant";
 import { useCurrentUserState } from "@/lib/auth/use-current-user";
 import { cn } from "@/lib/utils";
 import {
@@ -319,6 +320,7 @@ export function AppShell() {
           </div>
         </div>
       </Drawer>
+      <NorfAssistant />
     </div>
   );
 }

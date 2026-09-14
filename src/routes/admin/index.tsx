@@ -10,6 +10,7 @@ function AdminHome() {
   const q = useQuery({ queryKey: ["admin-state"], queryFn: () => getAdminState(), refetchInterval: 20_000 });
   const d = q.data;
   const findings = (d?.findings ?? []) as Array<{ severity: string; title: string; why: string; trail: string }>;
+  const n = (v: number | undefined) => (q.isPending ? "…" : (v ?? 0));
   return (
     <div className="space-y-6">
       <div>
@@ -19,15 +20,15 @@ function AdminHome() {
         </p>
       </div>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Stat label="Users" value={d?.userCount ?? d?.workspaceCount ?? "-"} />
-        <Stat label="Workspaces" value={d?.workspaceCount ?? "-"} />
-        <Stat label="Searches today" value={d?.searchesToday ?? 0} />
-        <Stat label="Jobs running" value={d?.jobsLive ?? 0} />
-        <Stat label="Jobs queued" value={d?.jobsQueued ?? 0} />
-        <Stat label="Companies" value={d?.companiesTotal ?? 0} />
-        <Stat label="Searches running" value={d?.searchesRunning ?? 0} />
-        <Stat label="Security high 24h" value={d?.securityHigh ?? 0} />
-        <Stat label="Admins" value={d?.admins?.length ?? "-"} />
+        <Stat label="Users" value={n(d?.userCount ?? d?.workspaceCount)} />
+        <Stat label="Workspaces" value={n(d?.workspaceCount)} />
+        <Stat label="Searches today" value={n(d?.searchesToday)} />
+        <Stat label="Jobs running" value={n(d?.jobsLive)} />
+        <Stat label="Jobs queued" value={n(d?.jobsQueued)} />
+        <Stat label="Companies" value={n(d?.companiesTotal)} />
+        <Stat label="Searches running" value={n(d?.searchesRunning)} />
+        <Stat label="Security high 24h" value={n(d?.securityHigh)} />
+        <Stat label="Admins" value={n(d?.admins?.length)} />
       </div>
       <section>
         <h2 className="mb-2 text-sm font-medium">Findings</h2>

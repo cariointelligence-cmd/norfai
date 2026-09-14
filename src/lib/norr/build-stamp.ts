@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-resend-bind";
+export const NORF_BUILD = "2026-09-14-admin-ai-seo";
 
 export function vercelDeployProbe() {
   const env = process.env;

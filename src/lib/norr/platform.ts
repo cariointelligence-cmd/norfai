@@ -713,19 +713,24 @@ export async function maybeAutoPublishBlogs(sql: Sql): Promise<number> {
   if (!process.env.XAI_API_KEY) return 0;
   try {
     const today = new Date().toISOString().slice(0, 10);
-    const st = await sql<{ day: string; published_today: number }>`select day, published_today from blog_auto_state where id = ${"default"}`;
-    let count = st[0]?.published_today ?? 0;
-    if (String(st[0]?.day ?? "") !== today) {
+    await sql.query(`create table if not exists blog_auto_state (
+      id text primary key, day date, published_today integer not null default 0, last_run_at timestamptz
+    )`);
+    await sql.query(`insert into blog_auto_state (id, day, published_today) values ('default', null, 0) on conflict (id) do nothing`);
+    const st = await sql<{ day: string; published_today: number; last_run_at: string | null }>`
+      select day, published_today, last_run_at from blog_auto_state where id = ${"default"}`;
+    let count = Number(st[0]?.published_today ?? 0);
+    if (String(st[0]?.day ?? "").slice(0, 10) !== today) {
       count = 0;
       await sql`update blog_auto_state set day = ${today}::date, published_today = 0 where id = ${"default"}`;
     }
-    if (Math.max(0, 1 - count) <= 0) return 0;
-    const last = await sql<{ last_run_at: string | null }>`select last_run_at from blog_auto_state where id = ${"default"}`;
-    const lastAt = last[0]?.last_run_at ? new Date(last[0].last_run_at).getTime() : 0;
-    if (lastAt && Date.now() - lastAt < 12 * 3600 * 1000) return 0;
+    if (count >= 3) return 0;
+    const lastAt = st[0]?.last_run_at ? new Date(st[0].last_run_at).getTime() : 0;
+    if (lastAt && Date.now() - lastAt < 4 * 3600 * 1000) return 0;
     await sql`update blog_auto_state set last_run_at = now() where id = ${"default"}`;
-    const loc = ["fi", "en"][count % 2];
-    if (!(await generateBlogPost(sql, { locale: loc, publish: false, authorId: null })).ok) return 0;
+    const loc = (["fi", "en", "sv"] as const)[count % 3];
+    const made = await generateBlogPost(sql, { locale: loc, publish: true, authorId: null });
+    if (!made.ok) return 0;
     await sql`update blog_auto_state set published_today = published_today + 1 where id = ${"default"}`;
     return 1;
   } catch (err) {

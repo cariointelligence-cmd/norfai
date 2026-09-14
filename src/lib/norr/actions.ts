@@ -314,7 +314,7 @@ export const getBootstrap = createServerFn({ method: "POST" }).middleware([authM
       recentRuns,
       recentCompanies,
       isAdmin: identity.isAdmin,
-      plan: identity.plan,
+      plan: identity.isAdmin ? "unlimited" : identity.plan,
       searchesUsed: identity.searchesUsed,
       searchesLimit: identity.searchesLimit,
       perSearch: perSearchLimitFor(normalizePlanId(identity.plan), Boolean(identity.isAdmin)),
@@ -2074,75 +2074,64 @@ export const startBillingPortal = createServerFn({ method: "POST" }).middleware(
   });
 
 export const getAdminState = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {
+    const empty = {
+      isAdmin: false,
+      seedOpen: true,
+      admins: [],
+      workspaceCount: 0,
+      userCount: 0,
+      planMix: [],
+      searchesToday: 0,
+      searchesRunning: 0,
+      companiesTotal: 0,
+      jobsLive: 0,
+      jobsQueued: 0,
+      securityHigh: 0,
+      findings: [],
+    };
     try {
-      const sql = await ctxSql(context);
-      await ensurePlatformSchema(sql);
-      const id = await ensurePlatformIdentity(sql, context.userId);
-      if (!id.isAdmin) return {
-        isAdmin: false,
-        seedOpen: id.seedOpen,
-        admins: [],
-        workspaceCount: 0
+      const sql = await rawSql(context);
+      const id = await readPlatformIdentity(sql, context.userId);
+      if (!id.isAdmin) return { ...empty, seedOpen: id.seedOpen };
+      const n = async (q) => {
+        try { return Number((await q)[0]?.n ?? 0) || 0; } catch { return 0; }
       };
-      const admins = await sql`select user_id, email, role from platform_admins order by created_at`;
-      const [ws] = await sql`select count(*)::int as n from workspaces`;
-      let userCount = ws?.n ?? 0;
-      let planMix: Array<{ plan: string; n: number }> = [];
-      let searchesToday = 0;
-      let searchesRunning = 0;
-      let companiesTotal = 0;
-      let jobsLive = 0;
-      let jobsQueued = 0;
-      let securityHigh = 0;
-      let findings: Array<{ severity: string; title: string; why: string; trail: string }> = [];
-      try {
-        userCount = (await sql`select count(*)::int as n from "user"`)[0]?.n ?? userCount;
-        planMix = await sql`select coalesce(plan, 'free') as plan, count(*)::int as n from workspaces group by 1 order by n desc`;
-        const sr = (await sql`
-          select
-            count(*) filter (where created_at > now() - interval '1 day')::int as today,
-            count(*) filter (where status in ('running','queued'))::int as running
-          from search_runs`)[0];
-        searchesToday = sr?.today ?? 0;
-        searchesRunning = sr?.running ?? 0;
-        companiesTotal = (await sql`select count(*)::int as n from companies where deleted_at is null`)[0]?.n ?? 0;
-        const jq = (await sql`select
-          count(*) filter (where status = 'running')::int as running,
-          count(*) filter (where status = 'queued')::int as queued
-          from jobs where status in ('queued','running')`)[0];
-        jobsLive = jq?.running ?? 0;
-        jobsQueued = jq?.queued ?? 0;
-        securityHigh = (await sql`select count(*)::int as n from security_events where created_at > now() - interval '1 day' and risk in ('high','blocked')`)[0]?.n ?? 0;
-      } catch { /* optional stats */ }
-      const queueDepth = jobsLive + jobsQueued;
-      if (queueDepth > 200) findings.push({ severity: "threat", title: "Job queue overloaded", why: `${jobsLive} running · ${jobsQueued} queued. Drain from Search health.`, trail: "/admin/search" });
-      else if (queueDepth > 40) findings.push({ severity: "warning", title: "Job queue elevated", why: `${jobsLive} running · ${jobsQueued} queued.`, trail: "/admin/search" });
-      if (searchesRunning > 2) findings.push({ severity: "warning", title: "Searches stuck running", why: `${searchesRunning} searches still marked running.`, trail: "/admin/search" });
+      const [admins, workspaceCount, userCount, planMix, today, running, companiesTotal, jobRun, jobQue, securityHigh] = await Promise.all([
+        sql`select user_id, email, role from platform_admins order by created_at`.catch(() => []),
+        n(sql`select count(*)::int as n from workspaces`),
+        n(sql`select count(*)::int as n from "user"`),
+        sql`select coalesce(plan, 'free') as plan, count(*)::int as n from workspaces group by 1 order by n desc`.catch(() => []),
+        n(sql`select count(*)::int as n from search_runs where created_at > now() - interval '1 day'`),
+        n(sql`select count(*)::int as n from search_runs where status in ('running','queued')`),
+        n(sql`select count(*)::int as n from companies where deleted_at is null`),
+        n(sql`select count(*)::int as n from jobs where status = 'running'`),
+        n(sql`select count(*)::int as n from jobs where status = 'queued'`),
+        n(sql`select count(*)::int as n from security_events where created_at > now() - interval '1 day' and risk in ('high','blocked')`),
+      ]);
+      const findings = [];
+      const queueDepth = jobRun + jobQue;
+      if (queueDepth > 200) findings.push({ severity: "threat", title: "Job queue overloaded", why: `${jobRun} running · ${jobQue} queued.`, trail: "/admin/search" });
+      else if (queueDepth > 40) findings.push({ severity: "warning", title: "Job queue elevated", why: `${jobRun} running · ${jobQue} queued.`, trail: "/admin/search" });
+      if (running > 2) findings.push({ severity: "warning", title: "Searches stuck running", why: `${running} searches still marked running.`, trail: "/admin/search" });
       if (securityHigh > 0) findings.push({ severity: "threat", title: "High-risk security events today", why: `${securityHigh} high/blocked events in 24h.`, trail: "/admin/security" });
-      if (searchesToday === 0) findings.push({ severity: "missing", title: "No searches today", why: "No customer search started in the last 24 hours.", trail: "/admin/search" });
       return {
         isAdmin: true,
         seedOpen: id.seedOpen,
         admins,
-        workspaceCount: ws?.n ?? 0,
-        userCount,
+        workspaceCount,
+        userCount: userCount || workspaceCount,
         planMix,
-        searchesToday,
-        searchesRunning,
+        searchesToday: today,
+        searchesRunning: running,
         companiesTotal,
-        jobsLive,
-        jobsQueued,
+        jobsLive: jobRun,
+        jobsQueued: jobQue,
         securityHigh,
         findings,
       };
     } catch (err) {
       console.error("[norf] admin-state", err);
-      return {
-        isAdmin: false,
-        seedOpen: true,
-        admins: [],
-        workspaceCount: 0
-      };
+      return empty;
     }
   });
 
@@ -2681,4 +2670,16 @@ export const adminGiftPlan = createServerFn({ method: "POST" }).middleware([auth
 export const adminGrantAdmin = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d).handler(async ({ context, data }) => {
   const sql = await ctxSql(context);
   return grantAdminByUserId(sql, context.userId, data?.userId);
+});
+
+export const askNorfAssistant = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d).handler(async ({ context, data }) => {
+  const sql = await rawSql(context);
+  const id = await readPlatformIdentity(sql, context.userId);
+  const { norfAssist } = await import("./assistant.ts");
+  return norfAssist({
+    question: String(data?.question ?? ""),
+    locale: String(data?.locale ?? "fi"),
+    isAdmin: id.isAdmin,
+    plan: id.plan,
+  });
 });
