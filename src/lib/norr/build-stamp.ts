@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-email-unknown";
+export const NORF_BUILD = "2026-09-14-admin-ops";
 
 export function vercelDeployProbe() {
   const env = process.env;

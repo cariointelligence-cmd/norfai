@@ -2091,6 +2091,7 @@ export const getAdminState = createServerFn({ method: "GET" }).middleware([authM
       let searchesRunning = 0;
       let companiesTotal = 0;
       let jobsLive = 0;
+      let jobsQueued = 0;
       let securityHigh = 0;
       let findings: Array<{ severity: string; title: string; why: string; trail: string }> = [];
       try {
@@ -2104,11 +2105,17 @@ export const getAdminState = createServerFn({ method: "GET" }).middleware([authM
         searchesToday = sr?.today ?? 0;
         searchesRunning = sr?.running ?? 0;
         companiesTotal = (await sql`select count(*)::int as n from companies where deleted_at is null`)[0]?.n ?? 0;
-        jobsLive = (await sql`select count(*)::int as n from jobs where status in ('queued','running')`)[0]?.n ?? 0;
+        const jq = (await sql`select
+          count(*) filter (where status = 'running')::int as running,
+          count(*) filter (where status = 'queued')::int as queued
+          from jobs where status in ('queued','running')`)[0];
+        jobsLive = jq?.running ?? 0;
+        jobsQueued = jq?.queued ?? 0;
         securityHigh = (await sql`select count(*)::int as n from security_events where created_at > now() - interval '1 day' and risk in ('high','blocked')`)[0]?.n ?? 0;
       } catch { /* optional stats */ }
-      if (jobsLive > 200) findings.push({ severity: "threat", title: "Job queue overloaded", why: `${jobsLive} live jobs. Worker is not draining.`, trail: "/admin/search" });
-      else if (jobsLive > 40) findings.push({ severity: "warning", title: "Job queue elevated", why: `${jobsLive} live jobs.`, trail: "/admin/search" });
+      const queueDepth = jobsLive + jobsQueued;
+      if (queueDepth > 200) findings.push({ severity: "threat", title: "Job queue overloaded", why: `${jobsLive} running · ${jobsQueued} queued. Drain from Search health.`, trail: "/admin/search" });
+      else if (queueDepth > 40) findings.push({ severity: "warning", title: "Job queue elevated", why: `${jobsLive} running · ${jobsQueued} queued.`, trail: "/admin/search" });
       if (searchesRunning > 2) findings.push({ severity: "warning", title: "Searches stuck running", why: `${searchesRunning} searches still marked running.`, trail: "/admin/search" });
       if (securityHigh > 0) findings.push({ severity: "threat", title: "High-risk security events today", why: `${securityHigh} high/blocked events in 24h.`, trail: "/admin/security" });
       if (searchesToday === 0) findings.push({ severity: "missing", title: "No searches today", why: "No customer search started in the last 24 hours.", trail: "/admin/search" });
@@ -2123,6 +2130,7 @@ export const getAdminState = createServerFn({ method: "GET" }).middleware([authM
         searchesRunning,
         companiesTotal,
         jobsLive,
+        jobsQueued,
         securityHigh,
         findings,
       };

@@ -246,13 +246,16 @@ export function AppShell() {
                 className="h-8 w-52 border border-line bg-canvas px-2 text-xs outline-none placeholder:text-faint focus:border-ink lg:w-64"
               />
               {findQ.trim().length >= 2 ? (
-                <div className="absolute right-0 top-9 z-30 w-80 border border-line bg-canvas p-2 text-sm shadow-lg">
+                <div className="absolute right-0 top-9 z-30 max-h-96 w-80 overflow-y-auto border border-line bg-canvas p-2 text-sm shadow-lg">
+                  {(find.data?.companies ?? []).length ? <div className="px-2 pb-1 text-[10px] uppercase tracking-[0.14em] text-faint">{ta("navCompanies")}</div> : null}
                   {(find.data?.companies ?? []).map((c: { id: string; name: string }) => (
                     <Link key={c.id} to="/companies/$companyId" params={{ companyId: c.id }} className="block px-2 py-1 hover:bg-panel-2" onClick={() => setFindQ("")}>{c.name}</Link>
                   ))}
+                  {(find.data?.people ?? []).length ? <div className="px-2 pb-1 pt-2 text-[10px] uppercase tracking-[0.14em] text-faint">{ta("navPeople")}</div> : null}
                   {(find.data?.people ?? []).map((p: { id: string; name: string }) => (
                     <Link key={p.id} to="/people/$personId" params={{ personId: p.id }} className="block px-2 py-1 hover:bg-panel-2" onClick={() => setFindQ("")}>{p.name}</Link>
                   ))}
+                  {(find.data?.runs ?? []).length ? <div className="px-2 pb-1 pt-2 text-[10px] uppercase tracking-[0.14em] text-faint">{ta("navHistory")}</div> : null}
                   {(find.data?.runs ?? []).map((r: { id: string; name?: string | null }) => (
                     <Link key={r.id} to="/search/$runId" params={{ runId: r.id }} className="block px-2 py-1 hover:bg-panel-2" onClick={() => setFindQ("")}>{r.name || r.id.slice(0, 8)}</Link>
                   ))}

@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { getAdminState } from "@/lib/norr/actions";
 import { Pill } from "@/components/status";
+import { NORF_BUILD } from "@/lib/norr/build-stamp.ts";
 
 export const Route = createFileRoute("/admin/")({ component: AdminHome });
 
@@ -21,7 +22,8 @@ function AdminHome() {
         <Stat label="Users" value={d?.userCount ?? d?.workspaceCount ?? "-"} />
         <Stat label="Workspaces" value={d?.workspaceCount ?? "-"} />
         <Stat label="Searches today" value={d?.searchesToday ?? 0} />
-        <Stat label="Jobs live" value={d?.jobsLive ?? 0} />
+        <Stat label="Jobs running" value={d?.jobsLive ?? 0} />
+        <Stat label="Jobs queued" value={d?.jobsQueued ?? 0} />
         <Stat label="Companies" value={d?.companiesTotal ?? 0} />
         <Stat label="Searches running" value={d?.searchesRunning ?? 0} />
         <Stat label="Security high 24h" value={d?.securityHigh ?? 0} />
@@ -57,7 +59,7 @@ function AdminHome() {
         </section>
       ) : null}
       <p className="text-sm text-mute">
-        Seed signup: {d?.seedOpen ? "open for CARIO and TAJU emails" : "closed. Invite from Users."}
+        Build {NORF_BUILD}. Seed signup: {d?.seedOpen ? "open for CARIO and TAJU emails" : "closed. Invite from Users."}
         {" "}Create accounts and gift plans under Users. Drain a stuck queue from Search health.
       </p>
       <div className="flex flex-wrap gap-2 text-sm">

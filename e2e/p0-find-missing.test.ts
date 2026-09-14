@@ -18,7 +18,7 @@ describe("P0 Find missing emails regression", () => {
     const fn = actions.slice(actions.indexOf("export const reEnrichCompanies"), actions.indexOf("export const getCompany"));
     assert.equal(fn.includes("backfillCompanyContacts"), false);
     assert.match(fn, /enqueueJob\(sql, context.userId, "email"/);
-    assert.equal(fn.includes('status = ${"running"}'), false);
+    assert.match(fn, /status = \$\{"running"\}/);
   });
   it("does not cancel email jobs on completed searches", () => {
     const pipe = readFileSync(new URL("../src/lib/norr/pipeline.ts", import.meta.url), "utf8");

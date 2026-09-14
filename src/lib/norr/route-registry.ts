@@ -20,7 +20,7 @@ export const ROUTE_REGISTRY: RouteDef[] = [
   { id: "cron", path: "/api/cron/tick", method: "GET", purpose: "watchdog", auth: "internal", timeoutMs: 28_000, sideEffects: true, capability: "queue" },
   { id: "jobs_drain", path: "/api/jobs/drain", method: "POST", purpose: "vercel job drain", auth: "internal", timeoutMs: 28_000, sideEffects: true, capability: "queue" },
   { id: "worker", path: "/api/internal/worker", method: "POST", purpose: "job drain recovery", auth: "internal", timeoutMs: 28_000, sideEffects: true, capability: "queue" },
-  { id: "canary", path: "/api/internal/canary", method: "GET", purpose: "synthetic search health", auth: "internal", timeoutMs: 15_000, sideEffects: false, capability: "ops" },
+  { id: "canary", path: "/api/internal/canary", method: "GET", purpose: "honeypot 404", auth: "internal", timeoutMs: 15_000, sideEffects: false, capability: "ops" },
   { id: "stripe", path: "/api/stripe/webhook", method: "POST", purpose: "billing events", auth: "internal", timeoutMs: 10_000, sideEffects: true, capability: "billing" },
   { id: "gsc", path: "/api/gsc/callback", method: "GET", purpose: "search console oauth", auth: "session", timeoutMs: 8_000, sideEffects: true, capability: "seo" },
   { id: "landing", path: "/", method: "GET", purpose: "marketing", auth: "public", timeoutMs: 5_000, sideEffects: false, capability: "face" },
@@ -32,6 +32,11 @@ export const ROUTE_REGISTRY: RouteDef[] = [
   { id: "admin", path: "/admin", method: "GET", purpose: "control plane", auth: "admin", timeoutMs: 8_000, sideEffects: false, capability: "ops" },
   { id: "admin_search", path: "/admin/search", method: "GET", purpose: "search health", auth: "admin", timeoutMs: 10_000, sideEffects: false, capability: "ops" },
   { id: "admin_security", path: "/admin/security", method: "GET", purpose: "security trail", auth: "admin", timeoutMs: 8_000, sideEffects: false, capability: "ops" },
+  { id: "search_tick", path: "/api/search/tick", method: "POST", purpose: "authenticated job drain pulse", auth: "session", timeoutMs: 30_000, sideEffects: true, capability: "queue" },
+  { id: "search_start", path: "/api/search/start", method: "POST", purpose: "create search run", auth: "session", timeoutMs: 8_000, sideEffects: true, capability: "COMPANY_DISCOVERY" },
+  { id: "overview", path: "/overview", method: "GET", purpose: "workspace dashboard", auth: "session", timeoutMs: 8_000, sideEffects: false, capability: "face" },
+  { id: "lists", path: "/lists", method: "GET", purpose: "saved lists", auth: "session", timeoutMs: 8_000, sideEffects: false, capability: "face" },
+  { id: "profiles", path: "/profiles", method: "GET", purpose: "saved search profiles", auth: "session", timeoutMs: 5_000, sideEffects: false, capability: "COMPANY_DISCOVERY" },
 ];
 
 export type RouteResolution =
