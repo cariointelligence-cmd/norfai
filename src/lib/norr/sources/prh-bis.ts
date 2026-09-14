@@ -28,7 +28,7 @@ function typeOf(t: string): "phone" | "email" | "website" | "other" {
   return "other";
 }
 
-export async function prhBisLookup(businessId: string): Promise<AdapterResult<{
+export async function prhBisLookup(businessId: string, opts?: { timeoutMs?: number }): Promise<AdapterResult<{
   phone: string | null;
   phoneRole: string | null;
   email: string | null;
@@ -38,7 +38,7 @@ export async function prhBisLookup(businessId: string): Promise<AdapterResult<{
   const bid = normalizeBusinessId(businessId);
   if (!bid) return { ok: false, error: "Invalid business ID" };
   const url = `${BASE}/${encodeURIComponent(bid)}`;
-  const r = await getJson<BisCompany | { results?: BisCompany[] }>(url, { timeoutMs: 12000 });
+  const r = await getJson<BisCompany | { results?: BisCompany[] }>(url, { timeoutMs: opts?.timeoutMs ?? 4000 });
   if (!r.ok) return { ok: false, error: r.error, state: r.status === 429 ? "rate_limited" : "temporarily_unavailable" };
   const raw = r.data as BisCompany & { results?: BisCompany[] };
   const c = raw.results?.[0] ?? raw;

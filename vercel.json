@@ -1,3 +1,8 @@
 {
-  "regions": ["arn1"]
+  "regions": ["arn1"],
+  "functions": {
+    "src/routes/api/search/tick.ts": { "maxDuration": 30 },
+    "src/routes/api/jobs/drain.ts": { "maxDuration": 30 },
+    "src/routes/api/cron/tick.ts": { "maxDuration": 30 }
+  }
 }

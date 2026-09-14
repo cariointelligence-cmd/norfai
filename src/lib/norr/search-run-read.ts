@@ -26,7 +26,10 @@ export async function readSearchRun(userId: string, runId: string, cursor?: stri
     companies = await sql`
       select c.id, c.name, c.business_id, c.municipality, c.industry_code, c.industry_label,
         c.website, c.overall_confidence, c.record_status, c.general_email, c.phone,
-        c.match_score, coalesce(rc.seen_before, false) as seen_before
+        c.match_score, coalesce(rc.seen_before, false) as seen_before,
+        (select p.full_name from people p
+          where p.user_id = ${userId} and p.company_id = c.id and p.deleted_at is null
+          order by p.confidence desc nulls last limit 1) as decision_maker
       from run_companies rc
       join companies c on c.id = rc.company_id
       where rc.user_id = ${userId} and rc.run_id = ${runId}
@@ -40,7 +43,11 @@ export async function readSearchRun(userId: string, runId: string, cursor?: stri
   const jobsLive = jobs.some((j: { status?: string }) => j.status === "running" || j.status === "queued");
   const viewStatus = jobsLive && run.status !== "cancelled" && run.status !== "failed" ? "running" : run.status;
   const missingEmail = unique.filter((c) => !c.general_email).length;
+  const foundEmail = unique.filter((c) => c.general_email).length;
+  const foundPhone = unique.filter((c) => c.phone).length;
+  const foundDecisionMaker = unique.filter((c) => c.decision_maker).length;
   const progress = runProgress(jobs, viewStatus);
+  const matched = Number(run.new_leads_count ?? 0) + Number(run.previously_seen_count ?? 0) || unique.length;
 
   return {
     ok: true as const,
@@ -51,7 +58,7 @@ export async function readSearchRun(userId: string, runId: string, cursor?: stri
     companies: unique,
     nextCursor: null,
     summary: {
-      matched: unique.length,
+      matched,
       newToYou: unique.filter((c) => !c.seen_before).length,
       seenBefore: unique.filter((c) => c.seen_before).length,
       excluded: Number(run.excluded_count ?? 0),
@@ -62,6 +69,11 @@ export async function readSearchRun(userId: string, runId: string, cursor?: stri
       emptyNew: unique.length === 0 && viewStatus !== "queued" && viewStatus !== "running",
       emptyNewMessage: "",
       missingEmail,
+      foundEmail,
+      foundPhone,
+      foundDecisionMaker,
+      missingPhone: unique.length - foundPhone,
+      missingDecisionMaker: unique.length - foundDecisionMaker,
       diagnosis: null,
       coverage: null,
     },

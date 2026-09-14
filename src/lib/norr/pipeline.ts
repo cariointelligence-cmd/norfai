@@ -292,7 +292,9 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
         note: `${diag.code}: ${diag.text}`,
       });
     }
-    const ranking = await freezeRunRanking(sql, userId, runId, criteria);
+    const ranking = complete
+      ? await freezeRunRanking(sql, userId, runId, criteria)
+      : { newCount: kept, seenCount: excludedSeen };
     let previousReport: Array<Record<string, unknown>> = [];
     try {
       const prev = await sql`select source_report from search_runs where id = ${runId} and user_id = ${userId} limit 1`;
@@ -424,7 +426,7 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
   if (kept >= want || quotaStopped) return finish(true);
   if (timedOut) return finish(false);
 
-  if (kept < want && Date.now() < deadline) {
+  if (kept < want && stored === 0 && Date.now() < deadline) {
     try {
       const extra = await homemadeRegisterDiscover({
         criteria,
@@ -672,6 +674,23 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		emails: facts.emails,
 		phones: facts.phones
 	});
+	if (bid && country === "FI" && (!facts.emails.length || !facts.phones.length || !facts.people.length)) {
+		try {
+			const bis = await prhBisLookup(bid, { timeoutMs: 3500 });
+			if (bis.ok) {
+				await persistHits({
+					website: bis.data.website,
+					websiteSource: "ytj",
+					people: [],
+					emails: (bis.data.contacts ?? []).filter((c) => c.kind === "email"),
+					phones: (bis.data.contacts ?? []).filter((c) => c.kind === "phone"),
+				});
+				if (bis.observations?.length) {
+					await insertObservations(sql, userId, "company", companyId, "ytj", bis.sourceUrl, "official_register", bis.observations);
+				}
+			}
+		} catch { /* BIS is optional contact fill */ }
+	}
 	await recordCapability(sql, userId, companyId, "email", facts.emails.length ? "SUCCESS" : "NO_DATA", { evidence: { n: facts.emails.length } });
 	await recordCapability(sql, userId, companyId, "phone", facts.phones.length ? "SUCCESS" : "NO_DATA", { evidence: { n: facts.phones.length } });
 	await recordCapability(sql, userId, companyId, "website", facts.website ? "SUCCESS" : "NO_DATA");
@@ -1472,7 +1491,7 @@ async function processNextJob(sql, userId, runId, opts) {
 					}),
 				]);
 				if (!disc.complete) {
-					await sql`update jobs set status = ${"queued"}, attempts = greatest(attempts - 1, 0), run_after = now() + interval '1 second', last_error = ${"discover continue"}, locked_at = null, payload = ${JSON.stringify({ ...payload, ytjCursor: disc.cursor ?? null, discoverExhausted: false, ytjScannedAll: false })}::jsonb, updated_at = now()
+					await sql`update jobs set status = ${"queued"}, attempts = greatest(attempts - 1, 0), run_after = now(), last_error = ${"discover continue"}, locked_at = null, payload = ${JSON.stringify({ ...payload, ytjCursor: disc.cursor ?? payload.ytjCursor ?? null, discoverExhausted: false, ytjScannedAll: false })}::jsonb, updated_at = now()
             where id = ${job.id} and user_id = ${userId}`;
 					return { did: true, type: job.type, incomplete: true };
 				}
@@ -1555,9 +1574,10 @@ export async function resumeDiscoverIfStarved(sql, userId, runId) {
 		want,
 		discoverOpen: Boolean(open[0]),
 		registerScannedAll: Boolean(payload.ytjScannedAll),
+		resumeCount: Number(payload.resumeCount ?? 0),
 	})) return false;
 	if (!done[0]) return false;
-	await sql`update jobs set status = ${"queued"}, run_after = now(), last_error = ${"discover continue"}, attempts = 0, locked_at = null, payload = ${JSON.stringify({ ...payload, discoverExhausted: false })}::jsonb, updated_at = now()
+	await sql`update jobs set status = ${"queued"}, run_after = now(), last_error = ${"discover continue"}, attempts = 0, locked_at = null, payload = ${JSON.stringify({ ...payload, discoverExhausted: false, ytjScannedAll: false, resumeCount: Number(payload.resumeCount ?? 0) + 1 })}::jsonb, updated_at = now()
     where id = ${done[0].id} and user_id = ${userId}`;
 	await sql`update search_runs set status = ${"running"}, finished_at = null where id = ${runId} and user_id = ${userId} and status in ('completed','running','queued')`;
 	return true;
@@ -1619,7 +1639,7 @@ export async function pumpSearch(sql, userId, runId) {
       where user_id = ${userId} and status = ${"running"}
         and (locked_at is null or locked_at < now() - interval '8 seconds')`;
 	} catch { /* */ }
-	return processJobsFor(sql, userId, runId, { maxMs: 16_000, concurrency: 1, skipSchema: true });
+	return processJobsFor(sql, userId, runId, { maxMs: 16_000, concurrency: 2, skipSchema: true });
 }
 
 const kickLocks = new Map();

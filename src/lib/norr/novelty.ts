@@ -141,12 +141,16 @@ export function shouldResumeDiscover(opts: {
   want: number;
   discoverOpen: boolean;
   registerScannedAll?: boolean;
+  resumeCount?: number;
 }): boolean {
   if (opts.cancelRequested || opts.pauseRequested) return false;
   if (opts.status === "cancelled" || opts.status === "failed" || opts.status === "paused") return false;
   if (opts.kept >= opts.want) return false;
   if (opts.discoverOpen) return false;
-  if (opts.registerScannedAll) return false;
+  if (opts.registerScannedAll) {
+    if ((opts.resumeCount ?? 0) >= 1) return false;
+    if (opts.kept >= Math.ceil(opts.want * 0.5)) return false;
+  }
   return true;
 }
 

@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { getSql } from "@/lib/db";
 import { pumpSearch } from "@/lib/norr/pipeline.ts";
 
+export const maxDuration = 30;
+
 export const Route = createFileRoute("/api/search/tick")({
   server: {
     handlers: { POST: handle },

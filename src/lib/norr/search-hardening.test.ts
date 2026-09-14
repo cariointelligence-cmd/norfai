@@ -309,6 +309,14 @@ describe("novelty and ranking", () => {
       want: 500,
       discoverOpen: false,
       registerScannedAll: true,
+    }), true);
+    assert.equal(shouldResumeDiscover({
+      status: "completed",
+      kept: 78,
+      want: 500,
+      discoverOpen: false,
+      registerScannedAll: true,
+      resumeCount: 1,
     }), false);
     assert.equal(shouldResumeDiscover({
       status: "running",
