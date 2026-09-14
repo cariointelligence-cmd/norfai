@@ -85,7 +85,7 @@ import { interpretTargetPrompt, applyPresetToCriteria } from "./targeting/parser
 import { OPPORTUNITY_PRESETS } from "./targeting/spec.ts";
 import { normalizeBusinessId, normalizeDomain, isJunkCompanyWebsite } from "./normalize.ts";
 import { scoped } from "./tenant.ts";
-import { snapshotQueueDepth, drainStuckUserWork } from "./queue-monitor.ts";
+import { countRunFacts } from "./search-run-read.ts";
 import { isoTime } from "@/lib/format.ts";
 import { buildSalesBrief } from "./sales-brief.ts";
 import { classifyHiring, classifyHiringCategory, hiringFreshness } from "./hiring-signal.ts";
@@ -581,13 +581,22 @@ export const getRun = createServerFn({ method: "GET" }).middleware([authMiddlewa
     join companies c on c.id = rc.company_id
     where rc.user_id = ${context.userId} and rc.run_id = ${data.runId} and c.deleted_at is null
       and c.record_status is distinct from 'rejected'`;
-  const [missingRow] = await sql`select count(*)::int as n from run_companies rc
-    join companies c on c.id = rc.company_id
-    where rc.user_id = ${context.userId} and rc.run_id = ${data.runId} and c.deleted_at is null
-      and c.record_status is distinct from 'rejected'
-      and c.general_email is null`;
-  const companyCount = Number(runCount?.n ?? uniqueCompanies.length);
-  const missingEmail = Number(missingRow?.n ?? uniqueCompanies.filter((c) => !c.general_email).length);
+  let facts = {
+    matched: Number(runCount?.n ?? uniqueCompanies.length),
+    newToYou: uniqueCompanies.filter((c) => !c.seen_before).length,
+    seenBefore: uniqueCompanies.filter((c) => c.seen_before).length,
+    foundEmail: uniqueCompanies.filter((c) => c.general_email).length,
+    foundPhone: uniqueCompanies.filter((c) => c.phone).length,
+    foundDecisionMaker: uniqueCompanies.filter((c) => c.decision_maker).length,
+    missingEmail: uniqueCompanies.filter((c) => !c.general_email).length,
+    missingPhone: uniqueCompanies.filter((c) => !c.phone).length,
+    missingDecisionMaker: uniqueCompanies.filter((c) => !c.decision_maker).length,
+  };
+  try {
+    facts = await countRunFacts(sql, context.userId, data.runId);
+  } catch { /* keep page fallback */ }
+  const companyCount = facts.matched;
+  const missingEmail = facts.missingEmail;
   const skipSeen = skipPreviouslyShown(run.criteria ?? {});
   const jobsLive = (jobs as Array<{ status?: string }>).some((j) => j.status === "running" || j.status === "queued");
   const viewStatus = displayRunStatus(String(run.status ?? ""), jobsLive);
@@ -605,8 +614,8 @@ export const getRun = createServerFn({ method: "GET" }).middleware([authMiddlewa
   }
   const report = sanitizeSourceReport(run.source_report);
   const diagnosis = faceRegisterDiagnosis(report, { companyCount, status: viewStatus });
-  const progress = runProgress(jobs, viewStatus);
-  const matched = Number(run.new_leads_count ?? 0) + Number(run.previously_seen_count ?? 0) || companyCount;
+  const progress = runProgress(jobs, viewStatus, { matched: companyCount, want: requested });
+  const matched = companyCount;
   let coverage = null;
   try {
     const rejected = await sql<{ reject_reason: string | null }>`
@@ -648,8 +657,8 @@ export const getRun = createServerFn({ method: "GET" }).middleware([authMiddlewa
     nextCursor,
     summary: {
       matched,
-      newToYou: Number(run.new_leads_count ?? uniqueCompanies.filter((c) => !c.seen_before).length),
-      seenBefore: Number(run.previously_seen_count ?? uniqueCompanies.filter((c) => c.seen_before).length),
+      newToYou: facts.newToYou,
+      seenBefore: facts.seenBefore,
       excluded,
       exhaustion: run.search_exhaustion_score ?? 0,
       rankingVersion: run.ranking_version ?? RANKING_VERSION,
@@ -658,6 +667,11 @@ export const getRun = createServerFn({ method: "GET" }).middleware([authMiddlewa
       emptyNew,
       emptyNewMessage: emptyNew ? emptyNewLeadsMessage(true) : "",
       missingEmail,
+      foundEmail: facts.foundEmail,
+      foundPhone: facts.foundPhone,
+      foundDecisionMaker: facts.foundDecisionMaker,
+      missingPhone: facts.missingPhone,
+      missingDecisionMaker: facts.missingDecisionMaker,
       diagnosis,
       coverage,
     },
