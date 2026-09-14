@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-focus-16";
+export const NORF_BUILD = "2026-09-14-neon-pool";
 
 export function vercelDeployProbe() {
   const env = process.env;

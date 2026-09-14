@@ -1,22 +1,20 @@
 import { pendingMigrations } from "../../scripts/migration-plan.mjs";
+import { neonPooledUrl, resolvePostgresUrl } from "./neon-url.ts";
+
+export { neonPooledUrl, resolvePostgresUrl };
 
 /** Which database backend is active. */
 export type DbSource = "neon" | "pglite";
 
-// An empty/whitespace DATABASE_URL (an easy misconfig in deploy UIs) must mean
-// "unset" — otherwise production would silently run on the PGLite fallback.
-const rawDatabaseUrl =
-  typeof process !== "undefined" ? process.env.DATABASE_URL : undefined;
-const databaseUrl =
-  rawDatabaseUrl && rawDatabaseUrl.trim() ? rawDatabaseUrl : undefined;
+const resolved = resolvePostgresUrl();
+const databaseUrl = resolved.url;
 
 /**
- * Active backend: real **Neon** when `DATABASE_URL` is set (deployed / configured
- * sandbox), otherwise a local embedded **PGLite** (Postgres compiled to WASM) so
- * the app has a working database even with nothing configured — the live preview
- * included. Swap in Neon later by just setting `DATABASE_URL`; no code changes.
+ * Active backend: real **Neon** (Vercel pooled) when a Postgres URL is set,
+ * otherwise local **PGLite**. Production Norfai on Vercel uses Neon.
  */
 export const dbSource: DbSource = databaseUrl ? "neon" : "pglite";
+export const neonPoolMeta = { pooled: resolved.pooled, source: resolved.source };
 
 /**
  * Minimal shared SQL surface, satisfied by both Neon and PGLite. Both the
@@ -93,12 +91,18 @@ function createNeonSql(): Promise<Sql> {
     types.setTypeParser(OID_INT8, Number);
     types.setTypeParser(OID_DATE, identity);
     types.setTypeParser(OID_INTERVAL, identity);
+    const pooled = neonPoolMeta.pooled || /-pooler\./i.test(databaseUrl ?? "");
     const pool = new Pool({
       connectionString: databaseUrl,
-      max: 5,
-      connectionTimeoutMillis: 3000,
-      idleTimeoutMillis: 10_000,
-      statement_timeout: 8_000,
+      max: pooled ? 16 : 8,
+      min: 0,
+      connectionTimeoutMillis: 4_000,
+      idleTimeoutMillis: pooled ? 8_000 : 12_000,
+      allowExitOnIdle: true,
+      statement_timeout: 25_000,
+      ssl: /\.neon\.tech/i.test(databaseUrl ?? "") && !/sslmode=/i.test(databaseUrl ?? "")
+        ? { rejectUnauthorized: true }
+        : undefined,
     });
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);

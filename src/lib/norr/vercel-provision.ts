@@ -10,6 +10,10 @@ const GITHUB_REPO = "cariointelligence-cmd/norfai";
 
 const ENV_COPY = [
   "DATABASE_URL",
+  "DATABASE_URL_UNPOOLED",
+  "POSTGRES_URL",
+  "POSTGRES_PRISMA_URL",
+  "POSTGRES_URL_NON_POOLING",
   "BETTER_AUTH_SECRET",
   "BETTER_AUTH_URL",
   "CRON_SECRET",
@@ -85,6 +89,10 @@ export function vercelTokenPresent(): boolean {
 
 const SECRET_ENV = new Set([
   "DATABASE_URL",
+  "DATABASE_URL_UNPOOLED",
+  "POSTGRES_URL",
+  "POSTGRES_PRISMA_URL",
+  "POSTGRES_URL_NON_POOLING",
   "BETTER_AUTH_SECRET",
   "CRON_SECRET",
   "INTERNAL_SERVICE_SECRET",
