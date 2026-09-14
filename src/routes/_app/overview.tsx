@@ -37,6 +37,15 @@ function Dashboard() {
         hive: "Viimeisin rekisteriyhteys",
         hiveNever: "Rekisteriä ei ole vielä kutsuttu tässä työtilassa.",
         loading: "Ladataan työpöytää",
+        construction: "Sivusto ja järjestelmät ovat rakenteilla 16.9.2026 asti. Pahoittelemme mahdollista haittaa.",
+        payOk: "Maksu vahvistettu. Käytössä {plan}.",
+        payPending: "Maksu vastaanotettu. Vahvistetaan Stripesta.",
+        quotaFull: "Hakukiintiö täynnä tälle jaksolle. Löydetyt yritykset säilyvät.",
+        quotaWarn: "Suurin osa hauista on käytetty ({used}/{limit}).",
+        openBilling: "Avaa tilaus",
+        seeBilling: "Katso tilaus",
+        feedback: "Palaute",
+        stripeWait: "Maksu vastaanotettu. Suunnitelma päivittyy, kun Stripe vahvistaa tilauksen.",
       },
       en: {
         title: "Overview",
@@ -61,6 +70,15 @@ function Dashboard() {
         hive: "Last register contact",
         hiveNever: "No register has been called in this workspace yet.",
         loading: "Loading the workspace",
+        construction: "The site and systems are under construction until 16 September 2026. Please excuse us for possible inconvenience.",
+        payOk: "Payment confirmed. You are on {plan}.",
+        payPending: "Payment received. Confirming with Stripe.",
+        quotaFull: "Search quota is used for this period. Found companies are kept.",
+        quotaWarn: "Most of this period’s searches are used ({used}/{limit}).",
+        openBilling: "Open billing",
+        seeBilling: "See plan",
+        feedback: "Feedback",
+        stripeWait: "Payment received. The plan updates when Stripe confirms the subscription.",
       },
       sv: {
         title: "Översikt",
@@ -85,6 +103,15 @@ function Dashboard() {
         hive: "Senaste registerkontakt",
         hiveNever: "Inget register har anropats i arbetsytan ännu.",
         loading: "Laddar arbetsytan",
+        construction: "Webbplatsen och systemen är under uppbyggnad till den 16 september 2026. Ursäkta eventuell olägenhet.",
+        payOk: "Betalning bekräftad. Du har {plan}.",
+        payPending: "Betalning mottagen. Bekräftas med Stripe.",
+        quotaFull: "Sökkvoten är fylld för perioden. Hittade bolag behålls.",
+        quotaWarn: "Större delen av sökningarna är använda ({used}/{limit}).",
+        openBilling: "Öppna abonnemang",
+        seeBilling: "Se plan",
+        feedback: "Feedback",
+        stripeWait: "Betalning mottagen. Planen uppdateras när Stripe bekräftar abonnemanget.",
       },
     },
     locale,
@@ -142,6 +169,9 @@ function Dashboard() {
 
   return (
     <div className="space-y-8">
+      <div className="border border-line bg-panel px-4 py-3 text-sm">
+        {copy.construction}
+      </div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="title">{copy.title}</h1>
@@ -154,21 +184,21 @@ function Dashboard() {
       {billingFlag ? (
         <p className="panel px-3 py-2 text-sm">
           {d.plan && d.plan !== "free"
-            ? `Maksu vahvistettu. Käytössä ${String(d.plan)}.`
-            : "Maksu vastaanotettu. Vahvistetaan Stripesta."}
+            ? copy.payOk.replace("{plan}", String(d.plan))
+            : copy.payPending}
         </p>
       ) : null}
       {!d.isAdmin && d.plan === "free" && d.searchesLimit > 0 && d.searchesUsed >= d.searchesLimit ? (
         <p className="border border-line bg-panel px-3 py-2 text-sm">
-          Hakukiintiö täynnä tälle jaksolle. Löydetyt yritykset säilyvät.{" "}
-          <Link to="/billing" className="underline">Avaa tilaus</Link>
+          {copy.quotaFull}{" "}
+          <Link to="/billing" className="underline">{copy.openBilling}</Link>
           {" · "}
-          <Link to="/tickets" className="underline">Palaute</Link>
+          <Link to="/tickets" className="underline">{copy.feedback}</Link>
         </p>
       ) : !d.isAdmin && d.plan === "free" && d.searchesLimit > 0 && d.searchesUsed >= Math.ceil(d.searchesLimit * 0.8) ? (
         <p className="border border-line bg-panel px-3 py-2 text-sm">
-          Suurin osa hauista on käytetty ({d.searchesUsed}/{d.searchesLimit}).{" "}
-          <Link to="/billing" className="underline">Katso tilaus</Link>
+          {copy.quotaWarn.replace("{used}", String(d.searchesUsed)).replace("{limit}", String(d.searchesLimit))}{" "}
+          <Link to="/billing" className="underline">{copy.seeBilling}</Link>
         </p>
       ) : null}
       {jobsLive ? (
@@ -191,7 +221,7 @@ function Dashboard() {
       )}
       {billingFlag ? (
         <p className="border border-line bg-panel px-3 py-2 text-sm">
-          Maksu vastaanotettu. Suunnitelma päivittyy, kun Stripe vahvistaa tilauksen.
+          {copy.stripeWait}
         </p>
       ) : null}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
