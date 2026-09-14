@@ -82,7 +82,7 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
           )`;
     }
   } catch { /* */ }
-  const maxMs = 14_000;
+  const maxMs = 22_000;
   let processed = 0;
   const { pickFocusSearch } = await import("./search-queue.ts");
   const focus = await pickFocusSearch(sql);
@@ -91,7 +91,7 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
   if (targetUser && targetRun) {
     processed = await processJobsFor(sql, targetUser, targetRun, {
       maxMs,
-      concurrency: 8,
+      concurrency: 16,
       skipSchema: true,
     });
     if (opts.userId && opts.userId === targetUser) {

@@ -250,7 +250,9 @@ function Dashboard() {
           <section>
             <h2 className="mb-3 text-sm font-medium">{copy.recentCompanies}</h2>
             <div className="border border-line">
-              {d.recentCompanies.map((c: any) => (
+              {d.recentCompanies.length === 0 ? (
+                <Empty title={copy.recentCompanies} body="-" />
+              ) : d.recentCompanies.map((c: any) => (
                 <Link key={c.id} to="/companies/$companyId" params={{ companyId: c.id }} className="flex items-center justify-between border-b border-line px-3 py-2 last:border-0 hover:bg-panel-2">
                   <div>
                     <div className="text-sm">{asDisplay(c.name)}</div>
@@ -264,9 +266,14 @@ function Dashboard() {
           <section>
             <h2 className="mb-3 text-sm font-medium">{copy.recentRuns}</h2>
             <div className="border border-line">
-              {d.recentRuns.map((r: any) => (
+              {d.recentRuns.length === 0 ? (
+                <Empty title={copy.recentRuns} body="-" />
+              ) : d.recentRuns.map((r: any) => (
                 <Link key={r.id} to="/search/$runId" params={{ runId: r.id }} className="flex items-center justify-between border-b border-line px-3 py-2 last:border-0 hover:bg-panel-2">
-                  <div className="font-mono text-xs text-mute">{asDisplay(r.id).slice(0, 8)}</div>
+                  <div>
+                    <div className="text-sm">{asDisplay(r.name) || asDisplay(r.id).slice(0, 8)}</div>
+                    <div className="font-mono text-xs text-mute">{formatWhen(r.created_at)}{r.new_leads_count != null ? ` · ${r.new_leads_count}` : ""}</div>
+                  </div>
                   <Pill>{asDisplay(r.status)}</Pill>
                 </Link>
               ))}

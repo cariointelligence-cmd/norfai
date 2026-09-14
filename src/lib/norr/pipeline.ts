@@ -385,7 +385,7 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
               if (failSample.length < 5) failSample.push(err instanceof Error ? err.message.slice(0, 120) : "store failed");
             });
           inflight.push(p);
-          if (inflight.length >= 4) await Promise.all(inflight.splice(0));
+          if (inflight.length >= 8) await Promise.all(inflight.splice(0));
           return kept < want && !quotaStopped;
         },
       },
@@ -1530,18 +1530,12 @@ async function claimNextJob(sql, userId, runId, opts) {
 	}
 	const live = (await sql`select count(*)::int as n from jobs where user_id = ${userId} and status = ${"running"}
       and (${runId ?? null}::text is null or run_id = ${runId ?? null})`)[0]?.n ?? 0;
-	const emailOnly = Number(live) >= 8;
-	if (emailOnly) {
-		const emailLive = (await sql`select count(*)::int as n from jobs where user_id = ${userId} and status = ${"running"} and type = ${"email"}
-          and (${runId ?? null}::text is null or run_id = ${runId ?? null})`)[0]?.n ?? 0;
-		if (Number(emailLive) >= 8) return null;
-	}
+	if (Number(live) >= 16) return null;
 	const job = (await sql`
     select id from jobs
     where user_id = ${userId} and status = 'queued' and run_after <= now()
       and (${runId ?? null}::text is null or run_id = ${runId ?? null})
       and (${!skipDiscover} or type <> ${"discover"})
-      and (${!emailOnly} or type = ${"email"})
       and (
         run_id is null
         or type = ${"email"}
@@ -1774,7 +1768,7 @@ export async function pumpSearch(sql, userId, runId) {
 		for (const [k, t] of pumpLocks) if (now - t > 60_000) pumpLocks.delete(k);
 	}
 	try { await stealStaleJobs(sql, userId, null); } catch { /* */ }
-	return processJobsFor(sql, userId, runId, { maxMs: 10_000, concurrency: 8, skipSchema: true });
+	return processJobsFor(sql, userId, runId, { maxMs: 20_000, concurrency: 16, skipSchema: true });
 }
 
 const kickLocks = new Map();

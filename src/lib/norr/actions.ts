@@ -267,27 +267,28 @@ export const getBootstrap = createServerFn({ method: "GET" }).middleware([authMi
     stripeReady: false
   };
   try {
-    const sql = await getSql();
-    const ws = await ensureWorkspace(sql, context.userId);
-    const identity = await readPlatformIdentity(sql, context.userId);
+    const sql = await ctxSql(context);
+    const uid = context.userId;
+    const ws = await ensureWorkspace(sql, uid);
+    const identity = await readPlatformIdentity(sql, uid);
     const [companies, people, runs, openReview, jobsRunning, contacts, sources, recentRuns, recentCompanies] = await Promise.all([
-      sql`select count(*)::int as n from companies where user_id = ${context.userId} and deleted_at is null`.then((r) => r[0]),
-      sql`select count(*)::int as n from people where user_id = ${context.userId} and deleted_at is null`.then((r) => r[0]),
-      sql`select count(*)::int as n from search_runs where user_id = ${context.userId}`.then((r) => r[0]),
-      sql`select count(*)::int as n from review_items where user_id = ${context.userId} and status = 'open'`.then((r) => r[0]).catch(() => ({ n: 0 })),
+      sql`select count(*)::int as n from companies where user_id = ${uid} and deleted_at is null`.then((r) => r[0]),
+      sql`select count(*)::int as n from people where user_id = ${uid} and deleted_at is null`.then((r) => r[0]),
+      sql`select count(*)::int as n from search_runs where user_id = ${uid}`.then((r) => r[0]),
+      sql`select count(*)::int as n from review_items where user_id = ${uid} and status = 'open'`.then((r) => r[0]).catch(() => ({ n: 0 })),
       sql`select count(*)::int as n from jobs j
         join search_runs r on r.id = j.run_id
-        where j.user_id = ${context.userId} and j.status = ${"running"}
+        where j.user_id = ${uid} and j.status = ${"running"}
           and r.status in ('running','queued')`.then((r) => r[0]).catch(() => ({ n: 0 })),
-      sql`select count(*)::int as n from contacts where user_id = ${context.userId}`.then((r) => r[0]).catch(() => ({ n: 0 })),
-      sql`select source_id, state, enabled from source_health where user_id = ${context.userId}`.catch(() => []),
-      sql`select id, status, created_at, stats from search_runs where user_id = ${context.userId} order by created_at desc limit 8`.catch(() => []),
+      sql`select count(*)::int as n from contacts where user_id = ${uid}`.then((r) => r[0]).catch(() => ({ n: 0 })),
+      sql`select source_id, state, enabled from source_health where user_id = ${uid}`.catch(() => []),
+      sql`select id, status, created_at, stats, name, new_leads_count from search_runs where user_id = ${uid} order by created_at desc limit 12`.catch(() => []),
       sql`select id, name, municipality, industry_label, overall_confidence, record_status, website
-    from companies where user_id = ${context.userId} and deleted_at is null order by updated_at desc limit 8`.catch(() => []),
+    from companies where user_id = ${uid} and deleted_at is null order by updated_at desc limit 12`.catch(() => []),
     ]);
     let hasStripeCustomer = false;
     try {
-      const cust = await sql`select stripe_customer_id from workspaces where user_id = ${context.userId} limit 1`;
+      const cust = await sql`select stripe_customer_id from workspaces where user_id = ${uid} limit 1`;
       hasStripeCustomer = Boolean(cust[0]?.stripe_customer_id);
     } catch {
       hasStripeCustomer = false;
@@ -663,7 +664,7 @@ export const getRun = createServerFn({ method: "GET" }).middleware([authMiddlewa
 });
 
 
-export const listCompanies = createServerFn({ method: "GET" }).middleware([authMiddleware]).validator((d) => d ?? {}).handler(async ({ context, data }) => {
+export const listCompanies = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d ?? {}).handler(async ({ context, data }) => {
   const sql = await ctxSql(context);
   const g = await gate(sql, context.userId, "company_list", {
     max: 90,

@@ -41,7 +41,7 @@ async function handle({ request }: { request: Request }) {
       focusUserId = queue.focus.userId;
       waiting = !queue.active;
     }
-    processed = await processJobsFor(sql, focusUserId, focusRunId, { maxMs: 14_000, concurrency: 8, skipSchema: true });
+    processed = await processJobsFor(sql, focusUserId, focusRunId, { maxMs: 20_000, concurrency: 16, skipSchema: true });
     try { await resumeDiscoverIfStarved(sql, focusUserId, focusRunId); } catch { /* keep */ }
   } catch (err) {
     console.warn("[norf] search.tick", err instanceof Error ? err.message : err);
