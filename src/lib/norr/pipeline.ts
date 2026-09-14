@@ -1582,25 +1582,34 @@ async function processNextJob(sql, userId, runId, opts) {
 		if (job.type === "discover" && job.run_id) {
 			const run = (await sql`select criteria from search_runs where id = ${job.run_id} and user_id = ${userId}`)?.[0];
 			if (run) {
-				const payload = job.payload && typeof job.payload === "object" ? job.payload : {};
-				const disc = await Promise.race([
-					runDiscover(sql, userId, job.run_id, run.criteria, { cursor: payload.ytjCursor ?? null }),
-					new Promise<{ complete: false; cursor: unknown; discovered: number; timedOut: true }>((resolve) => {
-						setTimeout(() => resolve({ complete: false, cursor: payload.ytjCursor ?? null, discovered: 0, timedOut: true }), Math.max(16_000, RUNTIME.discoverBudgetMs + 4_000));
-					}),
-				]);
-				if (!disc.complete) {
+				const wall = Date.now() + 14_000;
+				let payload = job.payload && typeof job.payload === "object" ? { ...job.payload } : {};
+				for (;;) {
 					const flags = (await sql`select cancel_requested, pause_requested, status from search_runs where id = ${job.run_id} and user_id = ${userId}`)?.[0];
 					if (flags?.cancel_requested || flags?.status === "cancelled") {
 						await sql`update jobs set status = ${"cancelled"}, locked_at = null, updated_at = now() where id = ${job.id} and user_id = ${userId}`;
 						return { did: true, type: job.type };
 					}
-					await sql`update jobs set status = ${"queued"}, attempts = greatest(attempts - 1, 0), run_after = now(), last_error = ${"discover continue"}, locked_at = null, payload = ${JSON.stringify({ ...payload, ytjCursor: disc.cursor ?? payload.ytjCursor ?? null, discoverExhausted: false, ytjScannedAll: false })}::jsonb, updated_at = now()
-            where id = ${job.id} and user_id = ${userId}`;
-					return { did: true, type: job.type, incomplete: true };
+					if (flags?.pause_requested || flags?.status === "paused") {
+						await sql`update jobs set status = ${"queued"}, locked_at = null, run_after = now(), payload = ${JSON.stringify(payload)}::jsonb, updated_at = now() where id = ${job.id} and user_id = ${userId}`;
+						return { did: true, type: job.type, incomplete: true };
+					}
+					const disc = await runDiscover(sql, userId, job.run_id, run.criteria, { cursor: payload.ytjCursor ?? null });
+					payload = {
+						...payload,
+						ytjCursor: disc.cursor ?? null,
+						discoverExhausted: Boolean(disc.exhausted),
+						ytjScannedAll: Boolean(disc.exhausted),
+					};
+					await sql`update jobs set payload = ${JSON.stringify(payload)}::jsonb, locked_at = now(), updated_at = now()
+            where id = ${job.id} and user_id = ${userId} and status = ${"running"}`;
+					if (disc.complete) break;
+					if (Date.now() >= wall) {
+						await sql`update jobs set status = ${"queued"}, attempts = greatest(attempts - 1, 0), run_after = now(), last_error = ${"discover continue"}, locked_at = null, payload = ${JSON.stringify(payload)}::jsonb, updated_at = now()
+              where id = ${job.id} and user_id = ${userId}`;
+						return { did: true, type: job.type, incomplete: true };
+					}
 				}
-				await sql`update jobs set payload = ${JSON.stringify({ ...payload, ytjCursor: disc.cursor ?? null, discoverExhausted: Boolean(disc.exhausted), ytjScannedAll: Boolean(disc.exhausted) })}::jsonb
-            where id = ${job.id} and user_id = ${userId}`;
 			}
 		} else if (job.type === "enrich" && job.company_id && job.run_id) await runEnrich(sql, userId, job.run_id, job.company_id);
 		else if (job.type === "email" && job.company_id && job.run_id) await runEnrich(sql, userId, job.run_id, job.company_id, { emailRecovery: true });

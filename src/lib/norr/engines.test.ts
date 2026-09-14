@@ -89,10 +89,10 @@ describe("search progress rail", () => {
     const live = runProgress([{ type: "discover", status: "running" }], "running");
     assert.equal(queued.stage, "discover");
     assert.equal(queued.label, "Registers");
-    assert.ok(queued.pct >= 12, `queued pct=${queued.pct}`);
+    assert.ok(queued.pct >= 20, `queued pct=${queued.pct}`);
     assert.equal(live.stage, "discover");
     assert.equal(live.label, "Registers");
-    assert.ok(live.pct >= 12 && live.pct <= 50, `running pct=${live.pct}`);
+    assert.ok(live.pct >= 20 && live.pct <= 50, `running pct=${live.pct}`);
     assert.equal(queued.label, live.label);
   });
   it("paused and cancelled stay paused/cancelled even with live jobs", () => {

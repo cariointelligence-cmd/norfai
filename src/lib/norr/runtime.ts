@@ -27,7 +27,7 @@ export const RUNTIME = {
   harvestBudgetFastMin: 6,
   harvestBudgetMin: 8,
   harvestBudgetMax: 36,
-  discoverBudgetMs: 8_000,
+  discoverBudgetMs: 12_000,
   ytjPageBatch: 1,
   ddgQueryLimit: 6,
   domainGuessCap: 6,
@@ -43,7 +43,7 @@ export const RUNTIME = {
 export type RuntimeConfig = typeof RUNTIME;
 
 export function jobLeaseSeconds(type: string, cfg: RuntimeConfig = RUNTIME): number {
-  if (type === "discover") return 8;
+  if (type === "discover") return 12;
   return Math.max(8, cfg.jobStealSeconds);
 }
 
