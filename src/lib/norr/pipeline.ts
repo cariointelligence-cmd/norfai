@@ -649,7 +649,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 	let nd = { ok: false, profile: null, sourceUrl: "", observations: [] };
 	let superC = { emails: [] as { value: string }[], phones: [] as { value: string }[], people: [] as { fullName: string }[], website: null as string | null, sourceUrl: null as string | null, sourceId: "supercrawl" };
 	const needDirs = directoriesNeeded({
-		emails: facts.emails.length,
+		emails: (facts.emails ?? []).filter((e) => e.classification === "published").length,
 		phones: facts.phones.length,
 		website: facts.website,
 		depth,

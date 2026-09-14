@@ -130,7 +130,7 @@ function isWafBody(html: string): boolean {
 async function fetchFinderHttp(url: string): Promise<{ ok: boolean; html: string; text: string; url: string; status: number; waf: boolean }> {
   try {
     const res = await safeFetch(url, {
-      timeoutMs: 3500,
+      timeoutMs: 5000,
       maxBytes: 1_200_000,
       headers: {
         "User-Agent": BROWSER_UA,
@@ -179,7 +179,7 @@ async function waybackHtml(url: string): Promise<{ ok: boolean; html: string; te
     const snap = r.ok ? r.data.archived_snapshots?.closest : null;
     if (!snap?.available || !snap.url) return null;
     const res = await safeFetch(snap.url, {
-      timeoutMs: 3500,
+      timeoutMs: 5000,
       maxBytes: 1_200_000,
       headers: { "User-Agent": BROWSER_UA, Accept: "text/html" },
     });

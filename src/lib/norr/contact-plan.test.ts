@@ -7,7 +7,7 @@ describe("contact plan", () => {
   it("skips search engines when a website is already known", () => {
     const p = contactPlan({ website: "https://katto.fi", depth: "normal" });
     assert.equal(p.skipSearch, true);
-    assert.equal(p.harvestBudget, 2);
+    assert.equal(p.harvestBudget, 3);
     assert.equal(p.probeGuesses, false);
   });
   it("guesses domains only when the register has no website", () => {
@@ -25,8 +25,10 @@ describe("contact plan", () => {
     assert.equal(r?.value, "info@hasan.fi");
     assert.equal(r?.classification, "inferred");
   });
-  it("stops extra page crawl once a published email exists", () => {
-    assert.equal(contactHarvestDone({ emails: 1, phones: 0 }), true);
+  it("stops extra page crawl once a named or person-linked email exists", () => {
+    assert.equal(contactHarvestDone({ emails: 1, phones: 0 }), false);
+    assert.equal(contactHarvestDone({ emails: 1, namedEmails: 1, phones: 0 }), true);
+    assert.equal(contactHarvestDone({ emails: 1, people: 1, phones: 0 }), true);
     assert.equal(contactHarvestDone({ emails: 0, phones: 1 }), false);
     assert.equal(contactHarvestDone({ emails: 1, phones: 0, depth: "deep" }), false);
   });

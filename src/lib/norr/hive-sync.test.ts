@@ -7,11 +7,12 @@ import { emptyCriteria, setIndustryCodes } from "./criteria.ts";
 
 describe("hive sync", () => {
   it("stops extra harvest once a public email exists", () => {
-    assert.equal(contactHarvestDone({ emails: 1, phones: 0, depth: "normal" }), true);
+    assert.equal(contactHarvestDone({ emails: 1, namedEmails: 1, phones: 0, depth: "normal" }), true);
+    assert.equal(contactHarvestDone({ emails: 1, phones: 0, depth: "normal" }), false);
     assert.equal(contactHarvestDone({ emails: 0, phones: 2, depth: "normal" }), false);
     assert.equal(directoriesNeeded({ emails: 1, phones: 1, depth: "normal" }), false);
     assert.equal(directoriesNeeded({ emails: 0, phones: 3, depth: "normal" }), true);
-    assert.equal(contactPlan({ website: "https://acme.fi", depth: "normal" }).harvestBudget, 2);
+    assert.equal(contactPlan({ website: "https://acme.fi", depth: "normal" }).harvestBudget, 3);
   });
 
   it("ranks discover ahead of email so the cap fills first", () => {

@@ -10,7 +10,7 @@ import { normalizeName, normalizePhone, normalizeWebsite, stripDiacritics, isJun
 import { extractJsonLd, extractMeta, extractPageContacts, extractPeopleFromText, extractPeopleFromHtml, isParkingPage, stripTags, looksLikeSpa, contactLinksFromHtml, cleanPersonName, detectTechnologies, decodeHref } from "../extract.ts";
 import { countryTlds, expandSearchQueries } from "./queries.ts";
 import { reliability } from "./catalog.ts";
-import { extractEmails, extractPhones, isJunkEmail, websiteFromPublishedEmail } from "../contacts.ts";
+import { extractEmails, extractPhones, isJunkEmail, isRoleAddress, websiteFromPublishedEmail } from "../contacts.ts";
 import { readRobots, robotsAllows } from "../crawler.ts";
 import { fetchRendered, playwrightAvailable } from "../browser.ts";
 import { analyzeWebsite, type WebsiteIntel } from "../targeting/website.ts";
@@ -344,7 +344,7 @@ async function harvestSiteLive(
   const emails: ContactHit[] = [];
   const phones: ContactHit[] = [];
   const people: PersonHit[] = [];
-  let home = await fetchPage(origin, opts.depth === "deep" ? 6000 : 1800);
+  let home = await fetchPage(origin, opts.depth === "deep" ? 6000 : 2200);
   if (!home.ok && opts.depth === "deep" && playwrightAvailable()) {
     const rendered = await fetchRendered(origin, { waitMs: 800, timeoutMs: 9000 });
     if (rendered.ok) home = { ok: true, url: rendered.url ?? origin, html: rendered.html, status: 200 };
@@ -373,7 +373,8 @@ async function harvestSiteLive(
     confidence: 70,
   })).filter((p) => p.value));
   mergeUniquePeople(people, extractPeopleFromHtml(home.html, home.url));
-  if (!opts.exhaustive && contactHarvestDone({ emails: emails.length, phones: phones.length, people: people.length, depth: opts.depth })) {
+  const namedEmails = emails.filter((e) => !isRoleAddress(e.value)).length;
+  if (!opts.exhaustive && contactHarvestDone({ emails: emails.length, namedEmails, phones: phones.length, people: people.length, depth: opts.depth })) {
     let intel: WebsiteIntel | null = null;
     try { intel = analyzeWebsite({ html: home.html, url: home.url }); } catch { intel = null; }
     return { website: origin, emails, phones, people, intel };
@@ -396,7 +397,7 @@ async function harvestSiteLive(
     } catch { return false; }
   }).slice(0, budget);
 
-  const pages = await poolMap(urls, 4, async (url) => fetchPage(url, 1800));
+  const pages = await poolMap(urls, 4, async (url) => fetchPage(url, 2200));
   for (const page of pages) {
     if (!page.ok) continue;
     const contacts = extractPageContacts(page.html, page.url);

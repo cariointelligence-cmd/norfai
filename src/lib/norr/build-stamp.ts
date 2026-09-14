@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-persist-once";
+export const NORF_BUILD = "2026-09-14-enrich-quality";
 
 export function vercelDeployProbe() {
   const env = process.env;
