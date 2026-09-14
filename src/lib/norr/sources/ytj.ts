@@ -349,9 +349,9 @@ export function buildYtjQueries(criteria: SearchCriteria): Query[] {
       push({ mainBusinessLine: code, location });
       continue;
     }
-    push({ mainBusinessLine: code, location });
-    const kids = expandIndustryQueryCodes([code]).filter((c) => c.length >= 4 && c !== code);
-    for (const kid of kids.slice(0, 20)) push({ mainBusinessLine: kid, location });
+    const kids = expandIndustryQueryCodes([code]).filter((c) => c !== code && c.length >= 3);
+    for (const kid of kids.slice(0, 24)) push({ mainBusinessLine: kid, location });
+    if (!kids.length) push({ mainBusinessLine: code, location });
   }
   }
   for (const name of keywords.slice(0, 4)) {
@@ -405,7 +405,7 @@ async function ytjSearchQueryRetry(q: Query, size = YTJ_PAGE_SIZE, page = 0) {
 
 /** Leave a 5-digit query that only returns dissolved rows so the next live code can run. */
 export function ytjShouldSkipBarrenQuery(opts: { liveThisQuery: number; deadBatches: number }): boolean {
-  return opts.liveThisQuery <= 0 && opts.deadBatches >= 2;
+  return opts.liveThisQuery <= 0 && opts.deadBatches >= 1;
 }
 
 async function fillFromQuery(

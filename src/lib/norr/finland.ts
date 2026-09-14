@@ -660,7 +660,18 @@ export function expandIndustryQueryCodes(codes: string[]): string[] {
         .slice()
         .sort((a, b) => Number(Boolean(TOL_SUCCESSORS[a.code])) - Number(Boolean(TOL_SUCCESSORS[b.code])))
         .forEach((k) => add(k.code));
-    } else add(v);
+      continue;
+    }
+    const mid = INDUSTRIES.filter((i) => i.code.length === 3 && (i.parent === v || i.code.startsWith(v)));
+    if (mid.length) {
+      for (const m of mid) {
+        const grand = INDUSTRIES.filter((i) => i.code.length >= 4 && (i.parent === m.code || i.code.startsWith(m.code)));
+        if (grand.length) grand.forEach((g) => add(g.code));
+        else add(m.code);
+      }
+      continue;
+    }
+    add(v);
   }
   return out;
 }

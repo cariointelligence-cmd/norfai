@@ -365,7 +365,7 @@ describe("YTJ query planner", () => {
     assert.equal(qs.some((q) => q.mainBusinessLine && String(q.mainBusinessLine).length < 4), false);
     assert.ok(qs.some((q) => q.mainBusinessLine === "41200"));
   });
-  it("expands marketing 73 to 5-digit agency codes and still queries the 73 division", () => {
+  it("expands marketing 73 to 5-digit agency codes and never queries 73 as a substring", () => {
     const expanded = expandIndustryQueryCodes(["73"]);
     assert.ok(expanded.includes("73111"));
     assert.equal(expanded.includes("73"), false);
@@ -375,10 +375,8 @@ describe("YTJ query planner", () => {
     const qs = buildYtjQueries(c);
     assert.ok(qs.length > 0);
     assert.ok(qs.some((q) => q.mainBusinessLine === "73111"));
-    assert.ok(qs.some((q) => q.mainBusinessLine === "73"));
-    const i73 = qs.findIndex((q) => q.mainBusinessLine === "73");
-    const iAgency = qs.findIndex((q) => q.mainBusinessLine === "73111");
-    assert.equal(qs[0]?.mainBusinessLine, "73");
+    assert.equal(qs.some((q) => q.mainBusinessLine === "73"), false);
+    assert.equal(qs[0]?.mainBusinessLine, "73111");
     assert.equal(qs.some((q) => q.name && q.mainBusinessLine), false);
     assert.equal(qs.some((q) => q.location && !q.mainBusinessLine && !q.name), false);
   });
@@ -403,14 +401,15 @@ describe("YTJ query planner", () => {
     assert.ok(qs.length <= 64);
     const lines = qs.map((q) => q.mainBusinessLine).filter(Boolean) as string[];
     assert.ok(lines.includes("62100"));
-    assert.ok(lines.includes("62"));
-    assert.ok(lines.includes("63"));
+    assert.equal(lines.includes("62"), false);
+    assert.equal(lines.includes("63"), false);
+    assert.ok(lines.includes("63100"));
     assert.ok(lines.indexOf("62100") < lines.indexOf("62010"));
     assert.equal(industryMatches("62100", ["62", "63"]), true);
     assert.equal(industryMatches("62200", ["62"]), true);
     assert.equal(ytjShouldSkipBarrenQuery({ liveThisQuery: 0, deadBatches: 2 }), true);
     assert.equal(ytjShouldSkipBarrenQuery({ liveThisQuery: 1, deadBatches: 8 }), false);
-    assert.equal(ytjShouldSkipBarrenQuery({ liveThisQuery: 0, deadBatches: 1 }), false);
+    assert.equal(ytjShouldSkipBarrenQuery({ liveThisQuery: 0, deadBatches: 1 }), true);
   });
   it("scans far enough through a large industry class to fill a 500-company cap", () => {
     assert.equal(YTJ_PAGE_SIZE, 100);
@@ -421,7 +420,7 @@ describe("YTJ query planner", () => {
     assert.equal(ytjSliceEnd(200), 400);
   });
   it("keeps 2-digit register codes only when no 5-digit children exist", () => {
-    assert.ok(expandIndustryQueryCodes(["47"]).includes("47"));
+    assert.ok(expandIndustryQueryCodes(["47"]).some((c) => c.startsWith("47") && c.length >= 3));
     assert.equal(expandIndustryQueryCodes(["73"]).includes("73"), false);
     assert.equal(groupForIndustryCodes(["73"]), "marketing");
     assert.equal(groupForIndustryCodes(["41", "42", "43"]), "construction");
@@ -439,12 +438,13 @@ describe("YTJ query planner", () => {
     }
     const qs = buildYtjQueries(c);
     const lines = qs.map((q) => q.mainBusinessLine).filter(Boolean);
-    assert.ok(lines.includes("69"));
-    assert.ok(lines.includes("70"));
-    assert.ok(lines.includes("71"));
-    assert.ok(lines.includes("74"));
+    assert.ok(lines.some((l) => String(l).startsWith("691") || String(l).startsWith("692")));
     assert.ok(lines.includes("70100"));
     assert.ok(lines.includes("70220"));
+    assert.ok(lines.some((l) => String(l).startsWith("711") || String(l).startsWith("712")));
+    assert.ok(lines.some((l) => String(l).startsWith("741") || String(l).startsWith("74")));
+    assert.equal(lines.includes("69"), false);
+    assert.equal(lines.includes("70"), false);
     assert.equal(ytjActivityStatus({ status: 2, tradeRegisterStatus: 1 }), "active");
     assert.equal(ytjActivityStatus({ status: 2, tradeRegisterStatus: 4, endDate: "2011-01-25" }), "dissolved");
     assert.equal(ytjActivityStatus({ status: 5 }), "invalidated");

@@ -1489,11 +1489,13 @@ async function runScrape(sql, userId, runId, companyId) {
 async function stealStaleJobs(sql, userId, runId) {
 	await sql`update jobs set status = ${"queued"}, locked_at = null, run_after = now(), updated_at = now(), last_error = ${"stolen stale lock"}
     where user_id = ${userId} and status = ${"running"}
-      and type <> ${"discover"}
       and (
-        locked_at is null
-        or locked_at < now() - make_interval(secs => ${RUNTIME.jobStealSeconds})
-        or updated_at < now() - interval '45 seconds'
+        (type <> ${"discover"} and (
+          locked_at is null
+          or locked_at < now() - interval '25 seconds'
+          or updated_at < now() - interval '45 seconds'
+        ))
+        or (type = ${"discover"} and locked_at < now() - interval '40 seconds')
       )
       and (${runId ?? null}::text is null or run_id = ${runId ?? null})`;
 }
