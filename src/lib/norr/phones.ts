@@ -4,6 +4,7 @@ export type PhoneRole = "mobile" | "switchboard" | "direct" | "unknown";
 
 /** Numbers seen on many unrelated firms — directory / CDN / shared switchboard leaks. */
 const SHARED_DIRECTORY_PHONES = new Set([
+  "+35810665100",
   "+35810665101",
 ]);
 
@@ -11,6 +12,7 @@ export function isJunkCompanyPhone(raw: string | null | undefined): boolean {
   const n = normalizePhone(raw);
   if (!n) return true;
   if (SHARED_DIRECTORY_PHONES.has(n)) return true;
+  if (n.startsWith("+35810665")) return true;
   return false;
 }
 

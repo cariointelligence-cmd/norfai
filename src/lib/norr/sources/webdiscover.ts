@@ -36,6 +36,8 @@ const DIRECTORY_HOSTS = [
   "finder.fi", "fonecta.fi", "ytj.fi", "prh.fi", "kauppalehti.fi",
   "asiakastieto.fi", "profinder.fi", "allbiz.fi", "sttinfo.fi",
   "almatalent.fi", "almamedia.fi", "almainights.fi", "almainsights.fi", "taloussanomat.fi",
+  "iltalehti.fi", "iltasanomat.fi", "aamulehti.fi", "talouselama.fi", "uusisuomi.fi",
+  "tekniikkatalous.fi", "tivi.fi", "mikrobitti.fi", "mtvuutiset.fi", "mtv.fi",
   "wikipedia.org", "wikidata.org", "facebook.com", "linkedin.com",
   "instagram.com", "twitter.com", "x.com", "youtube.com", "tiktok.com",
   "crunchbase.com", "bloomberg.com", "reuters.com", "yelp.fi", "yelp.com",

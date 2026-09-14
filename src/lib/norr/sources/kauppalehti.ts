@@ -95,7 +95,7 @@ export function parseKauppalehtiHtml(html: string, sourceUrl: string): Kauppaleh
 
   for (const e of extractEmails(html)) {
     if (isJunkEmail(e.value) || isRecruitingEmail(e.value)) continue;
-    if (/almamedia\.fi|kauppalehti\.fi/i.test(e.value)) continue;
+    if (/almamedia\.fi|kauppalehti\.fi|iltalehti\.fi|almatalent\.fi/i.test(e.value)) continue;
     emails.push({
       kind: "email",
       value: e.value,

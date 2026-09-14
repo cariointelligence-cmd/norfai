@@ -111,6 +111,8 @@ describe("search job budget", () => {
 describe("shared directory phones", () => {
   it("rejects the number that leaked onto many unrelated cards", () => {
     assert.equal(isJunkCompanyPhone("+35810665101"), true);
+    assert.equal(isJunkCompanyPhone("+35810665100"), true);
+    assert.equal(isJunkCompanyPhone("+358 10 665 100"), true);
     assert.equal(isJunkCompanyPhone("+358 10 665 101"), true);
     assert.equal(isJunkCompanyPhone("+358401234567"), false);
     assert.equal(phoneUsedTooWidely(2), true);

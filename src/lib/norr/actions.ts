@@ -79,6 +79,7 @@ import {
 import { ensureWorker } from "./worker.ts";
 import { compareEntities } from "./dedupe.ts";
 import { isRecruitingEmail, isBillingEmail, isJunkEmail, emailBelongsToCompany, needsEmailRecovery } from "./contacts.ts";
+import { isJunkCompanyPhone } from "./phones.ts";
 import { cleanPersonName } from "./extract.ts";
 import { rowsToCsv, rowsToXlsx, rowsToCrmCsv } from "./exporters.ts";
 import { interpretTargetPrompt, applyPresetToCriteria } from "./targeting/parser.ts";
@@ -557,7 +558,11 @@ export const getRun = createServerFn({ method: "GET" }).middleware([authMiddlewa
     limit ${limit}`;
   const uniqueCompanies = uniqueIds(companies.map((c) => c.id)).map((id) => {
     const row = companies.find((c) => c.id === id);
-    return { ...row, website: publicWebsite(row?.website) };
+    const website = publicWebsite(row?.website);
+    const email = String(row?.general_email ?? "");
+    const keepEmail = email && !isJunkEmail(email) && emailBelongsToCompany(email, { name: row?.name, website });
+    const phone = isJunkCompanyPhone(row?.phone) ? null : (row?.phone ?? null);
+    return { ...row, website, general_email: keepEmail ? row.general_email : null, phone };
   });
   try {
     await recordDelivered(
@@ -702,7 +707,14 @@ export const listCompanies = createServerFn({ method: "POST" }).middleware([auth
   and (${data.hasEmail ? 1 : 0} = 0 or c.general_email is not null)
   order by coalesce(c.match_score, c.overall_confidence) desc nulls last, c.updated_at desc, c.id
   limit ${limit} offset ${offset}`;
-  return { companies: rows, queuedContactJobs: 0 };
+  const companies = rows.map((row) => {
+    const website = publicWebsite(row?.website);
+    const email = String(row?.general_email ?? "");
+    const keepEmail = email && !isJunkEmail(email) && emailBelongsToCompany(email, { name: row?.name, website });
+    const phone = isJunkCompanyPhone(row?.phone) ? null : (row?.phone ?? null);
+    return { ...row, website, general_email: keepEmail ? row.general_email : null, phone };
+  });
+  return { companies, queuedContactJobs: 0 };
   } catch (err) {
     console.error("[norf] listCompanies", err);
     return { companies: [], queuedContactJobs: 0, error: err instanceof Error ? err.message.slice(0, 180) : "Could not load companies" };

@@ -49,7 +49,21 @@ const JUNK_EMAIL_DOMAINS = new Set([
   "vainu.com", "vainu.io", "finder.fi", "fonecta.fi",
   "k5a.io", "zaraz.com", "cloudflareinsights.com",
   "almamedia.fi", "almainights.fi", "almainsights.fi", "almatalent.fi", "kauppalehti.fi",
+  "iltalehti.fi", "iltasanomat.fi", "is.fi", "hs.fi", "yle.fi",
+  "aamulehti.fi", "talouselama.fi", "taloussanomat.fi", "uusisuomi.fi",
+  "tekniikkatalous.fi", "tivi.fi", "mikrobitti.fi", "mtvuutiset.fi", "mtv.fi",
+  "satakunnankansa.fi", "lapinkansa.fi", "kaleva.fi", "etuovi.com", "vuokraovi.com", "autotalli.com",
 ]);
+
+function junkEmailHost(domain: string): boolean {
+  const d = String(domain ?? "").toLowerCase().replace(/^www\./, "");
+  if (!d) return false;
+  if (JUNK_EMAIL_DOMAINS.has(d)) return true;
+  for (const j of JUNK_EMAIL_DOMAINS) {
+    if (d === j || d.endsWith(`.${j}`)) return true;
+  }
+  return false;
+}
 
 const BILLING_EMAIL_DOMAINS = new Set([
   "kollektor.fi", "erin.posti.com", "posti.com",
@@ -270,7 +284,7 @@ export function isGarbageEmail(email: string): boolean {
   const domain = v.split("@")[1] ?? "";
   if (!domain) return true;
   if (v.includes("%") || v.includes(" ")) return true;
-  if (JUNK_EMAIL_DOMAINS.has(domain)) return true;
+  if (junkEmailHost(domain)) return true;
   if (JUNK_EMAIL_LOCAL.has(local)) return true;
   if (isBillingEmail(v)) return true;
   if (!isPlausibleEmailDomain(domain)) return true;
