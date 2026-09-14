@@ -4,7 +4,7 @@ import type { SearchCriteria } from "./types.ts";
 import { compileCriteria } from "./filter-dsl.ts";
 import { boundedString } from "./security.ts";
 import { queryFingerprint, searchLabel } from "./fingerprint.ts";
-import { dispatchVercelExecution } from "./vercel-executor.ts";
+import { dispatchVercelExecution, kickSiblingDrain } from "./vercel-executor.ts";
 
 export type SearchIntakeResult = {
   ok: boolean;
@@ -41,7 +41,7 @@ export async function createQueuedSearch(opts: {
         and status in ('queued','running')
       order by created_at desc limit 1`;
     if (recent[0]) {
-      dispatchVercelExecution({ userId, runId: recent[0].id, reason: "search.reuse" });
+      await kickSiblingDrain({ userId, runId: recent[0].id, reason: "search.reuse" }, 80);
       return { ok: true, runId: recent[0].id, discovered: 0, reused: true, state: "QUEUED", createdMs: Date.now() - t0 };
     }
   } catch { /* fingerprint column may be missing */ }
@@ -57,7 +57,8 @@ export async function createQueuedSearch(opts: {
   }
   await sql`insert into jobs (id, user_id, run_id, type, payload, status)
     values (${jobId}, ${userId}, ${runId}, ${"discover"}, '{}'::jsonb, ${"queued"})`;
-  dispatchVercelExecution({ userId, runId, reason: "search.start" });
+  await kickSiblingDrain({ userId, runId, reason: "search.start" }, 80);
+  dispatchVercelExecution({ userId, runId, reason: "search.start" }, { http: false });
   return { ok: true, runId, discovered: 0, state: "QUEUED", createdMs: Date.now() - t0 };
 }
 

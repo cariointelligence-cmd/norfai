@@ -28,7 +28,7 @@ export const RUNTIME = {
   harvestBudgetMin: 8,
   harvestBudgetMax: 36,
   discoverBudgetMs: 12_000,
-  ytjPageBatch: 1,
+  ytjPageBatch: 2,
   ddgQueryLimit: 6,
   domainGuessCap: 6,
   extraCrawlCap: 4,

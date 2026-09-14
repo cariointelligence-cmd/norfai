@@ -36,6 +36,7 @@ export const CACHE_TTL = {
   contacts: 6 * 3_600_000,
   website: 6 * 3_600_000,
   financial: 7 * 24 * 3_600_000,
+  register: 20 * 60_000,
   negative: 2 * 60_000,
 } as const;
 

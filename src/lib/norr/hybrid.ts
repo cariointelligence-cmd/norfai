@@ -65,10 +65,16 @@ export function scheduleBackground(task: () => Promise<unknown>): void {
     waitUntil(run());
     return;
   }
-  // On Vercel, void-running a drain keeps the inbound request open until the
-  // drain finishes. That froze Start Search and Overview. Cron + tickSearch
-  // recover jobs when waitUntil is unavailable.
-  if (process.env.VERCEL) return;
+  if (process.env.VERCEL) {
+    if (!process.env.NODE_TEST_CONTEXT) {
+      void import("@vercel/functions")
+        .then((vf) => {
+          if (typeof vf.waitUntil === "function") vf.waitUntil(run());
+        })
+        .catch(() => undefined);
+    }
+    return;
+  }
   void run();
 }
 

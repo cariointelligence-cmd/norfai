@@ -398,6 +398,20 @@ async function ytjSearchQuery(
   size = YTJ_PAGE_SIZE,
   page = 0,
 ): Promise<AdapterResult<DiscoveredCompany[]> & { total?: number; sourceUrl?: string; rawCount?: number }> {
+  const { cacheGet, cacheSet, cacheKey, CACHE_TTL } = await import("../intel-cache.ts");
+  const key = cacheKey(["ytj.page", q.businessId, q.name, q.location, q.mainBusinessLine, page, size]);
+  const hit = cacheGet<Awaited<ReturnType<typeof ytjSearchQueryLive>>>(key);
+  if (hit?.ok) return hit;
+  const live = await ytjSearchQueryLive(q, size, page);
+  if (live.ok) cacheSet(key, live, CACHE_TTL.register);
+  return live;
+}
+
+async function ytjSearchQueryLive(
+  q: Query,
+  size = YTJ_PAGE_SIZE,
+  page = 0,
+): Promise<AdapterResult<DiscoveredCompany[]> & { total?: number; sourceUrl?: string; rawCount?: number }> {
   const url = queryUrl(q, page, size);
   const r = await getJson<{ totalResults?: number; companies?: YtjRaw[] }>(url, { timeoutMs: 5500 });
   if (!r.ok) {

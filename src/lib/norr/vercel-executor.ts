@@ -84,8 +84,9 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
   } catch { /* */ }
   const maxMs = 22_000;
   let processed = 0;
-  const { pickFocusSearch } = await import("./search-queue.ts");
-  const focus = await pickFocusSearch(sql);
+  const focus = opts.runId
+    ? { userId: opts.userId ?? null, runId: opts.runId }
+    : await pickFocusSearch(sql);
   const targetUser = focus?.userId ?? opts.userId ?? null;
   const targetRun = focus?.runId ?? opts.runId ?? null;
   if (targetUser && targetRun) {
@@ -162,8 +163,36 @@ export async function runVercelDrain(opts: DrainRequest): Promise<DrainResult> {
 }
 
 /** Fire-and-forget. In-process drain on waitUntil is the Nerve; HTTP is the chain. */
-export function dispatchVercelExecution(opts: DrainRequest): void {
+export function dispatchVercelExecution(opts: DrainRequest, flags?: { http?: boolean }): void {
   scheduleBackground(() => runVercelDrain({ ...opts, depth: opts.depth ?? 0, reason: opts.reason ?? "dispatch" }));
+  if (flags?.http === false) return;
+  void kickSiblingDrain(opts, 0);
+}
+
+/** Start a sibling drain lambda without holding the user request. */
+export async function kickSiblingDrain(opts: DrainRequest, waitMs = 80): Promise<void> {
+  const origin = vercelSelfOrigin();
+  const secret = internalSecret();
+  if (!origin || !secret) return;
+  const body = JSON.stringify({
+    userId: opts.userId ?? null,
+    runId: opts.runId ?? null,
+    depth: opts.depth ?? 0,
+    reason: opts.reason ?? "kick",
+  });
+  const signed = signServiceRequest({ service: "worker", scope: "jobs.drain", body });
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+    authorization: signed.authorization,
+    "x-norf-timestamp": signed.timestamp,
+    "x-norf-nonce": signed.nonce,
+    "x-norf-request-id": signed.requestId,
+    "x-norf-scope": signed.scope,
+  };
+  const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
+  if (bypass) headers["x-vercel-protection-bypass"] = bypass;
+  const p = fetch(`${origin}${DRAIN_PATH}`, { method: "POST", headers, body }).then((r) => r.arrayBuffer()).catch(() => undefined);
+  await Promise.race([p, new Promise<void>((r) => setTimeout(r, waitMs))]);
 }
 
 export function executionPlane() {
