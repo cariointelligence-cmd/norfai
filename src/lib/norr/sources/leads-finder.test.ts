@@ -75,6 +75,9 @@ describe("leads-finder hive adapter", () => {
     assert.equal(decideLeadsFinder({ configured: true, discovered: 40, emails: 10, want: 30 }).reason, "SKIPPED_NOT_JUSTIFIED");
     assert.equal(decideLeadsFinder({
       configured: true, discovered: 40, emails: 8, want: 30, requireEmail: true,
+    }).reason, "SKIPPED_NOT_JUSTIFIED");
+    assert.equal(decideLeadsFinder({
+      mode: "REQUIRED", configured: true, discovered: 40, emails: 8, want: 30, requireEmail: true,
     }).reason, "USED_FOR_VALIDATED_CONTACT_GAP");
     assert.equal(decideLeadsFinder({ configured: false, discovered: 0, want: 10, requireEmail: true }).reason, "SKIPPED_NOT_CONFIGURED");
     assert.equal(decideLeadsFinder({ mode: "OFF", configured: true, requireEmail: true }).reason, "SKIPPED_MODE_OFF");

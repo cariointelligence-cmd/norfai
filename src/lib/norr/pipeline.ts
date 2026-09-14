@@ -44,6 +44,7 @@ import { scoreMayProceed } from "./scrape-gate.ts";
 import { finderLookup } from "./sources/finder.ts";
 import { kauppalehtiLookup } from "./sources/kauppalehti.ts";
 import { northdataLookup } from "./sources/northdata.ts";
+import { supercrawlContacts } from "./sources/contact-supercrawl.ts";
 import { linkedinLookup } from "./sources/linkedin.ts";
 import { grokBudgetRemaining, grokContactSearch } from "./sources/groksearch.ts";
 import { federatedCompanySearch } from "./sources/discovery.ts";
@@ -626,6 +627,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 	let finderFirst = { ok: false, profile: null, sourceUrl: "", observations: [] };
 	let kl = { ok: false, profile: null, sourceUrl: "", observations: [] };
 	let nd = { ok: false, profile: null, sourceUrl: "", observations: [] };
+	let superC = { emails: [] as { value: string }[], phones: [] as { value: string }[], people: [] as { fullName: string }[], website: null as string | null, sourceUrl: null as string | null, sourceId: "supercrawl" };
 	const needDirs = directoriesNeeded({
 		emails: facts.emails.length,
 		phones: facts.phones.length,
@@ -634,7 +636,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		emailRecovery,
 	});
 	if (needDirs) {
-		[finderFirst, kl, nd] = await Promise.all([
+		[finderFirst, kl, nd, superC] = await Promise.all([
 		finderLookup({
 			name,
 			businessId: bid,
@@ -664,7 +666,10 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			profile: null,
 			sourceUrl: "",
 			observations: []
-		}))
+		})),
+		supercrawlContacts({ name, businessId: bid, municipality: mun }).catch(() => ({
+			emails: [], phones: [], people: [], website: null, sourceUrl: null, sourceId: "supercrawl",
+		})),
 		]);
 	}
 	if (facts.observations.length) await insertObservations(sql, userId, "company", companyId, catalogSource(facts.websiteSource), facts.website ?? void 0, "structured_web", facts.observations);
@@ -676,6 +681,16 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		emails: facts.emails,
 		phones: facts.phones
 	});
+	if (superC.emails.length || superC.phones.length || superC.website) {
+		await persistHits({
+			website: superC.website,
+			websiteSource: superC.sourceId,
+			people: superC.people,
+			emails: superC.emails,
+			phones: superC.phones,
+		});
+		if (superC.emails.length) facts.emails.push(...superC.emails);
+	}
 	if (!facts.emails.length && facts.website) {
 		const domain = normalizeDomain(facts.website);
 		if (domain) {
@@ -833,7 +848,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 	await harvestNewSite(li.website, "linkedin");
 	await bumpSource(sql, userId, "linkedin", "enrich", { confidence: li.companyUrl ? 64 : 40 });
 	}
-	if (facts.emails.length < 1 && grokBudgetRemaining() > 0) {
+	if (depth === "deep" && facts.emails.length < 1 && grokBudgetRemaining() > 0) {
 		const grok = await grokContactSearch({
 			name,
 			businessId: bid,

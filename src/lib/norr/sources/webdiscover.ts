@@ -320,22 +320,10 @@ export async function harvestSite(opts: {
   const emails: ContactHit[] = [];
   const phones: ContactHit[] = [];
   const people: PersonHit[] = [];
-  let home: { ok: boolean; url: string; html: string } = { ok: false, url: origin, html: "" };
-  try {
-    const robots = await Promise.race([
-      readRobots(new URL(origin).origin),
-      new Promise<{ body: string }>((resolve) => setTimeout(() => resolve({ body: "" }), 500)),
-    ]);
-    if (!robotsAllows(robots.body, new URL(origin).pathname)) {
-      return { website: origin, emails, phones, people };
-    }
-  } catch {
-    /* robots optional */
-  }
-  home = await fetchPage(origin, opts.depth === "deep" ? 8000 : 4000);
+  let home = await fetchPage(origin, opts.depth === "deep" ? 6000 : 2800);
   if (!home.ok && opts.depth === "deep" && playwrightAvailable()) {
     const rendered = await fetchRendered(origin, { waitMs: 800, timeoutMs: 9000 });
-    if (rendered.ok) home = { ok: true, url: rendered.url ?? origin, html: rendered.html };
+    if (rendered.ok) home = { ok: true, url: rendered.url ?? origin, html: rendered.html, status: 200 };
   }
   if (!home.ok) return { website: origin, emails, phones, people };
   if (opts.requireName && !pageMentionsCompany(stripTags(home.html).slice(0, 6000), opts.companyName, extractMeta(home.html).title ?? "")) {
@@ -384,7 +372,7 @@ export async function harvestSite(opts: {
     } catch { return false; }
   }).slice(0, budget);
 
-  const pages = await poolMap(urls, 4, async (url) => fetchPage(url, 3000));
+  const pages = await poolMap(urls, 4, async (url) => fetchPage(url, 2200));
   for (const page of pages) {
     if (!page.ok) continue;
     const contacts = extractPageContacts(page.html, page.url);

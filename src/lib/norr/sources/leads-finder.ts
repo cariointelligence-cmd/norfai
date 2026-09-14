@@ -255,6 +255,7 @@ export function decideLeadsFinder(opts: {
   }
   const contactGap = discovered >= 8 && emails < Math.ceil(discovered * 0.35) && (opts.requireEmail || opts.requireRole);
   const discoveryGap = discovered < Math.min(8, want) && (opts.requireRevenue || opts.requireRole);
+  if (mode !== "REQUIRED") return { use: false, reason: "SKIPPED_NOT_JUSTIFIED" };
   if (contactGap) return { use: true, reason: "USED_FOR_VALIDATED_CONTACT_GAP" };
   if (discoveryGap) return { use: true, reason: "USED_AS_DISCOVERY_SOURCE" };
   return { use: false, reason: "SKIPPED_NOT_JUSTIFIED" };
