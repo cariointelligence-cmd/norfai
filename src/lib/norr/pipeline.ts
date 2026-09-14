@@ -183,32 +183,43 @@ async function attachDiscovered(
     if (hardEarly === "seen") return "excluded_seen";
     if (hardEarly === "exported") return "excluded_exported";
   }
-  const existing =
-    (row.businessId ? await findCompanyByBid(sql, userId, row.businessId) : null)
-    ?? (await findCompanyByName(sql, userId, row.name, normalizeDomain(row.website ?? null)));
-  if (!existing && !skipQuota) {
-    const quota = await assertCompanyQuota(sql, userId);
-    if (!quota.ok) return "quota";
+  let companyId: string | null = null;
+  if (row.businessId) {
+    const hit = await sql<{ id: string }>`
+      select id from companies where user_id = ${userId} and business_id = ${row.businessId} and deleted_at is null limit 1`;
+    companyId = hit[0]?.id ?? null;
+  } else {
+    const byName = await findCompanyByName(sql, userId, row.name, normalizeDomain(row.website ?? null));
+    companyId = byName?.id ?? null;
   }
-  let companyId: string;
-  try {
-    companyId = await insertCompany(sql, userId, {
-      ...row,
-      websiteDomain: normalizeDomain(row.website ?? null),
-    });
-  } catch (err) {
-    if (isCompanyQuotaError(err)) return "quota";
-    throw err;
-  }
-  if (row.businessId && criteria) {
-    const existingRejected = await sql<{ record_status: string }>`
-      select record_status from companies where id = ${companyId} and user_id = ${userId} limit 1`;
-    if (existingRejected[0]?.record_status === "rejected") {
-      await sql`update companies set record_status = ${"discovered"}, reject_reason = null,
-        industry_code = coalesce(${row.industryCode ?? null}, industry_code),
-        industry_label = coalesce(${row.industryLabel ?? null}, industry_label),
-        updated_at = now()
-        where id = ${companyId} and user_id = ${userId}`;
+  if (!companyId) {
+    if (!skipQuota) {
+      const quota = await assertCompanyQuota(sql, userId);
+      if (!quota.ok) return "quota";
+    }
+    companyId = nid();
+    const site = canonicalCompanyWebsite(row.website ?? null);
+    const domain = normalizeDomain(site);
+    try {
+      await sql`insert into companies (
+        id, user_id, business_id, vat_id, lei, eu_id, name, name_normalized, trading_names, country,
+        legal_form, legal_form_code, registration_date, business_status, industry_code, industry_label,
+        street, postal_code, municipality, website, website_domain, last_discovered_at, record_status
+      ) values (
+        ${companyId}, ${userId}, ${row.businessId ?? null}, ${row.vatId ?? null}, ${row.lei ?? null}, ${row.euId ?? null},
+        ${row.name}, ${normalizeName(row.name)}, ${JSON.stringify(row.tradingNames ?? [])}::jsonb, ${row.country ?? "FI"},
+        ${row.legalForm ?? null}, ${row.legalFormCode ?? null}, ${row.registrationDate ?? null}, ${row.businessStatus ?? null},
+        ${row.industryCode ?? null}, ${row.industryLabel ?? null}, ${row.street ?? null}, ${row.postalCode ?? null},
+        ${row.municipality ?? null}, ${site}, ${domain}, now(), ${"discovered"}
+      )`;
+    } catch (err) {
+      if (isCompanyQuotaError(err)) return "quota";
+      if (row.businessId) {
+        const again = await sql<{ id: string }>`
+          select id from companies where user_id = ${userId} and business_id = ${row.businessId} and deleted_at is null limit 1`;
+        if (again[0]) companyId = again[0].id;
+        else throw err;
+      } else throw err;
     }
   }
   const snap = exposure ? snapshotFromMap(exposure, companyId, row.businessId ?? null) : null;
@@ -229,7 +240,8 @@ async function attachDiscovered(
     on conflict do nothing
     returning company_id`;
   if (!inserted[0]) return "duplicate";
-  await enqueueJob(sql, userId, "enrich", { runId, companyId });
+  await sql`insert into jobs (id, user_id, run_id, company_id, type, payload)
+    values (${nid()}, ${userId}, ${runId}, ${companyId}, ${"enrich"}, ${"{}"}::jsonb)`;
   return "kept";
 }
 
