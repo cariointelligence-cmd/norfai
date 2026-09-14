@@ -575,13 +575,18 @@ export async function nominatimPoi(
 }
 
 export async function mxCheck(domain: string): Promise<{ mx: boolean; hosts: string[] }> {
-  try {
-    const recs = await dns.resolveMx(domain);
-    const hosts = recs.sort((a, b) => a.priority - b.priority).map((r) => r.exchange);
-    return { mx: hosts.length > 0, hosts };
-  } catch {
-    return { mx: false, hosts: [] };
-  }
+  const host = domain.replace(/^www\./, "").toLowerCase().trim();
+  if (!host) return { mx: false, hosts: [] };
+  const { cacheCoalesce, cacheKey, CACHE_TTL } = await import("../intel-cache.ts");
+  return cacheCoalesce(cacheKey(["mx", host]), CACHE_TTL.domain, async () => {
+    try {
+      const recs = await dns.resolveMx(host);
+      const hosts = recs.sort((a, b) => a.priority - b.priority).map((r) => r.exchange);
+      return { mx: hosts.length > 0, hosts };
+    } catch {
+      return { mx: false, hosts: [] };
+    }
+  });
 }
 
 export async function rdapDomain(domain: string): Promise<AdapterResult<{ ldhName?: string; status?: string[] }>> {

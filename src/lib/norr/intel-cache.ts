@@ -7,6 +7,22 @@ type Entry<T> = { at: number; ttl: number; value: T; inflight?: Promise<T> };
 const store = new Map<string, Entry<unknown>>();
 const stats = { hits: 0, misses: 0, stale: 0, coalesced: 0, sets: 0 };
 
+const STORE_CAP = 2_500;
+
+function pruneStore(now = Date.now()): void {
+  if (store.size <= STORE_CAP) return;
+  for (const [k, v] of store) {
+    if (now - v.at > v.ttl) store.delete(k);
+  }
+  if (store.size <= STORE_CAP) return;
+  const overflow = store.size - Math.floor(STORE_CAP * 0.8);
+  let n = 0;
+  for (const k of store.keys()) {
+    store.delete(k);
+    if (++n >= overflow) break;
+  }
+}
+
 export const CACHE_TTL = {
   identity: 24 * 3_600_000,
   domain: 12 * 3_600_000,
@@ -32,18 +48,15 @@ export function cacheGet<T>(key: string): T | null {
     return null;
   }
   stats.hits += 1;
+  store.delete(key);
+  store.set(key, row);
   return row.value;
 }
 
 export function cacheSet<T>(key: string, value: T, ttlMs: number): T {
   store.set(key, { at: Date.now(), ttl: ttlMs, value });
   stats.sets += 1;
-  if (store.size > 4_000) {
-    const now = Date.now();
-    for (const [k, v] of store) {
-      if (now - v.at > v.ttl) store.delete(k);
-    }
-  }
+  pruneStore();
   return value;
 }
 

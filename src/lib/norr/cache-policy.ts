@@ -30,6 +30,21 @@ export type CacheEntry<T> = {
 };
 
 const mem = new Map<string, CacheEntry<unknown>>();
+const MEM_CAP = 2_500;
+
+function pruneMem(now = Date.now()): void {
+  if (mem.size <= MEM_CAP) return;
+  for (const [k, v] of mem) {
+    if (now - v.storedAt > v.ttlMs) mem.delete(k);
+  }
+  if (mem.size <= MEM_CAP) return;
+  const overflow = mem.size - Math.floor(MEM_CAP * 0.8);
+  let n = 0;
+  for (const k of mem.keys()) {
+    mem.delete(k);
+    if (++n >= overflow) break;
+  }
+}
 
 export function cacheKey(kind: CacheKind, parts: Array<string | null | undefined>): string {
   return `${kind}:${parts.map((p) => String(p ?? "").trim().toLowerCase()).join("|")}`;
@@ -65,6 +80,7 @@ export function writeCache<T>(opts: {
     ttlMs,
   };
   mem.set(opts.key, entry);
+  pruneMem(entry.storedAt);
   return entry;
 }
 

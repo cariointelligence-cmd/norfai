@@ -53,4 +53,10 @@ describe("vercel hybrid", () => {
     assert.ok(s.sets >= 1);
     assert.ok(s.hitRate >= 0);
   });
+
+  it("bounds hive intel cache so the memory buffer cannot grow without cap", () => {
+    resetIntelCacheForTests();
+    for (let i = 0; i < 2_600; i++) cacheSet(`k${i}`, i, CACHE_TTL.domain);
+    assert.ok(cacheStats().size <= 2_500);
+  });
 });

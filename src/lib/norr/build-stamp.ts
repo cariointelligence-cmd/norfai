@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-supercrawl";
+export const NORF_BUILD = "2026-09-14-hive-mem";
 
 export function vercelDeployProbe() {
   const env = process.env;

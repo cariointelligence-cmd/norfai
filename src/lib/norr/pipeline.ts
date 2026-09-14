@@ -1698,6 +1698,9 @@ export async function pumpSearch(sql, userId, runId) {
 	const now = Date.now();
 	if (now - (pumpLocks.get(runId) ?? 0) < 8_000) return 0;
 	pumpLocks.set(runId, now);
+	if (pumpLocks.size > 80) {
+		for (const [k, t] of pumpLocks) if (now - t > 60_000) pumpLocks.delete(k);
+	}
 	try { await stealStaleJobs(sql, userId, null); } catch { /* */ }
 	return processJobsFor(sql, userId, runId, { maxMs: 10_000, concurrency: 2, skipSchema: true });
 }

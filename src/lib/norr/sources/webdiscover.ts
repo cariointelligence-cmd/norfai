@@ -317,6 +317,30 @@ export async function harvestSite(opts: {
   const origin = canonicalCompanyWebsite(opts.website);
   if (!origin) return { website: null, emails: [], phones: [], people: [] };
   const budget = Math.max(2, Math.min(opts.budget ?? (opts.exhaustive ? 6 : 3), 8));
+  if (opts.requireName || opts.exhaustive) return harvestSiteLive(origin, budget, opts);
+  const { cacheCoalesce, cacheKey, CACHE_TTL } = await import("../intel-cache.ts");
+  return cacheCoalesce(cacheKey(["harvest", origin, String(budget)]), CACHE_TTL.website, () => harvestSiteLive(origin, budget, opts));
+}
+
+async function harvestSiteLive(
+  origin: string,
+  budget: number,
+  opts: {
+    website: string;
+    companyName: string;
+    extraUrls?: string[];
+    requireName?: boolean;
+    budget?: number;
+    depth?: string | null;
+    exhaustive?: boolean;
+  },
+): Promise<{
+  website: string | null;
+  emails: ContactHit[];
+  phones: ContactHit[];
+  people: PersonHit[];
+  intel?: WebsiteIntel | null;
+}> {
   const emails: ContactHit[] = [];
   const phones: ContactHit[] = [];
   const people: PersonHit[] = [];
