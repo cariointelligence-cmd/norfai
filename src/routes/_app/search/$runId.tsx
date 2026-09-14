@@ -92,6 +92,10 @@ function RunView() {
         paused: "Tauotettu",
         resumed: "Jatkuu",
         cancelled: "Peruttu",
+        exportRun: "Vie tämä haku",
+        runAgain: "Aja uudelleen",
+        duplicate: "Kopioi ehdot",
+        compare: "Vertaa edelliseen",
       },
       en: {
         findMissing: "Find missing emails ({n})",
@@ -104,6 +108,10 @@ function RunView() {
         paused: "Paused",
         resumed: "Resumed",
         cancelled: "Cancelled",
+        exportRun: "Export this run",
+        runAgain: "Run again",
+        duplicate: "Duplicate",
+        compare: "Compare with previous",
       },
       sv: {
         findMissing: "Hitta saknade e-postadresser ({n})",
@@ -116,6 +124,10 @@ function RunView() {
         paused: "Pausad",
         resumed: "Återupptagen",
         cancelled: "Avbruten",
+        exportRun: "Exportera denna sökning",
+        runAgain: "Kör igen",
+        duplicate: "Kopiera villkor",
+        compare: "Jämför med föregående",
       },
     },
     locale,
@@ -347,9 +359,9 @@ function RunView() {
             <option value="financial">CSV: financial</option>
             <option value="marketing">CSV: marketing</option>
           </select>
-          <Button variant="secondary" onClick={() => void exportRun()}>Export this run</Button>
-          <Button variant="secondary" onClick={() => void runAgain()}>Run again</Button>
-          <Button variant="secondary" onClick={() => duplicate()}>Duplicate</Button>
+          <Button variant="secondary" onClick={() => void exportRun()}>{copy.exportRun}</Button>
+          <Button variant="secondary" onClick={() => void runAgain()}>{copy.runAgain}</Button>
+          <Button variant="secondary" onClick={() => duplicate()}>{copy.duplicate}</Button>
           <Button
             variant="secondary"
             disabled={enrich.isPending || emailQueued > 0}
@@ -368,7 +380,7 @@ function RunView() {
                 });
               }}
             >
-              Compare with previous
+              {copy.compare}
             </Button>
           ) : null}
           {run.status === "running" || run.status === "queued" ? (

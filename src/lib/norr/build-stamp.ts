@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-catalog-i18n";
+export const NORF_BUILD = "2026-09-14-fi-honest";
 
 export function vercelDeployProbe() {
   const env = process.env;

@@ -22,10 +22,14 @@ function starterCriteria(): SearchCriteria {
   return c;
 }
 
-function friendlyError(err: unknown, fallback: string): string {
+function friendlyError(err: unknown, fallback: string, locale: string): string {
   const raw = err instanceof Error ? err.message : typeof err === "string" ? err : "";
   if (/load failed|failed to fetch|networkerror|abort|timed out|timeout/i.test(raw)) {
-    return "Connection dropped before the search finished. Try again.";
+    return locale === "fi"
+      ? "Yhteys katkesi ennen haun alkua. Yritä uudelleen."
+      : locale === "sv"
+        ? "Anslutningen bröts innan sökningen startade. Försök igen."
+        : "Connection dropped before the search started. Try again.";
   }
   return raw || fallback;
 }
@@ -144,7 +148,7 @@ function NewSearch() {
       if (!r.ok) toast.error(r.error ?? "Add a place or pick an industry (Kaikki toimialat is allowed).");
       else toast.message("Read the brief below, then start search.");
     } catch (err) {
-      toast.error(friendlyError(err, "Could not read the brief"));
+      toast.error(friendlyError(err, "Could not read the brief", locale));
     } finally {
       setBusy(false);
     }
@@ -168,7 +172,7 @@ function NewSearch() {
       setName(r.label);
       setSummary([r.blurb, "Industry is optional. Kaikki toimialat searches every register line."]);
     } catch (err) {
-      toast.error(friendlyError(err, "Preset could not be applied"));
+      toast.error(friendlyError(err, "Preset could not be applied", locale));
     }
   }
 
@@ -183,7 +187,7 @@ function NewSearch() {
       }
       window.location.assign(`/search/${res.runId}`);
     } catch (err) {
-      toast.error(friendlyError(err, "Search failed"));
+      toast.error(friendlyError(err, "Search failed", locale));
     } finally {
       setBusy(false);
     }
@@ -201,7 +205,7 @@ function NewSearch() {
       toast.message(`Seed list resolved ${res.discovered} companies from YTJ`);
       nav({ to: "/search/$runId", params: { runId: res.runId } });
     } catch (err) {
-      toast.error(friendlyError(err, "Import failed"));
+      toast.error(friendlyError(err, "Import failed", locale));
     } finally {
       setBusy(false);
     }
@@ -305,7 +309,7 @@ function NewSearch() {
                   if (!r.ok) toast.error(r.error ?? "Add a place or pick an industry (Kaikki toimialat is allowed).");
                   else toast.message("Read the proposed brief, then start search.");
                 } catch (err) {
-                  toast.error(friendlyError(err, "Could not read the brief"));
+                  toast.error(friendlyError(err, "Could not read the brief", locale));
                 } finally {
                   setBusy(false);
                 }

@@ -91,7 +91,8 @@ export function CriteriaBuilder({
         size: "Koko ja ikä",
         web: "Sivusto ja yhteystieto",
         signals: "Signaalit",
-        hint: "Valitse kenttä arkikielellä. Julkaistu liikevaihto tulee tilinpäätöksestä. Tyhjä jää Not found.",
+        hint: "Valitse kenttä arkikielellä. Julkaistu liikevaihto tulee tilinpäätöksestä. Tyhjä jää UNKNOWN.",
+        countryHint: "YTJ-rekisteri on live Suomessa. NO/DK/SE täyttyvät avoimista rekistereistä jos ne löytävät osumia. GB/DE/US eivät ole rekisterihaku.",
       },
       en: {
         geography: "Geography",
@@ -119,7 +120,8 @@ export function CriteriaBuilder({
         size: "Size and age",
         web: "Website and contact",
         signals: "Signals",
-        hint: "Pick fields in plain language. Published revenue comes from accounts. Empty stays Not found.",
+        hint: "Pick fields in plain language. Published revenue comes from accounts. Empty stays UNKNOWN.",
+        countryHint: "YTJ register search is live for Finland. NO/DK/SE use open registers when they return hits. GB/DE/US are not register search.",
       },
       sv: {
         geography: "Geografi",
@@ -147,7 +149,8 @@ export function CriteriaBuilder({
         size: "Storlek och ålder",
         web: "Sajt och kontakt",
         signals: "Signaler",
-        hint: "Välj fält på vardagsspråk. Publicerad omsättning kommer från bokslut. Tomt förblir Not found.",
+        hint: "Välj fält på vardagsspråk. Publicerad omsättning kommer från bokslut. Tomt förblir UNKNOWN.",
+        countryHint: "YTJ-register är live för Finland. NO/DK/SE använder öppna register när de ger träffar. GB/DE/US är inte registerökning.",
       },
     },
     locale,
@@ -181,6 +184,9 @@ export function CriteriaBuilder({
                 <option value="US">United States</option>
                 <option value="EU">EU (procurement + GLEIF)</option>
               </Select>
+              {value.country && value.country !== "FI" ? (
+                <p className="mt-1 text-xs text-mute">{copy.countryHint}</p>
+              ) : null}
             </Field>
             <Field label={copy.municipality}>
               <Select
