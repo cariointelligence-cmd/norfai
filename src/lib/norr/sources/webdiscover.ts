@@ -18,6 +18,7 @@ import { poolMap } from "../engines.ts";
 import { RUNTIME } from "../runtime.ts";
 import { pickFanOutUrls } from "../job-budget.ts";
 import { contactPlan, contactHarvestDone } from "../contact-plan.ts";
+import { isJunkHost } from "../junk-hosts.ts";
 
 const GENERIC_TOKENS = new Set([
   "rakennus", "rakennusliike", "rakennuttaminen", "korjausrakentaminen",
@@ -70,6 +71,7 @@ export function isDirectoryHost(urlOrHost: string): boolean {
   }
   host = host.replace(/^www\./, "");
   if (!host) return false;
+  if (isJunkHost(host)) return true;
   if (/^(assets|cdn|static|img|images|media|static-assets|fonts)\./.test(host)) return true;
   if (/\.(png|jpe?g|gif|webp|svg|avif|css|js|mjs|woff2?|ico)(\?|$)/i.test(urlOrHost)) return true;
   if (isJunkCompanyWebsite(urlOrHost.includes("://") ? urlOrHost : `https://${host}`)) return true;

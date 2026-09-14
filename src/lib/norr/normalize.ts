@@ -78,9 +78,9 @@ export function normalizeWebsite(raw: string | null | undefined): string | null 
   }
 }
 
-const JUNK_SITE_HOST =
-  /(?:^|\.)(almatalent|almamedia|almainights|almainsights|kauppalehti|iltalehti|iltasanomat|aamulehti|talouselama|taloussanomat|uusisuomi|tekniikkatalous|tivi|mikrobitti|mtvuutiset|etuovi|vuokraovi|autotalli|satakunnankansa|lapinkansa|kaleva|finder|fonecta|asiakastieto|northdata|proff|ytj|prh|wikipedia|wikidata|facebook|linkedin|instagram|youtube|tiktok|cloudfront|akamaized|akamaihd|googleusercontent|googleapis|gstatic|google|fbcdn|twimg|imgix|cloudinary|wixstatic|shopifycdn|fastly|vainu|leadfeeder|dealfront|zoominfo|apollo\.io|lusha|kompass|europages|creditsafe|bisnode|ytunnus|yritystieto|jsdelivr|unpkg|typekit|cookiebot|cookielaw|onetrust|hotjar|googletagmanager|google-analytics|doubleclick|schema\.org|w3\.org|jquery|cloudflare|cloudflareinsights|k5a|zaraz|abtasty|sentry|mixpanel|intercom|hubspot|hs-scripts|hsforms|optimizely|fullstory|cookieyes|clarity\.ms|vwo|nr-data|datadoghq|amplitude|segment)\.[a-z.]+$/i;
-const ASSET_HOST = /^(assets|cdn|static|img|images|media|static-assets|fonts|static-cdn)\./i;
+import { isJunkHost } from "./junk-hosts.ts";
+
+const ASSET_HOST = /^(assets|cdn|static|img|images|media|static-assets|fonts|static-cdn|amp)\./i;
 const ASSET_PATH = /\.(png|jpe?g|gif|webp|svg|avif|css|js|mjs|woff2?|ttf|eot|ico|map)(\?|$)/i;
 const PLATFORM_PATH = /^\/(css2?|gtag\/js|pagead|maps\/api|ajax\/libs)\b/i;
 
@@ -92,11 +92,7 @@ export function isJunkCompanyWebsite(raw: string | null | undefined): boolean {
     const u = new URL(w);
     const host = u.hostname.replace(/^www\./, "").toLowerCase();
     if (ASSET_HOST.test(host)) return true;
-    if (JUNK_SITE_HOST.test(host)) return true;
-    if (/(^|\.)(hs|yle|is|mtv)\.fi$/i.test(host)) return true;
-    if (/(^|\.)k5a\.io$/i.test(host)) return true;
-    if (/^cl-eu\d+\./i.test(host)) return true;
-    if (/\.googleapis\.com$|\.gstatic\.com$/i.test(host)) return true;
+    if (isJunkHost(host)) return true;
     if (ASSET_PATH.test(u.pathname)) return true;
     if (PLATFORM_PATH.test(u.pathname)) return true;
     if (/\/maps(\/|$)/i.test(u.pathname) && /google|goo\.gl/i.test(host)) return true;

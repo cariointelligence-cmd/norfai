@@ -1,4 +1,5 @@
 import { canonicalCompanyWebsite, normalizeDomain, normalizeName, normalizePhone, storedWebsiteUnusable } from "./normalize.ts";
+import { isJunkEmailDomain } from "./junk-hosts.ts";
 
 const ROLE_LOCAL = new Set([
   "info", "myynti", "sales", "office", "toimisto", "contact", "yhteys",
@@ -56,13 +57,7 @@ const JUNK_EMAIL_DOMAINS = new Set([
 ]);
 
 function junkEmailHost(domain: string): boolean {
-  const d = String(domain ?? "").toLowerCase().replace(/^www\./, "");
-  if (!d) return false;
-  if (JUNK_EMAIL_DOMAINS.has(d)) return true;
-  for (const j of JUNK_EMAIL_DOMAINS) {
-    if (d === j || d.endsWith(`.${j}`)) return true;
-  }
-  return false;
+  return isJunkEmailDomain(domain);
 }
 
 const BILLING_EMAIL_DOMAINS = new Set([

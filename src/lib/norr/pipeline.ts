@@ -594,6 +594,11 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 	}
 	}
 	const persistHits = async (hits) => {
+		try {
+			const stored = await sql`select id, kind, value from contacts where user_id = ${userId} and company_id = ${companyId}`;
+			const drop = stored.filter((r) => (r.kind === "email" && isJunkEmail(r.value)) || (r.kind === "phone" && isJunkCompanyPhone(r.value))).map((r) => r.id);
+			if (drop.length) await sql`delete from contacts where user_id = ${userId} and company_id = ${companyId} and id = any(${drop})`;
+		} catch { /* keep persist going */ }
 		if (hits.website) {
 			const incoming = canonicalCompanyWebsite(hits.website);
 			if (incoming && !isDirectoryHost(incoming)) await sql`update companies set website = ${incoming}, website_domain = ${normalizeDomain(incoming)} where id = ${companyId} and user_id = ${userId}`;

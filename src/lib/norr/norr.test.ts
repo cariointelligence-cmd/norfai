@@ -988,6 +988,13 @@ describe("contacts hygiene", () => {
     assert.equal(emailBelongsToCompany("info@asuntotekniikka.fi", { name: "Asuntotekniikka Oy", website: "https://asuntotekniikka.fi" }), true);
     assert.equal(isJunkEmail("heidi.antinkari@almamedia.fi"), true);
     assert.equal(isJunkEmail("il-oikeus@iltalehti.fi"), true);
+    assert.equal(isJunkEmail("toimitus@hs.fi"), true);
+    assert.equal(isJunkEmail("info@finder.fi"), true);
+    assert.equal(isJunkEmail("x@linkedin.com"), true);
+    assert.equal(isJunkCompanyWebsite("https://www.oikotie.fi/yritys/x"), true);
+    assert.equal(isJunkCompanyWebsite("https://duunitori.fi/tyopaikat/x"), true);
+    assert.equal(canonicalCompanyWebsite("https://www.yle.fi"), null);
+    assert.equal(canonicalCompanyWebsite("https://roditec.net"), "https://roditec.net");
     assert.equal(isJunkCompanyWebsite("https://www.iltalehti.fi"), true);
     assert.equal(canonicalCompanyWebsite("https://www.iltalehti.fi"), null);
     assert.equal(websiteFromPublishedEmail("il-oikeus@iltalehti.fi"), null);
