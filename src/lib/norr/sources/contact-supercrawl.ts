@@ -130,8 +130,6 @@ async function supercrawlLive(opts: {
     for (const p of pages) mergeHits(out, p);
     return out;
   }
-  const name = opts.name.trim();
-  if (name.length < 2) return { ...EMPTY };
   const q = encodeURIComponent([name, opts.municipality].filter(Boolean).join(" "));
   const bid = (opts.businessId ?? "").replace(/\s/g, "");
   const digits = /^\d{7}-\d$/.test(bid) ? bid.replace(/\D/g, "") : "";
