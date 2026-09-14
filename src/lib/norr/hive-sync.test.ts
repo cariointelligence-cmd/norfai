@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { contactHarvestDone, contactPlan, directoriesNeeded } from "./contact-plan.ts";
+import { contactHarvestDone, contactPlan, directoriesNeeded, finderNeeded } from "./contact-plan.ts";
 import { hiveJobRank, hivePlan, hiveSkipSignals } from "./hive-coordinator.ts";
 import { emptyCriteria, setIndustryCodes } from "./criteria.ts";
 
@@ -11,7 +11,7 @@ describe("hive sync", () => {
     assert.equal(contactHarvestDone({ emails: 1, phones: 0, depth: "normal" }), false);
     assert.equal(contactHarvestDone({ emails: 0, phones: 2, depth: "normal" }), false);
     assert.equal(directoriesNeeded({ emails: 1, phones: 1, depth: "normal" }), false);
-    assert.equal(directoriesNeeded({ emails: 0, phones: 3, depth: "normal" }), true);
+    assert.equal(finderNeeded({ emails: 0, depth: "normal" }), false);
     assert.equal(contactPlan({ website: "https://acme.fi", depth: "normal" }).harvestBudget, 3);
   });
 
@@ -29,7 +29,7 @@ describe("hive sync", () => {
     assert.match(src, /locked_at is null/);
     assert.match(src, /Number\(live\) >= 8/);
     assert.match(src, /when 'discover' then 0/);
-    assert.match(src, /skipRefresh/);
+    assert.match(src, /finderNeeded/);
     assert.match(src, /insert into jobs \(id, user_id, run_id, company_id, type, payload\)/);
     assert.doesNotMatch(src.slice(src.indexOf("async function attachDiscovered"), src.indexOf("export async function runDiscover")), /insertCompany\(/);
   });

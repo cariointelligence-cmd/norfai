@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { contactPlan, directoriesNeeded, contactHarvestDone } from "./contact-plan.ts";
+import { contactPlan, directoriesNeeded, finderNeeded, contactHarvestDone } from "./contact-plan.ts";
 import { inferGeneralMailbox } from "./contacts.ts";
 
 describe("contact plan", () => {
@@ -19,6 +19,10 @@ describe("contact plan", () => {
     assert.equal(directoriesNeeded({ emails: 1, phones: 0, website: "https://x.fi" }), false);
     assert.equal(directoriesNeeded({ emails: 0, phones: 0, website: null }), true);
     assert.equal(directoriesNeeded({ emails: 0, phones: 1, website: "https://x.fi" }), true);
+    assert.equal(finderNeeded({ emails: 0, depth: "normal" }), false);
+    assert.equal(finderNeeded({ emails: 0, depth: "deep" }), true);
+    assert.equal(finderNeeded({ emails: 0, emailRecovery: true }), true);
+    assert.equal(finderNeeded({ emails: 1, depth: "deep" }), false);
   });
   it("infers a role mailbox on a live company domain", () => {
     const r = inferGeneralMailbox("hasan.fi", []);

@@ -20,6 +20,16 @@ export function directoriesNeeded(opts: {
   return opts.emails < 1;
 }
 
+/** Fonecta Finder is paid-adjacent / WAF-heavy. Only deep or Find missing emails. */
+export function finderNeeded(opts: {
+  emails: number;
+  depth?: "normal" | "deep" | string | null;
+  emailRecovery?: boolean;
+}): boolean {
+  if (opts.emails >= 1) return false;
+  return Boolean(opts.emailRecovery || opts.depth === "deep");
+}
+
 /** Stop crawling extra pages once outreach has a real contact path. */
 export function contactHarvestDone(opts: {
   emails: number;

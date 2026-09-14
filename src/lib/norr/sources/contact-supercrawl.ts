@@ -92,7 +92,12 @@ export async function supercrawlContacts(opts: {
   const urls: Array<{ url: string; id: string }> = [
     { url: `https://www.020202.fi/haku?what=${q}`, id: "020202" },
   ];
-  if (/^\d{7}-\d$/.test(bid)) urls.push({ url: `https://www.ytunnus.fi/${bid}`, id: "ytunnus" });
+  if (/^\d{7}-\d$/.test(bid)) {
+    const digits = bid.replace(/\D/g, "");
+    urls.push({ url: `https://www.ytunnus.fi/${bid}`, id: "ytunnus" });
+    urls.push({ url: `https://www.kauppalehti.fi/yritykset/yritys/${digits}`, id: "kauppalehti" });
+    urls.push({ url: `https://www.asiakastieto.fi/yritykset/fi/haku?query=${encodeURIComponent(bid)}`, id: "asiakastieto" });
+  }
   const pages = await Promise.all(urls.map(async (u) => {
     const html = await fetchHtml(u.url);
     return html ? parseDirectoryContactHtml(html, u.url, u.id) : EMPTY;

@@ -58,7 +58,7 @@ import { RUNTIME, clampConcurrency } from "./runtime.ts";
 import { loadSourceFlags, sourceAllowed, disabledSourceIds } from "./immune/flags.ts";
 import { ytjFieldObservations } from "./sources/ytj.ts";
 import { cheapDiscoverReject } from "./cheap-filter.ts";
-import { directoriesNeeded, contactPlan, contactHarvestDone } from "./contact-plan.ts";
+import { directoriesNeeded, finderNeeded, contactPlan, contactHarvestDone } from "./contact-plan.ts";
 import { recordCapability } from "./capabilities.ts";
 import { hivePlan, hiveSkipIdentity, hiveSkipFinancial, hiveSkipSignals, hiveSourceReport } from "./hive-coordinator.ts";
 
@@ -648,21 +648,23 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 	let kl = { ok: false, profile: null, sourceUrl: "", observations: [] };
 	let nd = { ok: false, profile: null, sourceUrl: "", observations: [] };
 	let superC = { emails: [] as { value: string }[], phones: [] as { value: string }[], people: [] as { fullName: string }[], website: null as string | null, sourceUrl: null as string | null, sourceId: "supercrawl" };
+	const publishedN = (facts.emails ?? []).filter((e) => e.classification === "published").length;
 	const needDirs = directoriesNeeded({
-		emails: (facts.emails ?? []).filter((e) => e.classification === "published").length,
+		emails: publishedN,
 		phones: facts.phones.length,
 		website: facts.website,
 		depth,
 		emailRecovery,
 	});
-	if (needDirs) {
+	const needFinder = finderNeeded({ emails: publishedN, depth, emailRecovery });
+	if (needDirs || needFinder) {
 		[finderFirst, kl, nd, superC] = await Promise.all([
-		finderLookup({
+		(needFinder ? finderLookup({
 			name,
 			businessId: bid,
 			municipality: mun,
 			allowRender: depth === "deep"
-		}).catch(() => ({
+		}) : Promise.resolve({ ok: false, profile: null, sourceUrl: "", observations: [] })).catch(() => ({
 			ok: false,
 			profile: null,
 			sourceUrl: "",
