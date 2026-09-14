@@ -37,4 +37,11 @@ describe("hive sync", () => {
     assert.match(src, /insert into jobs \(id, user_id, run_id, company_id, type, payload\)/);
     assert.doesNotMatch(src.slice(src.indexOf("async function attachDiscovered"), src.indexOf("export async function runDiscover")), /insertCompany\(/);
   });
+
+  it("Face search tick actually drains jobs for the run", () => {
+    const tick = readFileSync(new URL("../../routes/api/search/tick.ts", import.meta.url), "utf8");
+    assert.match(tick, /processJobsFor/);
+    assert.match(tick, /resumeDiscoverIfStarved/);
+    assert.match(tick, /maxMs: 10_000/);
+  });
 });

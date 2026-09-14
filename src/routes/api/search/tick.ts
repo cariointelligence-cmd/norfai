@@ -22,6 +22,16 @@ async function handle({ request }: { request: Request }) {
     return Response.json({ ok: false, processed: 0, error: "Invalid JSON" }, { status: 400 });
   }
   if (!runId) return Response.json({ ok: false, processed: 0, error: "Missing runId" }, { status: 400 });
+  let processed = 0;
+  try {
+    const { getSql } = await import("@/lib/db");
+    const { processJobsFor, resumeDiscoverIfStarved } = await import("@/lib/norr/pipeline.ts");
+    const sql = await getSql();
+    processed = await processJobsFor(sql, userId, runId, { maxMs: 10_000, concurrency: 8, skipSchema: true });
+    try { await resumeDiscoverIfStarved(sql, userId, runId); } catch { /* keep */ }
+  } catch (err) {
+    console.warn("[norf] search.tick", err instanceof Error ? err.message : err);
+  }
   dispatchVercelExecution({ userId, runId, reason: "search.tick" });
-  return Response.json({ ok: true, accepted: true, processed: 0 });
+  return Response.json({ ok: true, accepted: true, processed });
 }

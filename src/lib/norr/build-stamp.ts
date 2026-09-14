@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-ytj-prefix";
+export const NORF_BUILD = "2026-09-14-tick-drain";
 
 export function vercelDeployProbe() {
   const env = process.env;

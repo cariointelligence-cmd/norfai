@@ -6,6 +6,13 @@ import { ensureOpsSchema } from "./tenant.ts";
 import { poolMap } from "./engines.ts";
 import { RUNTIME } from "./runtime.ts";
 import { isVercelRuntime, dispatchVercelExecution, countDueJobs } from "./vercel-executor.ts";
+import {
+  snapshotQueueDepth,
+  applyQueueImmune,
+  logQueueSnapshot,
+  persistQueueSnapshot,
+  type QueueSnapshot,
+} from "./queue-monitor.ts";
 
 const globalRef = globalThis as typeof globalThis & {
   __norfWorker__?: { timer: ReturnType<typeof setInterval> | null; inflight: boolean };

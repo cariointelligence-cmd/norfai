@@ -2604,13 +2604,14 @@ export const fillList = createServerFn({ method: "POST" }).middleware([authMiddl
     ids = await sql`select c.id from run_companies rc join companies c on c.id = rc.company_id
       where rc.user_id = ${context.userId} and rc.run_id = ${runId} and c.deleted_at is null
         and coalesce(c.name, '') <> ''
-        and (${industry} = '' or c.industry_code like ${industry + "%"} or coalesce(c.industry_label,'') ilike ${"%" + industry + "%"})
+        and c.record_status is distinct from 'rejected'
+        and (${industry} = '' or c.industry_code like ${industry + "%"})
         and (${municipality} = '' or coalesce(c.municipality,'') ilike ${"%" + municipality + "%"})
         and (${country} = '' or coalesce(c.country,'FI') = ${country})
         and (${rules.requireWebsite ? 1 : 0} = 0 or c.website is not null)
         and (${rules.requireEmail ? 1 : 0} = 0 or c.general_email is not null)
         and (${rules.requirePhone ? 1 : 0} = 0 or c.phone is not null)
-        and (${minRev} = 0 or coalesce(c.revenue, 0) >= ${minRev})
+        and (${minRev} = 0 or (c.revenue is not null and c.revenue >= ${minRev}))
         and (${minMatch} = 0 or coalesce(c.match_score, 0) >= ${minMatch})
         and (${rules.matchedOnly ? 1 : 0} = 0 or (
           coalesce(c.match_score, 0) > 0
@@ -2625,13 +2626,13 @@ export const fillList = createServerFn({ method: "POST" }).middleware([authMiddl
     ids = await sql`select co.id from companies co
       where co.user_id = ${context.userId} and co.deleted_at is null
         and coalesce(co.name, '') <> ''
-        and (${industry} = '' or co.industry_code like ${industry + "%"} or coalesce(co.industry_label,'') ilike ${"%" + industry + "%"})
+        and (${industry} = '' or co.industry_code like ${industry + "%"})
         and (${municipality} = '' or coalesce(co.municipality,'') ilike ${"%" + municipality + "%"})
         and (${country} = '' or coalesce(co.country,'FI') = ${country})
         and (${rules.requireWebsite ? 1 : 0} = 0 or co.website is not null)
         and (${rules.requireEmail ? 1 : 0} = 0 or co.general_email is not null)
         and (${rules.requirePhone ? 1 : 0} = 0 or co.phone is not null)
-        and (${minRev} = 0 or coalesce(co.revenue, 0) >= ${minRev})
+        and (${minRev} = 0 or (co.revenue is not null and co.revenue >= ${minRev}))
         and (${minMatch} = 0 or coalesce(co.match_score, 0) >= ${minMatch})
         and (${rules.requireDecisionMaker ? 1 : 0} = 0 or exists (
           select 1 from people p where p.user_id = co.user_id and p.company_id = co.id and p.deleted_at is null

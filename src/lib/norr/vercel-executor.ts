@@ -147,9 +147,10 @@ export async function invokeVercelDrain(opts: DrainRequest): Promise<{ ok: boole
     const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
     if (bypass) headers["x-vercel-protection-bypass"] = bypass;
     const p = fetch(`${origin}${DRAIN_PATH}`, { method: "POST", headers, body });
-    scheduleBackground(() => p.then((res) => res.arrayBuffer()).catch((err) => {
+    p.then((res) => res.arrayBuffer()).catch((err) => {
       console.warn("[norf] vercel drain invoke", err instanceof Error ? err.message : err);
-    }));
+    });
+    scheduleBackground(() => p);
     return { ok: true, mode: "http" };
   }
   scheduleBackground(() => runVercelDrain({ ...opts, depth }));
