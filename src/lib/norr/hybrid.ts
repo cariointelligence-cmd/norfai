@@ -67,7 +67,7 @@ export function scheduleBackground(task: () => Promise<unknown>): void {
   }
   if (process.env.VERCEL) {
     if (!process.env.NODE_TEST_CONTEXT) {
-      void import("@vercel/functions")
+      void import(/* @vite-ignore */ "@vercel/functions")
         .then((vf) => {
           if (typeof vf.waitUntil === "function") vf.waitUntil(run());
         })
