@@ -169,7 +169,7 @@ import {
   RANKING_VERSION,
 } from "./fingerprint.ts";
 import { limitedNewWarning, emptyNewLeadsMessage, skipPreviouslyShown, showEmptyNewBanner } from "./novelty.ts";
-import { runProgress } from "./progress.ts";
+import { runProgress, displayRunStatus } from "./progress.ts";
 import { faceRegisterDiagnosis } from "./face-diagnosis.ts";
 import { parseLeadPrefs, parseListRules } from "./prefs.ts";
 import { listPlatformUsers, createPlatformUser, giftWorkspacePlan, grantAdminByUserId } from "./admin-users.ts";
@@ -478,22 +478,27 @@ export const tickSearch = createServerFn({ method: "POST" }).middleware([authMid
 
 export const controlRun = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d).handler(async ({ context, data }) => {
   const sql = await ctxSql(context);
-  const g = await gate(sql, context.userId, "tick", {
-    max: 90,
-    windowMs: 6e4
-  });
-  if (!g.ok) return {
-    ok: false,
-    error: g.error
-  };
-  if (data.action === "pause") await sql`update search_runs set pause_requested = true, status = ${"paused"} where id = ${data.runId} and user_id = ${context.userId}`;
-  else if (data.action === "resume") await sql`update search_runs set pause_requested = false, status = ${"running"} where id = ${data.runId} and user_id = ${context.userId}`;
-  else {
-    await sql`update search_runs set cancel_requested = true, status = ${"cancelled"}, finished_at = now() where id = ${data.runId} and user_id = ${context.userId}`;
-    await sql`update jobs set status = ${"cancelled"} where run_id = ${data.runId} and user_id = ${context.userId} and status in ('queued','running')`;
+  const action = String(data.action ?? "");
+  const runId = boundedString(data.runId, 64);
+  if (!runId || !["pause", "resume", "cancel"].includes(action)) return { ok: false, error: "Invalid control" };
+  const owned = await sql`select id, status from search_runs where id = ${runId} and user_id = ${context.userId} limit 1`;
+  if (!owned[0]) return { ok: false, error: "Search not found" };
+  if (action === "pause") {
+    await sql`update search_runs set pause_requested = true, status = ${"paused"} where id = ${runId} and user_id = ${context.userId} and status <> ${"cancelled"}`;
+    await sql`update jobs set status = ${"queued"}, locked_at = null, run_after = now(), updated_at = now()
+      where run_id = ${runId} and user_id = ${context.userId} and status = ${"running"}`;
+  } else if (action === "resume") {
+    await sql`update search_runs set pause_requested = false, cancel_requested = false, status = ${"running"}, finished_at = null
+      where id = ${runId} and user_id = ${context.userId} and status <> ${"cancelled"}`;
+    dispatchVercelExecution({ userId: context.userId, runId, reason: "search.resume" });
+  } else {
+    await sql`update search_runs set cancel_requested = true, pause_requested = false, status = ${"cancelled"}, finished_at = now()
+      where id = ${runId} and user_id = ${context.userId}`;
+    await sql`update jobs set status = ${"cancelled"}, locked_at = null, updated_at = now()
+      where run_id = ${runId} and user_id = ${context.userId} and status in ('queued','running')`;
   }
-  await audit(sql, context.userId, `search.${data.action}`, "search_run", data.runId);
-  return { ok: true };
+  await audit(sql, context.userId, `search.${action}`, "search_run", runId);
+  return { ok: true, status: action === "pause" ? "paused" : action === "resume" ? "running" : "cancelled" };
 });
 
 export const getRun = createServerFn({ method: "GET" }).middleware([authMiddleware]).validator((d) => d).handler(async ({ context, data }) => {
@@ -583,7 +588,7 @@ export const getRun = createServerFn({ method: "GET" }).middleware([authMiddlewa
   const missingEmail = Number(missingRow?.n ?? uniqueCompanies.filter((c) => !c.general_email).length);
   const skipSeen = skipPreviouslyShown(run.criteria ?? {});
   const jobsLive = (jobs as Array<{ status?: string }>).some((j) => j.status === "running" || j.status === "queued");
-  const viewStatus = jobsLive && run.status !== "cancelled" && run.status !== "failed" ? "running" : run.status;
+  const viewStatus = displayRunStatus(String(run.status ?? ""), jobsLive);
   const emptyNew = showEmptyNewBanner({ excludeSeen: skipSeen, companyCount, status: viewStatus });
   let previousRunId = null;
   if (run.query_fingerprint) {

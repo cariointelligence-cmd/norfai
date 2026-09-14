@@ -1,5 +1,5 @@
 import { getSql } from "@/lib/db";
-import { runProgress } from "./progress.ts";
+import { runProgress, displayRunStatus } from "./progress.ts";
 
 export async function readSearchRun(userId: string, runId: string, cursor?: string | null) {
   const sql = await getSql();
@@ -41,7 +41,7 @@ export async function readSearchRun(userId: string, runId: string, cursor?: stri
 
   const unique = companies.map((c) => ({ ...c, website: c.website ?? null }));
   const jobsLive = jobs.some((j: { status?: string }) => j.status === "running" || j.status === "queued");
-  const viewStatus = jobsLive && run.status !== "cancelled" && run.status !== "failed" ? "running" : run.status;
+  const viewStatus = displayRunStatus(String(run.status ?? ""), jobsLive);
   const missingEmail = unique.filter((c) => !c.general_email).length;
   const foundEmail = unique.filter((c) => c.general_email).length;
   const foundPhone = unique.filter((c) => c.phone).length;

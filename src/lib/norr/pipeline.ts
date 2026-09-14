@@ -1590,6 +1590,11 @@ async function processNextJob(sql, userId, runId, opts) {
 					}),
 				]);
 				if (!disc.complete) {
+					const flags = (await sql`select cancel_requested, pause_requested, status from search_runs where id = ${job.run_id} and user_id = ${userId}`)?.[0];
+					if (flags?.cancel_requested || flags?.status === "cancelled") {
+						await sql`update jobs set status = ${"cancelled"}, locked_at = null, updated_at = now() where id = ${job.id} and user_id = ${userId}`;
+						return { did: true, type: job.type };
+					}
 					await sql`update jobs set status = ${"queued"}, attempts = greatest(attempts - 1, 0), run_after = now(), last_error = ${"discover continue"}, locked_at = null, payload = ${JSON.stringify({ ...payload, ytjCursor: disc.cursor ?? payload.ytjCursor ?? null, discoverExhausted: false, ytjScannedAll: false })}::jsonb, updated_at = now()
             where id = ${job.id} and user_id = ${userId}`;
 					return { did: true, type: job.type, incomplete: true };

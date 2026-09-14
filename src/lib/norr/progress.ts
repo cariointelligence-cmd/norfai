@@ -1,4 +1,8 @@
-export type JobLite = { type?: string; status?: string; last_error?: string | null };
+export function displayRunStatus(status: string, jobsLive: boolean): string {
+  if (status === "cancelled" || status === "failed" || status === "paused") return status;
+  if (jobsLive) return "running";
+  return status;
+}
 export type JobCountRow = { type?: string | null; status?: string | null; n?: number | null };
 
 const STAGE_WEIGHT: Record<string, number> = {

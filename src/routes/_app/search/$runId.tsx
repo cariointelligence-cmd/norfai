@@ -154,6 +154,18 @@ function RunView() {
     },
     onError: () => toast.error("Re-enrich was refused."),
   });
+  const control = useMutation({
+    mutationFn: (action: "pause" | "resume" | "cancel") => controlRun({ data: { runId, action } }),
+    onSuccess: (r, action) => {
+      if (r && "ok" in r && r.ok === false) {
+        toast.error("error" in r && typeof r.error === "string" ? r.error : "Could not update search");
+        return;
+      }
+      toast.message(action === "pause" ? "Paused" : action === "resume" ? "Resumed" : "Cancelled");
+      void q.refetch();
+    },
+    onError: () => toast.error("Could not update search"),
+  });
 
   useEffect(() => {
     setExtra([]);
@@ -341,13 +353,13 @@ function RunView() {
               Compare with previous
             </Button>
           ) : null}
-          {run.status === "running" ? (
-            <Button variant="secondary" onClick={() => controlRun({ data: { runId, action: "pause" } }).then(() => q.refetch())}>Pause</Button>
+          {run.status === "running" || run.status === "queued" ? (
+            <Button variant="secondary" disabled={control.isPending} onClick={() => control.mutate("pause")}>Pause</Button>
           ) : run.status === "paused" ? (
-            <Button variant="secondary" onClick={() => controlRun({ data: { runId, action: "resume" } }).then(() => q.refetch())}>Resume</Button>
+            <Button variant="secondary" disabled={control.isPending} onClick={() => control.mutate("resume")}>Resume</Button>
           ) : null}
-          {run.status !== "cancelled" && run.status !== "completed" ? (
-            <Button variant="danger" onClick={() => controlRun({ data: { runId, action: "cancel" } }).then(() => q.refetch())}>Cancel</Button>
+          {run.status !== "cancelled" && run.status !== "completed" && run.status !== "failed" ? (
+            <Button variant="danger" disabled={control.isPending} onClick={() => control.mutate("cancel")}>Cancel</Button>
           ) : null}
         </div>
       </div>

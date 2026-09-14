@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { clampScore, fnv1a64, mergeContactsNative, poolMap } from "./engines.ts";
-import { runProgress } from "./progress.ts";
+import { runProgress, displayRunStatus } from "./progress.ts";
 
 describe("native kernels (TS fallbacks)", () => {
   it("fnv is stable and 16 hex chars", () => {
@@ -94,5 +94,11 @@ describe("search progress rail", () => {
     assert.equal(live.label, "Registers");
     assert.ok(live.pct >= 12 && live.pct <= 50, `running pct=${live.pct}`);
     assert.equal(queued.label, live.label);
+  });
+  it("paused and cancelled stay paused/cancelled even with live jobs", () => {
+    assert.equal(displayRunStatus("paused", true), "paused");
+    assert.equal(displayRunStatus("cancelled", true), "cancelled");
+    assert.equal(displayRunStatus("queued", true), "running");
+    assert.equal(displayRunStatus("running", false), "running");
   });
 });

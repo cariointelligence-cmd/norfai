@@ -28,6 +28,7 @@ describe("hive sync", () => {
     const src = readFileSync(new URL("./pipeline.ts", import.meta.url), "utf8");
     assert.match(src, /locked_at is null/);
     assert.match(src, /type <> \$\{"discover"\}/);
+    assert.match(src, /flags\?\.cancel_requested/);
     assert.match(src, /when 'discover' then 0/);
     assert.match(src, /finderNeeded/);
     const rec = src.indexOf("if (emailRecovery) return");
