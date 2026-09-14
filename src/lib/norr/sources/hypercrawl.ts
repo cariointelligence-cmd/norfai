@@ -173,6 +173,7 @@ export async function hypercrawlSite(opts: {
   skipHome?: boolean;
   haveEmail?: boolean;
   havePhone?: boolean;
+  extraPaths?: string[];
 }): Promise<HyperHits> {
   const empty: HyperHits = { emails: [], phones: [], people: [], pages: 0, urls: [] };
   const origin = originOf(opts.website ?? "");
@@ -193,10 +194,11 @@ export async function hypercrawlSite(opts: {
   }
   const discovered = homeHtml ? countryLinksFromHtml(homeHtml, origin, nation) : [];
   const fallbacks = env.sitePaths.map((p) => origin + p);
+  const opp = (opts.extraPaths ?? []).map((p) => (p.startsWith("http") ? p : origin + p));
   const extra: string[] = [];
   const seen = new Set([origin, origin + "/"]);
   const wantPeople = !(opts.haveEmail && opts.havePhone) || people.length === 0;
-  const pool = wantPeople ? [...discovered, ...fallbacks] : discovered.filter((u) => /tiimi|team|johto|ledning|ledelse|styre|hallitus|medarbet|ansatte|people/i.test(u));
+  const pool = wantPeople ? [...discovered, ...opp, ...fallbacks] : discovered.filter((u) => /tiimi|team|johto|ledning|ledelse|styre|hallitus|medarbet|ansatte|people/i.test(u));
   for (const u of pool) {
     if (seen.has(u) || extra.length >= 5) continue;
     seen.add(u);

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { emptyCriteria, firstValue, valuesOf } from "@/lib/norr/criteria";
 import { applyOpportunityPreset, getBootstrap, importSeeds, interpretPrompt, saveProfile } from "@/lib/norr/actions";
-import { OPPORTUNITY_PRESETS, type OpportunityPresetId } from "@/lib/norr/targeting/spec";
+import { OPPORTUNITY_PRESETS, OPPORTUNITY_COPY, type OpportunityPresetId } from "@/lib/norr/targeting/spec";
 import { clampRequestedLeads, perSearchFromBoot } from "@/lib/norr/platform";
 import { BEGINNER_QUESTIONS } from "@/lib/norr/icp-compiler";
 import type { SearchCriteria } from "@/lib/norr/types";
@@ -17,7 +17,7 @@ import { loc } from "@/lib/content/locale";
 
 function starterCriteria(): SearchCriteria {
   const c = emptyCriteria();
-  c.maxResults = 1000;
+  c.maxResults = 50;
   c.mode = "quick";
   return c;
 }
@@ -404,7 +404,7 @@ function NewSearch() {
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
           {(Object.keys(OPPORTUNITY_PRESETS) as OpportunityPresetId[]).map((id) => {
-            const p = OPPORTUNITY_PRESETS[id];
+            const copy = OPPORTUNITY_COPY[id][locale === "sv" ? "sv" : locale === "fi" ? "fi" : "en"];
             return (
               <button
                 key={id}
@@ -412,8 +412,8 @@ function NewSearch() {
                 onClick={() => void pickPreset(id)}
                 className="border border-line bg-panel p-4 text-left hover:border-line-strong"
               >
-                <div className="text-sm font-medium">{p.label}</div>
-                <p className="mt-1 text-xs text-mute">{p.blurb}</p>
+                <div className="text-sm font-medium">{copy.label}</div>
+                <p className="mt-1 text-xs text-mute">{copy.blurb}</p>
               </button>
             );
           })}

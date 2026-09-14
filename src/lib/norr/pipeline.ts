@@ -256,14 +256,6 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
   const id = await readPlatformIdentity(sql, userId);
   const planCap = perSearchLimitFor(id.plan, id.isAdmin);
   let want = clampRequestedLeads(criteria.maxResults, isUnlimitedQuota(planCap) ? ENGINE_SEARCH_CEILING : planCap);
-  if (isUnlimitedQuota(planCap) && want <= 100) {
-    want = 1000;
-    try {
-      await sql`update search_runs
-        set criteria = jsonb_set(coalesce(criteria, '{}'::jsonb), '{maxResults}', ${JSON.stringify(1000)}::jsonb)
-        where id = ${runId} and user_id = ${userId}`;
-    } catch { /* keep running with want */ }
-  }
   const pool = Math.min(discoverPoolSize({ ...criteria, maxResults: want }), ENGINE_SEARCH_CEILING);
   const depth = criteria.depth === "deep" ? "deep" : "normal";
   const country = criteria.country || "FI";
@@ -515,6 +507,11 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 	const country = String(co.country ?? "FI");
 	const bid = co.business_id ?? null;
 	const vat = co.vat_id ?? null;
+	let preset: string | undefined;
+	try {
+		const [row] = await sql`select criteria->>'preset' as preset from search_runs where id = ${runId} and user_id = ${userId}`;
+		preset = row?.preset || undefined;
+	} catch { /* optional */ }
 	const website = co.website ?? null;
 	const emailRecovery = Boolean(_opts?.emailRecovery);
 	const runRow = (await sql`select criteria from search_runs where id = ${runId} and user_id = ${userId} limit 1`)[0];
@@ -704,6 +701,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		country,
 		depth: emailRecovery ? "deep" : depth,
 		emailRecovery,
+		preset,
 	});
 	let finderFirst = { ok: false, profile: null, sourceUrl: "", observations: [] };
 	let kl = { ok: false, profile: null, sourceUrl: "", observations: [] };
@@ -1763,15 +1761,7 @@ export async function resumeDiscoverIfStarved(sql, userId, runId) {
 	const run = (await sql`select criteria, status, pause_requested, cancel_requested from search_runs where id = ${runId} and user_id = ${userId}`)?.[0];
 	if (!run) return false;
 	const ident = await readPlatformIdentity(sql, userId);
-	let want = Math.max(1, Number(run.criteria?.maxResults ?? 100));
-	if (isUnlimitedQuota(perSearchLimitFor(ident.plan, ident.isAdmin)) && want <= 100) {
-		want = 1000;
-		try {
-			await sql`update search_runs
-        set criteria = jsonb_set(coalesce(criteria, '{}'::jsonb), '{maxResults}', ${JSON.stringify(1000)}::jsonb)
-        where id = ${runId} and user_id = ${userId}`;
-		} catch { /* */ }
-	}
+	let want = clampRequestedLeads(Number(run.criteria?.maxResults ?? 100), isUnlimitedQuota(perSearchLimitFor(ident.plan, ident.isAdmin)) ? ENGINE_SEARCH_CEILING : perSearchLimitFor(ident.plan, ident.isAdmin));
 	const skipSeen = skipPreviouslyShown(run.criteria ?? {});
 	let kept = 0;
 	try {

@@ -20,6 +20,7 @@ import { pickFanOutUrls } from "../job-budget.ts";
 import { hypercrawlSite } from "./hypercrawl.ts";
 import { attachDecisionContacts } from "./decision-contacts.ts";
 import { runDecisionMakerFleet } from "./dm-fleet.ts";
+import { extraPathsForPreset } from "./opportunity-engines.ts";
 import { countryEnv } from "../countries/env.ts";
 import { isJunkHost } from "../junk-hosts.ts";
 
@@ -521,6 +522,7 @@ export async function collectFastContacts(opts: {
   country?: string | null;
   depth?: "normal" | "deep";
   emailRecovery?: boolean;
+  preset?: string;
 }): Promise<{
   website: string | null;
   websiteSource: string | null;
@@ -629,6 +631,7 @@ export async function collectFastContacts(opts: {
           skipHome: true,
           haveEmail: emails.length > 0,
           havePhone: phones.length > 0,
+          extraPaths: extraPathsForPreset(opts.preset, opts.country),
         }),
         runDecisionMakerFleet({ website, country: opts.country }),
       ]);

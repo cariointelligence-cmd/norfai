@@ -8,6 +8,8 @@ import { fleetCounts, fleetFor, pickFleet } from "./sources/nation-fleet.ts";
 import { extractDecisionMakersFromHtml } from "./sources/dm-extract.ts";
 import { dmPathCount } from "./sources/dm-fleet.ts";
 import { intelEngineIds, runIntelEngine } from "./vercel-intel.ts";
+import { clampRequestedLeads } from "./platform.ts";
+import { opportunityEngineCount, extraPathsForPreset, opportunityEnginesFor } from "./sources/opportunity-engines.ts";
 import { workLanes } from "./progress.ts";
 import { identityLooksForeign, applyLlmVerdict, llmFilterIdentity } from "./hive-llm.ts";
 import { extractEmails, isJunkEmail, isBillingEmail, isRecruitingEmail, validEmailSyntax, decodeCfEmail, inferGeneralMailbox, inferPersonMailbox, emailMatchesPerson, websiteFromPublishedEmail, websiteFromPublishedEmails, isConsumerMailboxDomain, emailBelongsToCompany, needsEmailRecovery } from "./contacts.ts";
@@ -1131,6 +1133,22 @@ describe("country isolation and decision contacts", () => {
     );
     assert.equal(lanes.length, 4);
     assert.ok(lanes.every((l) => l.label && Number.isFinite(l.pct)));
+    const companies = lanes.find((l) => l.key === "discover")!;
+    const filled = workLanes([{ type: "discover", status: "running" }], "running", { matched: 86, want: 50 });
+    assert.ok((filled.find((l) => l.key === "discover")?.pct ?? 0) >= 90);
+    void companies;
+  });
+  it("never upgrades a 50-company request to 1000 even on unlimited plans", () => {
+    assert.equal(clampRequestedLeads(50, -1), 50);
+    assert.equal(clampRequestedLeads(50, 50), 50);
+    assert.equal(clampRequestedLeads(1000, 50), 50);
+  });
+  it("ships 70+ opportunity crawlers per language and keeps them isolated", () => {
+    assert.ok(opportunityEngineCount("FI").perLanguage >= 70);
+    assert.ok(opportunityEngineCount("SE").perLanguage >= 70);
+    assert.ok(opportunityEngineCount("NO").perLanguage >= 70);
+    assert.equal(opportunityEnginesFor("seo", "FI").every((e) => e.nation === "FI"), true);
+    assert.equal(extraPathsForPreset("seo", "SE").some((p) => p.includes("yhteystiedot")), false);
   });
 });
 

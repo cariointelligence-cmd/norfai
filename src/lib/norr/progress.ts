@@ -163,9 +163,18 @@ export function workLanes(
   const missingE = Math.max(0, Number(hint?.missingEmail ?? 0));
   const dm = Math.max(0, Number(hint?.foundDecisionMaker ?? 0));
   const missingDm = Math.max(0, Number(hint?.missingDecisionMaker ?? 0));
-  const discPct = live ? Math.min(90, Math.round((100 * matched) / want)) : matched ? 100 : 0;
+  const discPct = live
+    ? Math.min(99, Math.round((100 * matched) / want))
+    : matched ? 100 : 0;
+  const companies: WorkLane = {
+    key: "discover",
+    label: "Companies",
+    pct: discPct,
+    hint: matched ? `${matched} matched` : "Register search",
+    running: live && matched < want,
+  };
   return [
-    lane("discover", "Companies", ["discover"], discPct, matched ? `${matched} matched` : "Register search"),
+    companies,
     lane("enrich", "Enrichment", ["enrich", "scrape", "crawl"], live && matched ? 18 : 0, "Websites and public pages"),
     lane("email", "Emails", ["email"], emails + missingE ? Math.round((100 * emails) / Math.max(emails + missingE, 1)) : 0, `${emails} found · ${missingE} missing`),
     lane("people", "Decision-makers", ["email", "enrich"], dm + missingDm ? Math.round((100 * dm) / Math.max(dm + missingDm, 1)) : 0, `${dm} found · ${missingDm} missing`),

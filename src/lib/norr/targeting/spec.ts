@@ -183,6 +183,52 @@ export const OPPORTUNITY_PRESETS: Record<
   },
 };
 
+export const OPPORTUNITY_COPY: Record<
+  OpportunityPresetId,
+  Record<"fi" | "en" | "sv", { label: string; blurb: string }>
+> = {
+  website_sales: {
+    fi: { label: "Verkkosivujen kehitys", blurb: "Toimivat yritykset, joiden julkinen sivu on heikko." },
+    en: { label: "Website development", blurb: "Active firms with enough scale and a weak public site." },
+    sv: { label: "Webbutveckling", blurb: "Aktiva bolag med svag publiksajt." },
+  },
+  digitalization: {
+    fi: { label: "Digitalisaatio / CRM / automaatio", blurb: "Vakiintuneet yritykset, matala digikypsyys." },
+    en: { label: "Digitalization / CRM / automation", blurb: "Established businesses with low digital maturity." },
+    sv: { label: "Digitalisering / CRM / automation", blurb: "Etablerade bolag med låg digital mognad." },
+  },
+  marketing_sales: {
+    fi: { label: "Mainonta / laskeutumissivut", blurb: "Mainostekniikka heikolla sivulla. Mahdollinen hukka." },
+    en: { label: "Advertising / landing pages", blurb: "Ad infrastructure on a weak site. Possible wasted spend." },
+    sv: { label: "Annonsering / landningssidor", blurb: "Annonsinfrastruktur på svag sajt." },
+  },
+  seo: {
+    fi: { label: "Hakukoneoptimointi", blurb: "Indeksoitavat sivut, ohut metadata, heikko rakenne." },
+    en: { label: "SEO", blurb: "Indexable sites with thin metadata and weak structure." },
+    sv: { label: "SEO", blurb: "Indexerbara sajter med tunn metadata." },
+  },
+  ai_automation: {
+    fi: { label: "Tekoälyautomaatio", blurb: "Skaala ja rekry, vähän julkista automaatiota." },
+    en: { label: "AI automation", blurb: "Scale, hiring, little public automation tooling." },
+    sv: { label: "AI-automation", blurb: "Skala och rekrytering, lite synlig automation." },
+  },
+  fast_growing: {
+    fi: { label: "Nopeakasvuiset", blurb: "Rekry, laajentuminen tai hankinta aktiivisessa firmassa." },
+    en: { label: "Fast-growing companies", blurb: "Hiring, expansion or procurement on an active firm." },
+    sv: { label: "Snabbväxande bolag", blurb: "Rekrytering, expansion eller upphandling." },
+  },
+  financially_strong: {
+    fi: { label: "Taloudellisesti vahvat", blurb: "Julkaistu voitto tai vahva tase. Tuntematon pysyy unknown." },
+    en: { label: "Financially strong", blurb: "Published profit or strong balance-sheet language. Unknown stays labelled." },
+    sv: { label: "Finansiellt starka", blurb: "Publicerad vinst eller stark balans. Okänt förblir unknown." },
+  },
+  distressed: {
+    fi: { label: "Vaikeuksissa / käänne", blurb: "Tappio tai heikko oma pääoma vain jos lähde on sen julkaissut." },
+    en: { label: "Distressed / turnaround", blurb: "Negative-result or weak-equity language when a source actually published it." },
+    sv: { label: "I kris / turnaround", blurb: "Negativt resultat endast när källan publicerat det." },
+  },
+};
+
 export function emptyTarget(): TargetSpec {
   return {};
 }
