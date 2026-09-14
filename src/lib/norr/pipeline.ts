@@ -57,7 +57,7 @@ import { RUNTIME, clampConcurrency } from "./runtime.ts";
 import { loadSourceFlags, sourceAllowed, disabledSourceIds } from "./immune/flags.ts";
 import { ytjFieldObservations } from "./sources/ytj.ts";
 import { cheapDiscoverReject } from "./cheap-filter.ts";
-import { directoriesNeeded } from "./contact-plan.ts";
+import { directoriesNeeded, contactPlan, contactHarvestDone } from "./contact-plan.ts";
 import { recordCapability } from "./capabilities.ts";
 import { hivePlan, hiveSkipIdentity, hiveSkipFinancial, hiveSkipSignals, hiveSourceReport } from "./hive-coordinator.ts";
 
@@ -709,6 +709,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 	markHost(facts.website);
 	markHost(site);
 	const harvestNewSite = async (url, source) => {
+		if (contactHarvestDone({ emails: facts.emails.length, phones: facts.phones.length, people: facts.people.length, depth })) return;
 		const w = canonicalCompanyWebsite(url ?? null);
 		if (!w || isDirectoryHost(w)) return;
 		let host = "";
@@ -722,7 +723,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		const harvested = await harvestSite({
 			website: w,
 			companyName: name,
-			budget: depth === "deep" ? 16 : 10
+			budget: contactPlan({ website: w, depth }).harvestBudget
 		});
 		await persistHits({
 			website: harvested.website,
@@ -880,14 +881,11 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			seed: true
 		}
 	});
-	else await enqueueJob(sql, userId, "score", {
-		runId,
-		companyId
-	});
 	if (!hiveSkipSignals(searchPlan)) await enqueueJob(sql, userId, "signals", {
 		runId,
 		companyId
 	});
+	try { await runScore(sql, userId, runId, companyId); } catch { /* score after contacts; extra job not required */ }
 	await sql`update companies set record_status = ${"enriched"}, last_verified_at = now() where id = ${companyId} and user_id = ${userId} and record_status = 'discovered'`;
 	await bumpSource(sql, userId, "ytj", "enrich", { confidence: 90 });
 }
@@ -1419,14 +1417,20 @@ async function runScrape(sql, userId, runId, companyId) {
 }
 
 async function stealStaleJobs(sql, userId, runId) {
-	await sql`update jobs set status = ${"queued"}, locked_at = null, updated_at = now(), last_error = ${"stolen stale lock"}
-    where user_id = ${userId} and status = ${"running"} and locked_at is not null
-      and locked_at < now() - make_interval(secs => ${RUNTIME.jobStealSeconds})
+	await sql`update jobs set status = ${"queued"}, locked_at = null, run_after = now(), updated_at = now(), last_error = ${"stolen stale lock"}
+    where user_id = ${userId} and status = ${"running"}
+      and (
+        locked_at is null
+        or locked_at < now() - make_interval(secs => ${RUNTIME.jobStealSeconds})
+        or updated_at < now() - interval '15 seconds'
+      )
       and (${runId ?? null}::text is null or run_id = ${runId ?? null})`;
 }
 
 async function claimNextJob(sql, userId, runId, opts) {
 	const skipDiscover = Boolean(opts?.skipDiscover);
+	const live = (await sql`select count(*)::int as n from jobs where user_id = ${userId} and status = ${"running"}`)[0]?.n ?? 0;
+	if (Number(live) >= 4) return null;
 	const job = (await sql`
     select id from jobs
     where user_id = ${userId} and status = 'queued' and run_after <= now()
@@ -1521,7 +1525,7 @@ async function processNextJob(sql, userId, runId, opts) {
 			return { did: true, type: job.type, error: "Unknown job type" };
 		}
 		await sql`update jobs set status = ${"done"}, updated_at = now() where id = ${job.id} and user_id = ${userId}`;
-		if (job.company_id && job.run_id && (job.type === "scrape" || job.type === "crawl" || job.type === "signals" || job.type === "enrich")) {
+		if (job.company_id && job.run_id && (job.type === "scrape" || job.type === "crawl" || job.type === "signals")) {
 			await enqueueScore(sql, userId, job.run_id, job.company_id);
 		}
 		if (job.run_id) await updateRunStats(sql, userId, job.run_id);
@@ -1631,14 +1635,8 @@ export async function processJobsFor(sql, userId, runId, opts) {
 /** Run-page pump: no schema DDL. Steal stale locks, then process this run. */
 export async function pumpSearch(sql, userId, runId) {
 	if (!runId || !userId) return 0;
-	try {
-		await sql.query("SET statement_timeout TO 20000");
-	} catch { /* */ }
-	try {
-		await sql`update jobs set status = ${"queued"}, locked_at = null, run_after = now(), last_error = ${"stale lock released"}, updated_at = now()
-      where user_id = ${userId} and status = ${"running"}
-        and (locked_at is null or locked_at < now() - interval '8 seconds')`;
-	} catch { /* */ }
+	try { await sql.query("SET statement_timeout TO 20000"); } catch { /* */ }
+	try { await stealStaleJobs(sql, userId, null); } catch { /* */ }
 	return processJobsFor(sql, userId, runId, { maxMs: 16_000, concurrency: 2, skipSchema: true });
 }
 
