@@ -5,33 +5,40 @@ import { emailBelongsToCompany, isJunkEmail } from "./contacts.ts";
 import { isJunkCompanyPhone } from "./phones.ts";
 
 export async function countRunFacts(sql: Awaited<ReturnType<typeof getSql>>, userId: string, runId: string) {
-  const [row] = await sql`
+  const [rc] = await sql`
     select
       count(*)::int as matched,
-      count(*) filter (where coalesce(rc.seen_before, false) = false)::int as new_to_you,
-      count(*) filter (where coalesce(rc.seen_before, false) = true)::int as seen_before,
-      count(*) filter (
-        where nullif(btrim(c.general_email), '') is not null
-          and c.general_email !~* '@(almamedia\\.fi|almainights\\.fi|finder\\.fi|kauppalehti\\.fi|fonecta\\.fi|ytj\\.fi)'
-      )::int as found_email,
-      count(*) filter (where nullif(btrim(c.phone), '') is not null)::int as found_phone,
-      count(*) filter (where exists (
-        select 1 from people p
-        where p.user_id = ${userId} and p.company_id = c.id and p.deleted_at is null
-          and char_length(coalesce(p.full_name, '')) between 5 and 48
-      ))::int as found_dm
+      count(*) filter (where coalesce(seen_before, false) = false)::int as new_to_you,
+      count(*) filter (where coalesce(seen_before, false) = true)::int as seen_before
+    from run_companies
+    where user_id = ${userId} and run_id = ${runId}`;
+  const matched = Number(rc?.matched ?? 0);
+  const [ct] = await sql`
+    select
+      count(*) filter (where nullif(btrim(c.general_email), '') is not null)::int as found_email,
+      count(*) filter (where nullif(btrim(c.phone), '') is not null)::int as found_phone
     from run_companies rc
     join companies c on c.id = rc.company_id
     where rc.user_id = ${userId} and rc.run_id = ${runId}
       and c.deleted_at is null`;
-  const matched = Number(row?.matched ?? 0);
-  const foundEmail = Number(row?.found_email ?? 0);
-  const foundPhone = Number(row?.found_phone ?? 0);
-  const foundDecisionMaker = Number(row?.found_dm ?? 0);
+  let foundDecisionMaker = 0;
+  try {
+    const [dm] = await sql`
+      select count(distinct rc.company_id)::int as n
+      from run_companies rc
+      inner join people p
+        on p.company_id = rc.company_id and p.user_id = ${userId} and p.deleted_at is null
+      where rc.user_id = ${userId} and rc.run_id = ${runId}`;
+    foundDecisionMaker = Number(dm?.n ?? 0);
+  } catch {
+    foundDecisionMaker = 0;
+  }
+  const foundEmail = Number(ct?.found_email ?? 0);
+  const foundPhone = Number(ct?.found_phone ?? 0);
   return {
     matched,
-    newToYou: Number(row?.new_to_you ?? 0),
-    seenBefore: Number(row?.seen_before ?? 0),
+    newToYou: Number(rc?.new_to_you ?? 0),
+    seenBefore: Number(rc?.seen_before ?? 0),
     foundEmail,
     foundPhone,
     foundDecisionMaker,
@@ -101,7 +108,24 @@ export async function readSearchRun(userId: string, runId: string, cursor?: stri
   };
   try {
     facts = await countRunFacts(sql, userId, runId);
-  } catch { /* page fallback */ }
+  } catch {
+    try {
+      const [rc] = await sql`
+        select count(*)::int as matched,
+          count(*) filter (where coalesce(seen_before, false) = false)::int as neu
+        from run_companies where user_id = ${userId} and run_id = ${runId}`;
+      const matched = Number(rc?.matched ?? facts.matched);
+      facts = {
+        ...facts,
+        matched,
+        newToYou: Number(rc?.neu ?? facts.newToYou),
+        seenBefore: Math.max(0, matched - Number(rc?.neu ?? 0)),
+        missingEmail: Math.max(0, matched - facts.foundEmail),
+        missingPhone: Math.max(0, matched - facts.foundPhone),
+        missingDecisionMaker: Math.max(0, matched - facts.foundDecisionMaker),
+      };
+    } catch { /* keep page fallback */ }
+  }
   const want = Number((run.criteria as { maxResults?: number } | undefined)?.maxResults ?? 0) || facts.matched;
   const progress = runProgress(jobs, viewStatus, { matched: facts.matched, want });
   let queue: { active: boolean; position: number; ahead: number; lane: string | null } = { active: jobsLive, position: 1, ahead: 0, lane: null };

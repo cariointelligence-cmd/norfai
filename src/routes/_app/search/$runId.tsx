@@ -266,12 +266,13 @@ function RunView() {
   }
   if (!q.data.ok) return <p className="text-sm text-bad">{q.data.error}</p>;
   const { run, jobs, summary } = q.data;
-  const missingEmail = Number((summary as { missingEmail?: number } | undefined)?.missingEmail ?? companies.filter((c) => !c.general_email).length);
-  const foundEmail = Number((summary as { foundEmail?: number } | undefined)?.foundEmail ?? companies.filter((c) => c.general_email).length);
-  const foundPhone = Number((summary as { foundPhone?: number } | undefined)?.foundPhone ?? companies.filter((c) => c.phone).length);
-  const foundDecisionMaker = Number((summary as { foundDecisionMaker?: number } | undefined)?.foundDecisionMaker ?? companies.filter((c) => c.decision_maker).length);
-  const missingPhone = Number((summary as { missingPhone?: number } | undefined)?.missingPhone ?? companies.filter((c) => !c.phone).length);
-  const missingDecisionMaker = Number((summary as { missingDecisionMaker?: number } | undefined)?.missingDecisionMaker ?? companies.filter((c) => !c.decision_maker).length);
+  const matched = Number(summary?.matched ?? 0);
+  const foundEmail = Number(summary?.foundEmail ?? 0);
+  const missingEmail = Number(summary?.missingEmail ?? Math.max(0, matched - foundEmail));
+  const foundPhone = Number(summary?.foundPhone ?? 0);
+  const missingPhone = Number(summary?.missingPhone ?? Math.max(0, matched - foundPhone));
+  const foundDecisionMaker = Number(summary?.foundDecisionMaker ?? 0);
+  const missingDecisionMaker = Number(summary?.missingDecisionMaker ?? Math.max(0, matched - foundDecisionMaker));
   const running = run.status === "running" || run.status === "queued";
   const emailJobs = (jobs as Array<{ type?: string; status?: string }>).filter((j) => j.type === "email");
   const emailQueued = emailJobs.filter((j) => j.status === "queued" || j.status === "running").length;

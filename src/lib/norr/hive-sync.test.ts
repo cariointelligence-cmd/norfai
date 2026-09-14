@@ -45,7 +45,8 @@ describe("hive sync", () => {
   it("run stats count the full run not the first page", () => {
     const read = readFileSync(new URL("./search-run-read.ts", import.meta.url), "utf8");
     assert.match(read, /countRunFacts/);
-    assert.match(read, /count\(\*\) filter/);
+    assert.match(read, /from run_companies/);
+    assert.doesNotMatch(read.slice(read.indexOf("export async function countRunFacts"), read.indexOf("export async function readSearchRun")), /exists \(/);
     assert.match(read, /facts\.foundEmail/);
   });
 
