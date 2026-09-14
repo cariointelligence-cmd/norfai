@@ -1096,32 +1096,40 @@ export const listProfiles = createServerFn({ method: "GET" }).middleware([authMi
     };
   });
 
-export const listRuns = createServerFn({ method: "GET" }).middleware([authMiddleware]).validator((d) => d ?? {}).handler(async ({ context, data }) => {
-  const sql = await ctxSql(context);
-  const q = boundedString(data?.q?.trim?.() ?? "", 80);
-  const status = boundedString(data?.status ?? "", 24);
-  const rows = await sql`
-    select id, status, created_at, finished_at, stats, name, query_fingerprint, ranking_version,
-      new_leads_count, previously_seen_count, excluded_count, search_exhaustion_score, criteria
-    from search_runs
-    where user_id = ${context.userId}
-      and (${status} = '' or status = ${status})
-      and (${q} = '' or coalesce(name,'') ilike ${"%" + q + "%"} or id ilike ${"%" + q + "%"})
-    order by created_at desc
-    limit 200`;
-  return {
-    runs: rows.map((r) => ({
-      ...sanitizeRunList(r),
-      name: r.name ?? null,
-      query_fingerprint: r.query_fingerprint ?? null,
-      ranking_version: r.ranking_version ?? null,
-      new_leads_count: r.new_leads_count ?? null,
-      previously_seen_count: r.previously_seen_count ?? null,
-      excluded_count: r.excluded_count ?? null,
-      search_exhaustion_score: r.search_exhaustion_score ?? null,
-      criteria: r.criteria ?? {},
-    })),
-  };
+export const listRuns = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d ?? {}).handler(async ({ context, data }) => {
+  try {
+    const sql = await ctxSql(context);
+    const q = boundedString(data?.q?.trim?.() ?? "", 80);
+    const status = boundedString(data?.status ?? "", 24);
+    const sinceDays = clampInt(data?.sinceDays, 0, 3650, 0);
+    const rows = await sql`
+      select id, status, created_at, finished_at, stats, name, query_fingerprint, ranking_version,
+        new_leads_count, previously_seen_count, excluded_count, search_exhaustion_score, criteria
+      from search_runs
+      where user_id = ${context.userId}
+        and (${status} = '' or status = ${status})
+        and (${q} = '' or coalesce(name,'') ilike ${"%" + q + "%"} or id::text ilike ${"%" + q + "%"})
+        and (${sinceDays} = 0 or created_at >= now() - make_interval(days => ${sinceDays}))
+      order by created_at desc
+      limit 80`;
+    return {
+      ok: true as const,
+      runs: rows.map((r) => ({
+        ...sanitizeRunList(r),
+        name: r.name ?? null,
+        query_fingerprint: r.query_fingerprint ?? null,
+        ranking_version: r.ranking_version ?? null,
+        new_leads_count: r.new_leads_count ?? null,
+        previously_seen_count: r.previously_seen_count ?? null,
+        excluded_count: r.excluded_count ?? null,
+        search_exhaustion_score: r.search_exhaustion_score ?? null,
+        criteria: r.criteria ?? {},
+      })),
+    };
+  } catch (err) {
+    console.error("[norf] listRuns", err);
+    return { ok: false as const, runs: [], error: err instanceof Error ? err.message.slice(0, 180) : "Could not load searches" };
+  }
 });
 
 export const listJobs = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {

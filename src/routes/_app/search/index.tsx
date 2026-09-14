@@ -192,7 +192,11 @@ function SearchHistory() {
           <option value="90">{copy.d90}</option>
         </select>
       </div>
-      {rows.length === 0 ? (
+      {runs.isLoading ? (
+        <p className="text-sm text-mute">Loading searches…</p>
+      ) : runs.isError || (runs.data && "ok" in runs.data && runs.data.ok === false) ? (
+        <Empty title={copy.empty} body={("error" in (runs.data ?? {}) && typeof (runs.data as { error?: string }).error === "string" ? (runs.data as { error: string }).error : "Could not load search history. Refresh the page.")} />
+      ) : rows.length === 0 ? (
         <Empty title={copy.empty} body={copy.emptyBody} />
       ) : (
         <div className="space-y-2">
