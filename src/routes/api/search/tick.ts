@@ -1,7 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { getSql } from "@/lib/db";
-import { pumpSearch } from "@/lib/norr/pipeline.ts";
-import { scheduleBackground } from "@/lib/norr/hybrid.ts";
+import { dispatchVercelExecution } from "@/lib/norr/vercel-executor.ts";
 
 export const maxDuration = 30;
 
@@ -24,12 +22,6 @@ async function handle({ request }: { request: Request }) {
     return Response.json({ ok: false, processed: 0, error: "Invalid JSON" }, { status: 400 });
   }
   if (!runId) return Response.json({ ok: false, processed: 0, error: "Missing runId" }, { status: 400 });
-  try {
-    const sql = await getSql();
-    scheduleBackground(() => pumpSearch(sql, userId, runId));
-    return Response.json({ ok: true, accepted: true, processed: 0 });
-  } catch (err) {
-    console.error("[norf] /api/search/tick", err);
-    return Response.json({ ok: false, processed: 0 }, { status: 200 });
-  }
+  dispatchVercelExecution({ userId, runId, reason: "search.tick" });
+  return Response.json({ ok: true, accepted: true, processed: 0 });
 }

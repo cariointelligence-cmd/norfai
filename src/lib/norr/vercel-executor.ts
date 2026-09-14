@@ -67,27 +67,42 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
   const { getSql } = await import("@/lib/db");
   const { processJobsFor, processDueSchedules } = await import("./pipeline.ts");
   const sql = await getSql();
-  const maxMs = vercelFunctionBudgetMs();
+  try {
+    await sql`update jobs set status = ${"cancelled"}, locked_at = null, last_error = ${"run closed"}, updated_at = now()
+      where status in ('queued','running')
+        and run_id in (select id from search_runs where status in ('completed','cancelled','failed'))`;
+  } catch { /* */ }
+  const maxMs = 12_000;
   let processed = 0;
-  if (opts.userId) {
-    processed = await processJobsFor(sql, opts.userId, opts.runId ?? null, {
+  if (opts.userId && opts.runId) {
+    processed = await processJobsFor(sql, opts.userId, opts.runId, {
       maxMs,
-      concurrency: 2,
+      concurrency: 3,
       skipSchema: true,
     });
-    try { await processDueSchedules(sql, opts.userId); } catch { /* schedules optional */ }
+  } else if (opts.userId) {
+    const focus = await sql<{ id: string }>`
+      select id from search_runs
+      where user_id = ${opts.userId} and status in ('running','queued')
+      order by created_at desc limit 1`;
+    processed = await processJobsFor(sql, opts.userId, focus[0]?.id ?? null, {
+      maxMs,
+      concurrency: 3,
+      skipSchema: true,
+    });
+    try { await processDueSchedules(sql, opts.userId); } catch { /* */ }
   } else {
-    const users = await sql<{ user_id: string }>`
-      select distinct user_id from jobs
-      where status in ('queued','running') and run_after <= now()
-      limit ${RUNTIME.workerUserLimit}`;
-    for (const u of users) {
-      processed += await processJobsFor(sql, u.user_id, null, {
-        maxMs: Math.min(8_000, maxMs),
-        concurrency: 2,
+    const focus = await sql<{ user_id: string; id: string }>`
+      select user_id, id from search_runs
+      where status in ('running','queued')
+      order by created_at desc
+      limit 3`;
+    for (const r of focus) {
+      processed += await processJobsFor(sql, r.user_id, r.id, {
+        maxMs: 8_000,
+        concurrency: 3,
         skipSchema: true,
       });
-      try { await processDueSchedules(sql, u.user_id); } catch { /* */ }
     }
   }
   const remaining = await countDueJobs(opts.userId, opts.runId);
@@ -121,20 +136,10 @@ export async function invokeVercelDrain(opts: DrainRequest): Promise<{ ok: boole
     };
     const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
     if (bypass) headers["x-vercel-protection-bypass"] = bypass;
-    const ac = new AbortController();
-    const t = setTimeout(() => ac.abort(), 25_000);
-    try {
-      const res = await fetch(`${origin}${DRAIN_PATH}`, { method: "POST", headers, body, signal: ac.signal });
-      if (!res.ok) {
-        console.warn("[norf] vercel drain http", res.status);
-        return { ok: false, mode: "http" };
-      }
-    } catch (err) {
+    const p = fetch(`${origin}${DRAIN_PATH}`, { method: "POST", headers, body });
+    scheduleBackground(() => p.then((res) => res.arrayBuffer()).catch((err) => {
       console.warn("[norf] vercel drain invoke", err instanceof Error ? err.message : err);
-      return { ok: false, mode: "http" };
-    } finally {
-      clearTimeout(t);
-    }
+    }));
     return { ok: true, mode: "http" };
   }
   scheduleBackground(() => runVercelDrain({ ...opts, depth }));

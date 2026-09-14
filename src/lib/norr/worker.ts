@@ -70,7 +70,7 @@ export async function runWorkerTick(): Promise<{ users: number; queue?: QueueSna
     users.push(row.user_id);
   }
   await poolMap(users, RUNTIME.workerUserConcurrency, async (userId) => {
-    await processJobsFor(sql, userId, null, { maxMs: RUNTIME.workerMaxMs, concurrency: RUNTIME.workerJobConcurrency });
+    await processJobsFor(sql, userId, null, { maxMs: 8_000, concurrency: 2, skipSchema: true });
     await processDueSchedules(sql, userId);
   });
   const hour = new Date().getUTCHours();

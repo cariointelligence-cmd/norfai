@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ensureWorker, triggerWorkerTick } from "@/lib/norr/worker";
 import { safeEqual } from "@/lib/norr/security";
-import { provisionCarioNorfai } from "@/lib/norr/vercel-provision.ts";
+import { dispatchVercelExecution } from "@/lib/norr/vercel-executor.ts";
+import { scheduleBackground } from "@/lib/norr/hybrid.ts";
 
 export const Route = createFileRoute("/api/cron/tick")({
   server: {
@@ -24,11 +25,9 @@ async function handle({ request }: { request: Request }) {
     return new Response("unauthorized", { status: 401 });
   }
   ensureWorker();
-  const tick = await triggerWorkerTick();
-  const cario = await provisionCarioNorfai().catch((e: unknown) => ({
-    error: e instanceof Error ? e.message : "provision failed",
-  }));
-  return new Response(JSON.stringify({ ...tick, cario }), {
+  dispatchVercelExecution({ reason: "cron.tick" });
+  scheduleBackground(() => triggerWorkerTick());
+  return new Response(JSON.stringify({ ok: true, kicked: true }), {
     status: 200,
     headers: { "content-type": "application/json" },
   });

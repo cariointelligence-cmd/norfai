@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-async-queue";
+export const NORF_BUILD = "2026-09-14-server-drain";
 
 export function vercelDeployProbe() {
   const env = process.env;
