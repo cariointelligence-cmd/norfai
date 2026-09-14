@@ -11,6 +11,7 @@ import { isDirectoryHost } from "./webdiscover.ts";
 import { nationOf } from "../countries/env.ts";
 import { cacheGet, cacheSet, cacheKey, CACHE_TTL } from "../intel-cache.ts";
 import { swedenHelper, norwayHelper } from "./nation-helpers.ts";
+import { runNationFleet } from "./nation-fleet.ts";
 
 export type SuperCrawlHits = {
   emails: ContactHit[];
@@ -121,13 +122,20 @@ async function supercrawlLive(opts: {
   const name = opts.name.trim();
   if (name.length < 2) return { ...EMPTY };
   const nation = nationOf(opts.country);
+  const fleetSkip = nation === "FI" ? ["fi_020202", "fi_ytunnus", "fi_kauppalehti_id"] : [];
   if (nation === "SE") {
     const h = await swedenHelper({ name, municipality: opts.municipality });
-    return { emails: h.emails, phones: h.phones, people: h.people, website: h.website, sourceUrl: null, sourceId: h.sourceId };
+    const out: SuperCrawlHits = { emails: h.emails, phones: h.phones, people: h.people, website: h.website, sourceUrl: null, sourceId: h.sourceId };
+    const fleet = await runNationFleet({ country: "SE", name, businessId: opts.businessId, municipality: opts.municipality, website: h.website, skip: ["se_allabolag_search"] }).catch(() => null);
+    if (fleet) mergeHits(out, { emails: fleet.emails, phones: fleet.phones, people: fleet.people, website: fleet.website, sourceUrl: null, sourceId: "fleet" });
+    return out;
   }
   if (nation === "NO") {
     const h = await norwayHelper({ name, municipality: opts.municipality });
-    return { emails: h.emails, phones: h.phones, people: h.people, website: h.website, sourceUrl: null, sourceId: h.sourceId };
+    const out: SuperCrawlHits = { emails: h.emails, phones: h.phones, people: h.people, website: h.website, sourceUrl: null, sourceId: h.sourceId };
+    const fleet = await runNationFleet({ country: "NO", name, businessId: opts.businessId || h.businessId, municipality: opts.municipality, website: h.website }).catch(() => null);
+    if (fleet) mergeHits(out, { emails: fleet.emails, phones: fleet.phones, people: fleet.people, website: fleet.website, sourceUrl: null, sourceId: "fleet" });
+    return out;
   }
   const q = encodeURIComponent([name, opts.municipality].filter(Boolean).join(" "));
   const bid = (opts.businessId ?? "").replace(/\s/g, "");
@@ -140,6 +148,8 @@ async function supercrawlLive(opts: {
   const pages = await Promise.all(primary.map((u) => fetchParse(u.url, u.id)));
   const out: SuperCrawlHits = { emails: [], phones: [], people: [], website: null, sourceUrl: null, sourceId: "supercrawl" };
   for (const p of pages) mergeHits(out, p);
+  const fleet = await runNationFleet({ country: "FI", name, businessId: opts.businessId, municipality: opts.municipality, website: out.website, skip: fleetSkip }).catch(() => null);
+  if (fleet) mergeHits(out, { emails: fleet.emails, phones: fleet.phones, people: fleet.people, website: fleet.website, sourceUrl: null, sourceId: "fleet" });
   return out;
 }
 

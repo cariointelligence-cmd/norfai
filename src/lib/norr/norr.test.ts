@@ -4,6 +4,7 @@ import { countryEnv, sourcesAllowedFor } from "./countries/env.ts";
 import { attachDecisionContacts, isDecisionTitle } from "./sources/decision-contacts.ts";
 import { scoreCountryPath, countryLinksFromHtml } from "./sources/hypercrawl.ts";
 import { parseAllabolagCard } from "./sources/nation-helpers.ts";
+import { fleetCounts, fleetFor, pickFleet } from "./sources/nation-fleet.ts";
 import { workLanes } from "./progress.ts";
 import { identityLooksForeign, applyLlmVerdict, llmFilterIdentity } from "./hive-llm.ts";
 import { extractEmails, isJunkEmail, isBillingEmail, isRecruitingEmail, validEmailSyntax, decodeCfEmail, inferGeneralMailbox, inferPersonMailbox, emailMatchesPerson, websiteFromPublishedEmail, websiteFromPublishedEmails, isConsumerMailboxDomain, emailBelongsToCompany, needsEmailRecovery } from "./contacts.ts";
@@ -1093,6 +1094,17 @@ describe("country isolation and decision contacts", () => {
   });
   it("drops maventa scan mailboxes as billing", () => {
     assert.equal(isBillingEmail("fi-04965811@scan.maventa.com"), true);
+  });
+  it("ships 25+ free crawlers per country and never crosses directories", () => {
+    const n = fleetCounts();
+    assert.ok(n.FI >= 25 && n.SE >= 25 && n.NO >= 25);
+    const fiHosts = fleetFor("FI").map((c) => c.url({ name: "Consti" }) ?? "").join(" ");
+    assert.equal(/allabolag\.se|brreg\.no|gulesider\.no/.test(fiHosts), false);
+    const seHosts = fleetFor("SE").map((c) => c.url({ name: "Volvo" }) ?? "").join(" ");
+    assert.equal(/ytj\.fi|020202\.fi|finder\.fi/.test(seHosts), false);
+    const noPick = pickFleet("NO", { name: "Equinor", businessId: "923609016" }, 8);
+    assert.ok(noPick.some((c) => c.id === "no_brreg_roller"));
+    assert.equal(noPick.some((c) => c.nation !== "NO"), false);
   });
   it("exposes four simple work lanes", () => {
     const lanes = workLanes(

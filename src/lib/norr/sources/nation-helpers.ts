@@ -14,6 +14,7 @@ export type HelperHits = {
   people: PersonHit[];
   website: string | null;
   sourceId: string;
+  businessId?: string | null;
 };
 
 const EMPTY: HelperHits = { emails: [], phones: [], people: [], website: null, sourceId: "nation-helper" };
@@ -115,7 +116,7 @@ export async function norwayHelper(opts: { name: string; municipality?: string |
     ?? search.data.find((c) => namesAlign(opts.name, c.name ?? ""))
     ?? null;
   const website = takeWebsite(hit?.website ?? null, "NO");
-  return { emails: [], phones: [], people: [], website, sourceId: "brreg" };
+  return { emails: [], phones: [], people: [], website, sourceId: "brreg", businessId: hit?.businessId ?? null };
 }
 
 void parseAllabolagHtml;
