@@ -95,7 +95,7 @@ export function AppShell() {
   });
   const boot = useQuery({
     queryKey: ["bootstrap"],
-    queryFn: () => getBootstrap(),
+    queryFn: () => getBootstrap({ data: {} }),
     enabled: Boolean(user),
     retry: 0,
     staleTime: 8_000,

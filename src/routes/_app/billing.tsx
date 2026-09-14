@@ -11,7 +11,7 @@ export const Route = createFileRoute("/_app/billing")({ component: Billing });
 function Billing() {
   const search = useRouterState({ select: (s) => s.location.searchStr });
   const qc = useQueryClient();
-  const boot = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap() });
+  const boot = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap({ data: {} }) });
   const success = search.includes("billing=success");
   useEffect(() => {
     if (!success) return;

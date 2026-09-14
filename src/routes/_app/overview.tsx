@@ -118,7 +118,7 @@ function Dashboard() {
   );
   const q = useQuery({
     queryKey: ["bootstrap"],
-    queryFn: () => getBootstrap(),
+    queryFn: () => getBootstrap({ data: {} }),
     retry: 1,
     staleTime: 8_000,
     placeholderData: {

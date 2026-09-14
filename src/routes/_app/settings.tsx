@@ -51,7 +51,7 @@ function Settings() {
     locale,
   );
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap() });
+  const q = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap({ data: {} }) });
   const [name, setName] = useState("Workspace");
   const [retentionDays, setRetentionDays] = useState(730);
   const [countryAllowlist, setCountryAllowlist] = useState("FI");

@@ -6,13 +6,17 @@ import { Empty, Pill } from "@/components/status";
 export const Route = createFileRoute("/_app/people/")({ component: People });
 
 function People() {
-  const q = useQuery({ queryKey: ["people"], queryFn: () => listPeople() });
+  const q = useQuery({ queryKey: ["people"], queryFn: () => listPeople({ data: {} }) });
   const rows = q.data?.people ?? [];
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-medium tracking-tight">Decision-makers</h1>
       <p className="text-sm text-mute">Only names extracted from public company pages (JSON-LD / HTML) or Wikidata P169. Employment is inherently uncertain.</p>
-      {rows.length === 0 ? (
+      {q.isLoading ? (
+        <p className="text-sm text-mute">Loading people…</p>
+      ) : q.isError || (q.data && "ok" in q.data && q.data.ok === false) ? (
+        <Empty title="Could not load people" body="Refresh the page. Decision-makers are stored after enrichment." />
+      ) : rows.length === 0 ? (
         <Empty title="No people stored" body="People appear after a company website is crawled or Wikidata returns a CEO. YTJ open data does not include officers." />
       ) : (
         <div className="overflow-x-auto">

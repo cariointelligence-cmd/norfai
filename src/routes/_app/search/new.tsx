@@ -95,7 +95,7 @@ function NewSearch() {
     locale,
   );
   const nav = useNavigate();
-  const boot = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap() });
+  const boot = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap({ data: {} }) });
   const perSearch = perSearchFromBoot(boot.data);
   const [criteria, setCriteria] = useState<SearchCriteria>(starterCriteria);
   const [name, setName] = useState("Finnish companies worth contacting");

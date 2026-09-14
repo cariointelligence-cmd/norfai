@@ -235,7 +235,7 @@ async function gate(sql, userId, op, opts) {
   return { ok: true, identity, role, ip: meta.ip };
 }
 
-export const getBootstrap = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {
+export const getBootstrap = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d ?? {}).handler(async ({ context }) => {
   const fallback = {
     workspace: {
       id: "",
@@ -680,97 +680,28 @@ export const getRun = createServerFn({ method: "GET" }).middleware([authMiddlewa
 
 
 export const listCompanies = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d ?? {}).handler(async ({ context, data }) => {
+  try {
   const sql = await ctxSql(context);
-  const g = await gate(sql, context.userId, "company_list", {
-    max: 90,
-    windowMs: 6e4
-  });
-  if (!g.ok) return {
-    companies: [],
-    queuedContactJobs: 0,
-    error: g.error
-  };
   const q = boundedString(data.q?.trim() ?? "", 80);
   const sortBy = allowSort(data.sortBy);
-  const limit = clampInt(data.limit, 1, listPageCap(), listPageCap());
+  const limit = clampInt(data.limit, 1, 80, 80);
   const offset = clampInt(data.offset, 0, listOffsetCap(), 0);
   const rows = await sql`
   select c.id, c.name, c.business_id, c.municipality, c.industry_label, c.website, c.overall_confidence, c.record_status,
   c.general_email, c.general_email_class, c.phone, c.last_verified_at, c.country,
-  c.website_score, c.seo_score, c.digital_maturity, c.commercial_opportunity, c.match_score, c.company_age_years, c.revenue,
-  c.intel #>> '{website,adPlatforms,meta}' as meta_ads,
-  dm.full_name as decision_maker, dm.title as decision_title
+  c.website_score, c.seo_score, c.digital_maturity, c.commercial_opportunity, c.match_score, c.company_age_years, c.revenue
   from companies c
-  left join lateral (
-  select p.full_name, p.title
-  from people p
-  where p.user_id = c.user_id and p.company_id = c.id and p.deleted_at is null
-  and p.full_name ~ '^[A-ZÅÄÖ]'
-  and p.full_name !~* '(olemme|mukaan|toimihenkil|yhteystied|yritysosto|henkilöstö|henkilosto|suomen )'
-  and char_length(p.full_name) between 5 and 48
-  order by case
-  when coalesce(p.title,'') ~* 'toimitusjohtaja|managing director|verkställande|\\yceo\\y' then 0
-  when coalesce(p.seniority,'') = 'executive' then 1
-  when coalesce(p.title,'') ~* 'puheenjohtaja|chair' then 2
-  else 3 end, p.confidence desc nulls last
-  limit 1
-  ) dm on true
   where c.user_id = ${context.userId} and c.deleted_at is null
   and (${q} = '' or c.name ilike ${"%" + q + "%"} or coalesce(c.business_id,'') ilike ${"%" + q + "%"} or coalesce(c.municipality,'') ilike ${"%" + q + "%"})
   and (${data.status ?? ""} = '' or c.record_status = ${data.status ?? ""})
-  and (${data.minScore ?? 0} = 0 or c.overall_confidence >= ${data.minScore ?? 0})
   and (${data.hasEmail ? 1 : 0} = 0 or c.general_email is not null)
-  and (${data.publishedOnly ? 1 : 0} = 0 or c.general_email_class = 'published')
-  and (${data.inferredOnly ? 1 : 0} = 0 or c.general_email_class = 'inferred')
-  and (${data.listId ?? ""} = '' or c.id in (select company_id from list_members where user_id = ${context.userId} and list_id = ${data.listId ?? ""}))
-  and (${data.tag ?? ""} = '' or c.id in (
-  select ct.company_id from company_tags ct join tags t on t.id = ct.tag_id
-  where ct.user_id = ${context.userId} and t.name = ${data.tag ?? ""}
-  ))
-  order by
-  case ${sortBy}
-  when 'commercial' then c.commercial_opportunity
-  when 'website' then c.website_score
-  when 'seo' then c.seo_score
-  when 'digital' then c.digital_maturity
-  when 'ads' then c.commercial_opportunity
-  when 'age' then c.company_age_years
-  when 'opportunity' then c.commercial_opportunity
-  else coalesce(c.match_score, c.overall_confidence)
-  end desc nulls last,
-  c.updated_at desc, c.id
+  order by coalesce(c.match_score, c.overall_confidence) desc nulls last, c.updated_at desc, c.id
   limit ${limit} offset ${offset}`;
-  const jobs = await sql`select count(*)::int as n from jobs where user_id = ${context.userId} and status in ('queued','running')`;
-  const ext = noteExtraction(context.userId, "list", rows.map((r) => r.id));
-  await persistExtractionCounters(sql, context.userId, {
-    uniqueCompanies: ext.uniqueCompanies,
-    ip: g.ip
-  });
-  if (ext.risk === "high" || ext.risk === "blocked") {
-    await persistSecurityEvent(sql, {
-      userId: context.userId,
-      action: "extract.list",
-      risk: ext.risk,
-      ip: g.ip,
-      detail: {
-        unique: ext.uniqueCompanies,
-        score: ext.score
-      }
-    });
-    await bumpAbuse(sql, context.userId, ext.risk === "blocked" ? 20 : 8, ext.risk, {
-      reason: "mass_list",
-      ip: g.ip
-    });
+  return { companies: rows, queuedContactJobs: 0 };
+  } catch (err) {
+    console.error("[norf] listCompanies", err);
+    return { companies: [], queuedContactJobs: 0, error: err instanceof Error ? err.message.slice(0, 180) : "Could not load companies" };
   }
-  if (ext.risk === "blocked" && !g.identity.isAdmin) return {
-    companies: [],
-    queuedContactJobs: jobs[0]?.n ?? 0,
-    error: "Workspace is temporarily restricted. Contact support."
-  };
-  return {
-    companies: rows,
-    queuedContactJobs: jobs[0]?.n ?? 0
-  };
 });
 
 export const findWorkspace = createServerFn({ method: "GET" }).middleware([authMiddleware]).validator((d) => d ?? {}).handler(async ({ context, data }) => {
@@ -1038,16 +969,21 @@ export const getPerson = createServerFn({ method: "GET" }).middleware([authMiddl
   };
 });
 
-export const listPeople = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {
-  return { people: await (await ctxSql(context))`
-    select p.id, p.full_name, p.title, p.company_id, c.name as company_name, p.work_email, p.work_email_class, p.confidence, p.source_page
-    from people p join companies c on c.id = p.company_id
-    where p.user_id = ${context.userId} and p.deleted_at is null
-    and p.full_name ~ '^[A-ZÅÄÖ]'
-    and p.full_name !~* '(olemme|mukaan|toimihenkil|yhteystied|yritysosto|henkilöstö|henkilosto|suomen )'
-    and char_length(p.full_name) between 5 and 48
-    order by p.discovered_at desc limit 200` };
-  });
+export const listPeople = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d ?? {}).handler(async ({ context }) => {
+  try {
+    const sql = await ctxSql(context);
+    const people = await sql`
+      select p.id, p.full_name, p.title, p.company_id, c.name as company_name, p.work_email, p.work_email_class, p.confidence, p.source_page
+      from people p join companies c on c.id = p.company_id
+      where p.user_id = ${context.userId} and p.deleted_at is null
+      order by p.discovered_at desc nulls last
+      limit 200`;
+    return { ok: true, people };
+  } catch (err) {
+    console.error("[norf] listPeople", err);
+    return { ok: false, people: [], error: err instanceof Error ? err.message.slice(0, 160) : "Could not load people" };
+  }
+});
 
 export const saveProfile = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d).handler(async ({ context, data }) => {
     const sql = await ctxSql(context);
@@ -1123,18 +1059,26 @@ export const listRuns = createServerFn({ method: "POST" }).middleware([authMiddl
     const status = boundedString(data?.status ?? "", 24);
     const sinceDays = clampInt(data?.sinceDays, 0, 3650, 0);
     const rows = await sql`
-      select id, status, created_at, finished_at, stats, name, query_fingerprint, ranking_version,
-        new_leads_count, previously_seen_count, excluded_count, search_exhaustion_score, criteria
+      select id, status, created_at, finished_at, stats, name, new_leads_count, previously_seen_count, excluded_count, criteria
       from search_runs
       where user_id = ${context.userId}
-        and (${status} = '' or status = ${status})
-        and (${q} = '' or coalesce(name,'') ilike ${"%" + q + "%"} or id::text ilike ${"%" + q + "%"})
-        and (${sinceDays} = 0 or created_at >= now() - make_interval(days => ${sinceDays}))
       order by created_at desc
-      limit 80`;
+      limit 50`;
+    const filtered = rows.filter((r) => {
+      if (status && String(r.status) !== status) return false;
+      if (sinceDays) {
+        const t = r.created_at ? new Date(r.created_at as string).getTime() : 0;
+        if (t && t < Date.now() - sinceDays * 864e5) return false;
+      }
+      if (q) {
+        const hay = `${r.name ?? ""} ${r.id}`.toLowerCase();
+        if (!hay.includes(q.toLowerCase())) return false;
+      }
+      return true;
+    });
     return {
       ok: true as const,
-      runs: rows.map((r) => ({
+      runs: filtered.map((r) => ({
         ...sanitizeRunList(r),
         name: r.name ?? null,
         query_fingerprint: r.query_fingerprint ?? null,

@@ -49,7 +49,7 @@ function Companies() {
   const [outcome, setOutcome] = useState("");
   const [sortBy, setSortBy] = useState("match");
   const qc = useQueryClient();
-  const boot = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap() });
+  const boot = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap({ data: {} }) });
   const jobsRunning = boot.data?.counts.jobsRunning ?? 0;
   const list = useQuery({
     queryKey: ["companies", q, status, email, sortBy, outcome],
