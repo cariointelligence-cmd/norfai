@@ -1,9 +1,10 @@
 import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
-import { startBillingPortal, startCheckout, confirmBilling } from "@/lib/norr/actions";
+import { useEffect, useState } from "react";
+import { startBillingPortal, startCheckout, startCreditCheckout, confirmBilling } from "@/lib/norr/actions";
 import { BOOTSTRAP_QUERY } from "@/lib/client/bootstrap";
 import { PLANS, formatSearchQuota, isUnlimitedQuota, perSearchFromBoot, type PlanId } from "@/lib/norr/platform";
+import { CREDIT_CENTS, CREDIT_MIN_EUR, CREDIT_MIN_QTY, LEADS_PER_CREDIT_MIN, LEADS_PER_CREDIT_MAX, parseCreditQuantity } from "@/lib/norr/credits";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
@@ -13,7 +14,8 @@ function Billing() {
   const search = useRouterState({ select: (s) => s.location.searchStr });
   const qc = useQueryClient();
   const boot = useQuery(BOOTSTRAP_QUERY);
-  const success = search.includes("billing=success");
+  const success = search.includes("billing=success") || search.includes("credits=success");
+  const [creditQty, setCreditQty] = useState(String(CREDIT_MIN_QTY));
   useEffect(() => {
     if (!success) return;
     void confirmBilling().then(() => qc.invalidateQueries({ queryKey: ["bootstrap"] }));
@@ -32,6 +34,14 @@ function Billing() {
       else toast.error(r.error);
     },
   });
+  const buyCredits = useMutation({
+    mutationFn: (credits: number) => startCreditCheckout({ data: { credits, origin: window.location.origin } }),
+    onSuccess: (r) => {
+      if (r.ok) window.location.href = r.url;
+      else toast.error(r.error);
+    },
+  });
+  const parsedCredits = parseCreditQuantity(creditQty);
   const plan = (boot.data?.plan ?? "free") as PlanId;
   const used = boot.data?.searchesUsed ?? 0;
   const limit = boot.data?.searchesLimit ?? 50;
@@ -94,6 +104,36 @@ function Billing() {
           </article>
         ))}
       </div>
+      {!admin ? (
+        <section className="border border-line bg-panel p-4 space-y-3">
+          <h2 className="text-sm font-medium">Buy extra credits</h2>
+          <p className="text-sm text-mute">
+            €{(CREDIT_CENTS / 100).toFixed(2)} per credit. One credit typically covers {LEADS_PER_CREDIT_MIN}–{LEADS_PER_CREDIT_MAX} extra leads, depending on public data.
+            Minimum purchase €{CREDIT_MIN_EUR} ({CREDIT_MIN_QTY} credits). Credits are added only after Stripe confirms payment.
+          </p>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="text-sm">
+              Credits
+              <input
+                className="mt-1 block h-9 w-28 border border-line bg-canvas px-2 text-sm tabular"
+                inputMode="numeric"
+                value={creditQty}
+                onChange={(e) => setCreditQty(e.target.value)}
+              />
+            </label>
+            <Button
+              size="sm"
+              disabled={buyCredits.isPending || !parsedCredits.ok}
+              onClick={() => parsedCredits.ok && buyCredits.mutate(parsedCredits.credits)}
+            >
+              {parsedCredits.ok
+                ? `Pay €${(parsedCredits.amountCents / 100).toFixed(2)}`
+                : `Min €${CREDIT_MIN_EUR}`}
+            </Button>
+          </div>
+          {!parsedCredits.ok ? <p className="text-xs text-warn">{parsedCredits.error}</p> : null}
+        </section>
+      ) : null}
     </div>
   );
 }

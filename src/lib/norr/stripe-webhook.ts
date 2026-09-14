@@ -115,6 +115,8 @@ export function interpretStripeEvent(event: {
   data?: { object?: Record<string, unknown> };
 }): StripeApply | null {
   const obj = event.data?.object ?? {};
+  const kind = (obj.metadata as { kind?: unknown } | undefined)?.kind;
+  if (kind === "credits") return null;
   const userId = stripeUserId(obj) ?? null;
   const customerId = stripeCustomerId(obj);
   const subscriptionId = stripeSubscriptionId(obj);

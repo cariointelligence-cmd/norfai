@@ -2051,6 +2051,30 @@ export const startCheckout = createServerFn({ method: "POST" }).middleware([auth
     });
   });
 
+export const startCreditCheckout = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d).handler(async ({ context, data }) => {
+  const sql = await ctxSql(context);
+  const g = await gate(sql, context.userId, "credits", { max: 8, windowMs: 60 * 60 * 1000 });
+  if (!g.ok) return { ok: false, error: g.error };
+  const origin = resolveCheckoutOrigin(data.origin);
+  if (!origin) return { ok: false, error: "Untrusted return URL for Stripe checkout" };
+  const id = await ensurePlatformIdentity(sql, context.userId);
+  if (id.isAdmin) return { ok: false, error: "Admin quota is already unlimited." };
+  let customerId = null;
+  try {
+    customerId = (await sql`select stripe_customer_id from workspaces where user_id = ${context.userId} limit 1`)[0]?.stripe_customer_id ?? null;
+  } catch {
+    customerId = null;
+  }
+  const { createStripeCreditCheckout } = await import("./credits.ts");
+  return createStripeCreditCheckout({
+    userId: context.userId,
+    email: id.email,
+    origin,
+    credits: data.credits,
+    customerId,
+  });
+});
+
 export const startBillingPortal = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d).handler(async ({ context, data }) => {
     const sql = await ctxSql(context);
     const origin = resolveCheckoutOrigin(data.origin);

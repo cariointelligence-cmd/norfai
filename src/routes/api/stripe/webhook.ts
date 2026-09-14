@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { getSql } from "@/lib/db";
 import { applyStripeSubscription, ensurePlatformSchema, stripeEnv } from "@/lib/norr/platform";
 import { interpretStripeEvent, verifyStripeSignature } from "@/lib/norr/stripe-webhook";
+import { applyPaidCredits, interpretStripeCreditEvent } from "@/lib/norr/credits";
 
 export const Route = createFileRoute("/api/stripe/webhook")({
   server: {
@@ -37,6 +38,11 @@ export const Route = createFileRoute("/api/stripe/webhook")({
             /* table catch-up: still apply */
           }
         }
+        const credit = interpretStripeCreditEvent(event);
+        if (credit) {
+          const applied = await applyPaidCredits(sql, credit);
+          if (!applied.ok) console.error("[norf] stripe credits", applied.error);
+        } else {
         const action = interpretStripeEvent(event);
         if (action) {
           let userId = action.userId;
@@ -75,6 +81,7 @@ export const Route = createFileRoute("/api/stripe/webhook")({
           } else {
             await applyStripeSubscription(sql, userId, action.plan, action.customerId, action.subscriptionId, action.resetQuota);
           }
+        }
         }
         if (event.id) {
           try {
