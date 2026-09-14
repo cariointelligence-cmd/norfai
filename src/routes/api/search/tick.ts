@@ -27,7 +27,7 @@ async function handle({ request }: { request: Request }) {
     const { getSql } = await import("@/lib/db");
     const { processJobsFor, resumeDiscoverIfStarved } = await import("@/lib/norr/pipeline.ts");
     const sql = await getSql();
-    processed = await processJobsFor(sql, userId, runId, { maxMs: 10_000, concurrency: 8, skipSchema: true });
+    processed = await processJobsFor(sql, userId, runId, { maxMs: 14_000, concurrency: 8, skipSchema: true });
     try { await resumeDiscoverIfStarved(sql, userId, runId); } catch { /* keep */ }
   } catch (err) {
     console.warn("[norf] search.tick", err instanceof Error ? err.message : err);

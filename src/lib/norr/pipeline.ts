@@ -1495,7 +1495,7 @@ async function stealStaleJobs(sql, userId, runId) {
           or locked_at < now() - interval '25 seconds'
           or updated_at < now() - interval '45 seconds'
         ))
-        or (type = ${"discover"} and locked_at < now() - interval '40 seconds')
+        or (type = ${"discover"} and locked_at < now() - interval '18 seconds')
       )
       and (${runId ?? null}::text is null or run_id = ${runId ?? null})`;
 }

@@ -42,6 +42,9 @@ describe("hive sync", () => {
     const tick = readFileSync(new URL("../../routes/api/search/tick.ts", import.meta.url), "utf8");
     assert.match(tick, /processJobsFor/);
     assert.match(tick, /resumeDiscoverIfStarved/);
-    assert.match(tick, /maxMs: 10_000/);
+    assert.match(tick, /maxMs: 14_000/);
+    const runPage = readFileSync(new URL("../../routes/_app/search/$runId.tsx", import.meta.url), "utf8");
+    assert.match(runPage, /AbortSignal\.timeout\(25000\)/);
+    assert.doesNotMatch(runPage, /AbortSignal\.timeout\(4000\)/);
   });
 });
