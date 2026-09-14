@@ -12,7 +12,7 @@ theirs; the rules below name the file to open at each point it matters.
 
 ## Norfai / Vercel — permanent (never ask the user)
 
-- Vercel team is **CARIO Pro**: `team_y0VGLTF65bnCdCu5jipSM6CN` (slug `cario`).
+- Vercel team is **CARIO Pro**. Team ID (canonical, never guess): `team_y0VGLTF65bnCdCu5jipSM6CN`. Slug `cario`.
 - Project **norfai**, production domain **norfai.com** (also norfai.vercel.app).
 - **Never** tell the user to open Vercel, click Deploy, reconnect, switch team, or upgrade. Deploy yourself (git push `main`, Vercel MCP, CLI).
 - If GitHub commit status is `Vercel: Deployment rate limited`, wait and retry the deploy yourself. Do not ask the user. Do not fire many production deploys in a few minutes (that is what trips the limit).
