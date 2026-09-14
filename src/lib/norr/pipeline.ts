@@ -1665,6 +1665,10 @@ async function processNextJob(sql, userId, runId, opts) {
 			return { did: true, type: job.type, error: "Unknown job type" };
 		}
 		await sql`update jobs set status = ${"done"}, updated_at = now() where id = ${job.id} and user_id = ${userId}`;
+		if ((job.type === "enrich" || job.type === "email") && job.company_id) {
+			await sql`update companies set record_status = ${"enriched"}, updated_at = now()
+        where id = ${job.company_id} and user_id = ${userId} and coalesce(record_status, ${"discovered"}) = ${"discovered"}`;
+		}
 		if (job.company_id && job.run_id && job.type === "scrape") {
 			await enqueueScore(sql, userId, job.run_id, job.company_id);
 		}
@@ -1727,11 +1731,48 @@ export async function resumeDiscoverIfStarved(sql, userId, runId) {
 	return true;
 }
 
+export async function resumeEnrichIfStarved(sql, userId, runId) {
+	if (!runId) return 0;
+	const run = (await sql`select status, pause_requested, cancel_requested from search_runs where id = ${runId} and user_id = ${userId}`)?.[0];
+	if (!run || run.pause_requested || run.cancel_requested) return 0;
+	if (run.status !== "running" && run.status !== "queued") return 0;
+	const missing = await sql`
+    select c.id
+    from run_companies rc
+    join companies c on c.id = rc.company_id
+    where rc.user_id = ${userId} and rc.run_id = ${runId}
+      and c.user_id = ${userId} and c.deleted_at is null
+      and coalesce(c.record_status, ${"discovered"}) = ${"discovered"}
+      and not exists (
+        select 1 from jobs j
+        where j.user_id = ${userId} and j.run_id = ${runId} and j.company_id = c.id
+          and j.type in (${"enrich"}, ${"email"}) and j.status in ('queued','running')
+      )
+    limit 80`;
+	let n = 0;
+	for (const row of missing) {
+		const existing = await sql`select id, status from jobs
+      where user_id = ${userId} and run_id = ${runId} and company_id = ${row.id} and type = ${"enrich"}
+      limit 1`;
+		if (existing[0]?.status === "queued" || existing[0]?.status === "running") continue;
+		if (existing[0]) {
+			await sql`update jobs set status = ${"queued"}, run_after = now(), locked_at = null, last_error = ${"enrich resume"}, attempts = 0, updated_at = now()
+        where id = ${existing[0].id} and user_id = ${userId}`;
+		} else {
+			await sql`insert into jobs (id, user_id, run_id, company_id, type, payload)
+        values (${nid()}, ${userId}, ${runId}, ${row.id}, ${"enrich"}, ${"{}"}::jsonb)`;
+		}
+		n += 1;
+	}
+	return n;
+}
+
 export async function processJobsFor(sql, userId, runId, opts) {
 	if (!opts?.skipSchema) {
 		try { await ensureOpsSchema(sql); } catch { /* */ }
 	}
 	try { if (runId) await resumeDiscoverIfStarved(sql, userId, runId); } catch { /* */ }
+	try { if (runId) await resumeEnrichIfStarved(sql, userId, runId); } catch { /* */ }
 	const maxMs = opts?.maxMs ?? RUNTIME.workerMaxMs;
 	const concurrency = clampConcurrency(opts?.concurrency);
 	const t0 = Date.now();

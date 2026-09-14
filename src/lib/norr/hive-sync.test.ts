@@ -38,7 +38,7 @@ describe("hive sync", () => {
     assert.doesNotMatch(src.slice(src.indexOf("async function attachDiscovered"), src.indexOf("export async function runDiscover")), /insertCompany\(/);
     assert.match(src, /discoverSlots/);
     assert.match(src, /skipDiscover = opts\?\.skipDiscover \|\| discoverSlots <= 0/);
-    assert.match(src, /skipHeavy/);
+    assert.match(src, /resumeEnrichIfStarved/);
   });
 
   it("Face search tick actually drains jobs for the run", () => {
@@ -46,6 +46,7 @@ describe("hive sync", () => {
     assert.match(tick, /searchQueueView/);
     assert.match(tick, /processJobsFor/);
     assert.match(tick, /resumeDiscoverIfStarved/);
+    assert.match(tick, /resumeEnrichIfStarved/);
     assert.match(tick, /maxMs: 20_000/);
     assert.match(tick, /concurrency: 16/);
     const runPage = readFileSync(new URL("../../routes/_app/search/$runId.tsx", import.meta.url), "utf8");

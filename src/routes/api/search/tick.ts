@@ -30,7 +30,7 @@ async function handle({ request }: { request: Request }) {
   let focusUserId = userId;
   try {
     const { getSql } = await import("@/lib/db");
-    const { processJobsFor, resumeDiscoverIfStarved } = await import("@/lib/norr/pipeline.ts");
+    const { processJobsFor, resumeDiscoverIfStarved, resumeEnrichIfStarved } = await import("@/lib/norr/pipeline.ts");
     const { searchQueueView } = await import("@/lib/norr/search-queue.ts");
     const sql = await getSql();
     const queue = await searchQueueView(sql, userId, runId);
@@ -43,6 +43,7 @@ async function handle({ request }: { request: Request }) {
     }
     processed = await processJobsFor(sql, focusUserId, focusRunId, { maxMs: 20_000, concurrency: 16, skipSchema: true });
     try { await resumeDiscoverIfStarved(sql, focusUserId, focusRunId); } catch { /* keep */ }
+    try { await resumeEnrichIfStarved(sql, focusUserId, focusRunId); } catch { /* keep */ }
   } catch (err) {
     console.warn("[norf] search.tick", err instanceof Error ? err.message : err);
   }
