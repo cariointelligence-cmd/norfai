@@ -161,8 +161,13 @@ function RunView() {
       summary: { matched: 0, missingEmail: 0, newToYou: 0, seenBefore: 0, excluded: 0 },
     },
     refetchInterval: (query) => {
-      const status = query.state.data && query.state.data.ok ? query.state.data.run.status : "";
-      return status === "running" || status === "queued" ? 2000 : false;
+      const data = query.state.data;
+      if (!data || !data.ok) return 2000;
+      const status = data.run?.status ?? "";
+      const jobs = (data.jobs ?? []) as Array<{ type?: string; status?: string }>;
+      const emailLive = jobs.some((j) => j.type === "email" && (j.status === "queued" || j.status === "running"));
+      if (status === "running" || status === "queued" || emailLive) return 2000;
+      return false;
     },
   });
   const enrich = useMutation({

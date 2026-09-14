@@ -48,10 +48,13 @@ describe("worker queue pressure", () => {
   });
 
   it("cancels leftover jobs on finished runs and caps live jobs per search", () => {
-    assert.equal(shouldRetireFinishedRunJob("completed", "queued"), true);
+    assert.equal(shouldRetireFinishedRunJob("completed", "queued", "crawl"), true);
     assert.equal(shouldRetireFinishedRunJob("cancelled", "running"), true);
     assert.equal(shouldRetireFinishedRunJob("running", "queued"), false);
     assert.equal(shouldRetireFinishedRunJob("completed", "done"), false);
+    assert.equal(shouldRetireFinishedRunJob("completed", "queued", "email"), false);
+    assert.equal(shouldRetireFinishedRunJob("completed", "queued", "enrich"), false);
+    assert.equal(shouldRetireFinishedRunJob("cancelled", "queued", "email"), true);
     assert.equal(liveJobsPerRunCap(100), 180);
     assert.equal(liveJobsPerRunCap(5), 24);
     assert.equal(shouldForceDrainOptional({ pressure: "overloaded", oldestQueuedMs: 1000, depth: 491 }), true);

@@ -101,10 +101,24 @@ export function shouldForceDrainOptional(input: {
   return oldest != null && oldest >= 10 * 60 * 1000;
 }
 
-export function shouldRetireFinishedRunJob(runStatus: string | null | undefined, jobStatus: string | null | undefined): boolean {
+/** Core work that must finish even after the original search page looks complete. */
+export const CORE_LIVE_JOB_TYPES = ["discover", "enrich", "email"] as const;
+
+export function isCoreLiveJobType(type: string | null | undefined): boolean {
+  return (CORE_LIVE_JOB_TYPES as readonly string[]).includes(String(type ?? ""));
+}
+
+export function shouldRetireFinishedRunJob(
+  runStatus: string | null | undefined,
+  jobStatus: string | null | undefined,
+  jobType?: string | null,
+): boolean {
   const run = String(runStatus ?? "");
   const job = String(jobStatus ?? "");
-  return (run === "completed" || run === "cancelled" || run === "failed") && (job === "queued" || job === "running");
+  if (!(run === "completed" || run === "cancelled" || run === "failed")) return false;
+  if (!(job === "queued" || job === "running")) return false;
+  if (run === "completed" && isCoreLiveJobType(jobType)) return false;
+  return true;
 }
 
 export function liveJobsPerRunCap(maxResults?: number | null): number {
@@ -321,6 +335,14 @@ export async function applyQueueImmune(
   let pruned = 0;
   let stolen = 0;
   try {
+    await sql`update search_runs r set status = ${"running"}, finished_at = null
+      where r.status = ${"completed"}
+        and exists (
+          select 1 from jobs j
+          where j.run_id = r.id
+            and j.status in ('queued','running')
+            and j.type in ('discover','enrich','email')
+        )`;
     const orphans = await sql<{ id: string }>`
       update jobs j set status = ${"cancelled"}, last_error = ${"run already finished"},
         locked_at = null, updated_at = now()
@@ -328,6 +350,7 @@ export async function applyQueueImmune(
       where j.run_id = r.id
         and r.status in ('completed','cancelled','failed')
         and j.status in ('queued','running')
+        and j.type not in ('discover','enrich','email')
       returning j.id`;
     pruned += orphans.length;
   } catch {
@@ -355,23 +378,24 @@ export async function applyQueueImmune(
         locked_at = null, updated_at = now()
       from search_runs r
       where j.run_id = r.id
-        and r.created_at < now() - interval '20 minutes'
+        and r.updated_at < now() - interval '20 minutes'
         and r.status in ('running','queued')
         and j.status in ('queued','running')
+        and j.type not in ('discover','enrich','email')
         and not exists (
           select 1 from jobs c
           where c.run_id = r.id and c.status in ('queued','running')
-            and c.type in ('discover','enrich')
+            and c.type in ('discover','enrich','email')
         )
       returning j.id`;
     pruned += staleRuns.length;
     await sql`update search_runs r set status = ${"completed"}, finished_at = coalesce(finished_at, now())
       where r.status in ('running','queued')
-        and r.created_at < now() - interval '20 minutes'
+        and r.updated_at < now() - interval '20 minutes'
         and not exists (
           select 1 from jobs j
           where j.run_id = r.id and j.status in ('queued','running')
-            and j.type in ('discover','enrich')
+            and j.type in ('discover','enrich','email')
         )`;
   } catch {
     /* keep */
@@ -423,6 +447,14 @@ export async function drainStuckUserWork(sql: Sql, userId: string): Promise<{ ca
   let cancelled = 0;
   let closed = 0;
   try {
+    await sql`update search_runs r set status = ${"running"}, finished_at = null
+      where r.user_id = ${userId} and r.status = ${"completed"}
+        and exists (
+          select 1 from jobs j
+          where j.run_id = r.id and j.user_id = ${userId}
+            and j.status in ('queued','running')
+            and j.type in ('discover','enrich','email')
+        )`;
     const orphans = await sql<{ id: string }>`
       update jobs j set status = ${"cancelled"}, last_error = ${"run already finished"},
         locked_at = null, updated_at = now()
@@ -430,6 +462,7 @@ export async function drainStuckUserWork(sql: Sql, userId: string): Promise<{ ca
       where j.run_id = r.id and j.user_id = ${userId}
         and r.status in ('completed','cancelled','failed')
         and j.status in ('queued','running')
+        and j.type not in ('discover','enrich','email')
       returning j.id`;
     cancelled += orphans.length;
   } catch { /* keep */ }
@@ -439,13 +472,14 @@ export async function drainStuckUserWork(sql: Sql, userId: string): Promise<{ ca
         locked_at = null, updated_at = now()
       from search_runs r
       where j.run_id = r.id and j.user_id = ${userId}
-        and r.created_at < now() - interval '20 minutes'
+        and r.updated_at < now() - interval '20 minutes'
         and r.status in ('running','queued')
         and j.status in ('queued','running')
+        and j.type not in ('discover','enrich','email')
         and not exists (
           select 1 from jobs c
           where c.run_id = r.id and c.status in ('queued','running')
-            and c.type in ('discover','enrich')
+            and c.type in ('discover','enrich','email')
         )
       returning j.id`;
     cancelled += leftover.length;
@@ -453,11 +487,11 @@ export async function drainStuckUserWork(sql: Sql, userId: string): Promise<{ ca
       update search_runs r set status = ${"completed"}, finished_at = coalesce(finished_at, now())
       where r.user_id = ${userId}
         and r.status in ('running','queued')
-        and r.created_at < now() - interval '20 minutes'
+        and r.updated_at < now() - interval '20 minutes'
         and not exists (
           select 1 from jobs j
           where j.run_id = r.id and j.status in ('queued','running')
-            and j.type in ('discover','enrich')
+            and j.type in ('discover','enrich','email')
         )
       returning r.id`;
     closed = done.length;

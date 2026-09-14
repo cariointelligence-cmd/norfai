@@ -819,7 +819,7 @@ export const reEnrichCompanies = createServerFn({ method: "POST" }).middleware([
     await enqueueJob(sql, context.userId, "email", { runId, companyId: row.id });
   }
   dispatchVercelExecution({ userId: context.userId, runId, reason: "email.recovery" });
-  void processJobsFor(sql, context.userId, runId, { maxMs: interactiveBudgetMs("enrich"), concurrency: 16, skipDiscover: true }).catch((err) => {
+  void processJobsFor(sql, context.userId, runId, { maxMs: 20_000, concurrency: 16, skipDiscover: true }).catch((err) => {
     console.warn("[norf] reenrich tick", err);
   });
   await updateRunStats(sql, context.userId, runId);
