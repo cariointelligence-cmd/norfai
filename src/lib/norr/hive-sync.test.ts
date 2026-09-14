@@ -28,7 +28,7 @@ describe("hive sync", () => {
     assert.match(src, /locked_at is null/);
     assert.match(src, /Number\(live\) >= 8/);
     assert.match(src, /when 'discover' then 0/);
-    assert.match(src, /supercrawlContacts/);
+    assert.match(src, /skipRefresh/);
     assert.match(src, /insert into jobs \(id, user_id, run_id, company_id, type, payload\)/);
     assert.doesNotMatch(src.slice(src.indexOf("async function attachDiscovered"), src.indexOf("export async function runDiscover")), /insertCompany\(/);
   });

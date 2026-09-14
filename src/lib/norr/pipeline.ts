@@ -593,9 +593,26 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
             and (website is null or website ~* 'closed\\.html?')`;
 		}
 		const src = hits.websiteSource ?? "website";
+		const people = (hits.people ?? []).slice(0, 12);
+		if (people.length) await Promise.all(people.map((p) => upsertPerson(sql, userId, companyId, p)));
+		const seenMail = new Set();
+		const emails = [];
+		for (const e of hits.emails ?? []) {
+			const k = String(e.value ?? "").toLowerCase();
+			if (!k || seenMail.has(k)) continue;
+			seenMail.add(k);
+			emails.push(e);
+		}
+		const seenPhone = new Set();
+		const phones = [];
+		for (const p of hits.phones ?? []) {
+			const k = String(p.value ?? "");
+			if (!k || seenPhone.has(k)) continue;
+			seenPhone.add(k);
+			phones.push(p);
+		}
 		await Promise.all([
-			...(hits.people ?? []).map((p) => upsertPerson(sql, userId, companyId, p)),
-			...(hits.emails ?? []).map((e) => upsertContact(sql, userId, companyId, {
+			...emails.map((e) => upsertContact(sql, userId, companyId, {
 				kind: "email",
 				value: e.value,
 				classification: e.classification,
@@ -603,8 +620,8 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 				sourceUrl: e.sourceUrl ?? void 0,
 				evidence: e.evidence ?? "Public page",
 				confidence: e.confidence
-			})),
-			...(hits.phones ?? []).map((p) => upsertContact(sql, userId, companyId, {
+			}, { skipRefresh: true })),
+			...phones.map((p) => upsertContact(sql, userId, companyId, {
 				kind: "phone",
 				value: p.value,
 				classification: "published",
@@ -612,8 +629,9 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 				sourceUrl: p.sourceUrl ?? void 0,
 				evidence: p.evidence ?? "Public page",
 				confidence: p.confidence
-			})),
+			}, { skipRefresh: true })),
 		]);
+		if (emails.length || phones.length) await refreshCompanyContactFields(sql, userId, companyId);
 	};
 	const site = canonicalCompanyWebsite((await loadCompany(sql, userId, companyId))?.website);
 	const facts = await collectFastContacts({
@@ -1013,7 +1031,7 @@ async function upsertPerson(sql, userId, companyId, p) {
 	await refreshCompanyContactFields(sql, userId, companyId);
 	return id;
 }
-async function upsertContact(sql, userId, companyId, c) {
+async function upsertContact(sql, userId, companyId, c, opts) {
 	if (c.kind === "email") {
 		const decoded = decodeEmailCandidate(c.value);
 		if (!decoded || isGarbageEmail(decoded) || isBillingEmail(decoded) || isRecruitingEmail(decoded)) return null;
@@ -1059,7 +1077,7 @@ async function upsertContact(sql, userId, companyId, c) {
       source_url = coalesce(source_url, ${c.sourceUrl ?? null}),
       person_id = coalesce(person_id, ${c.personId ?? null})
       where id = ${existing[0].id}`;
-		await refreshCompanyContactFields(sql, userId, companyId);
+		if (!opts?.skipRefresh) await refreshCompanyContactFields(sql, userId, companyId);
 		return existing[0].id;
 	}
 	const id = nid();
@@ -1071,7 +1089,7 @@ async function upsertContact(sql, userId, companyId, c) {
     ${role}, ${disposable}, ${syntax}, ${c.mxValid ?? null}, ${c.derivationMethod ?? null}, ${c.confidence},
     ${c.sourceId ?? null}, ${c.sourceUrl ?? null}, ${c.evidence ?? null}
   )`;
-	await refreshCompanyContactFields(sql, userId, companyId);
+	if (!opts?.skipRefresh) await refreshCompanyContactFields(sql, userId, companyId);
 	return id;
 }
 async function refreshCompanyContactFields(sql, userId, companyId) {
