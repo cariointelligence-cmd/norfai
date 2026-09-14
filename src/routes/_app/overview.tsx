@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { confirmBilling } from "@/lib/norr/actions";
 import { BOOTSTRAP_QUERY } from "@/lib/client/bootstrap";
 import { Empty, Pill, Stat } from "@/components/status";
@@ -8,11 +8,23 @@ import { ProgressRailPulse } from "@/components/progress-rail";
 import { asDisplay, formatWhen } from "@/lib/format";
 import { useI18n } from "@/lib/i18n";
 import { loc } from "@/lib/content/locale";
+import { CONSTRUCTION_BANNER_UNTIL_MS, constructionBannerActive } from "@/lib/construction-banner";
 
 export const Route = createFileRoute("/_app/overview")({ component: Dashboard });
 
 function Dashboard() {
   const { locale, ta } = useI18n();
+  const [showConstruction, setShowConstruction] = useState(() => constructionBannerActive());
+  useEffect(() => {
+    if (!showConstruction) return;
+    const wait = CONSTRUCTION_BANNER_UNTIL_MS - Date.now();
+    if (wait <= 0) {
+      setShowConstruction(false);
+      return;
+    }
+    const t = window.setTimeout(() => setShowConstruction(false), Math.min(wait, 2_147_483_647));
+    return () => window.clearTimeout(t);
+  }, [showConstruction]);
   const copy = loc(
     {
       fi: {
@@ -154,9 +166,11 @@ function Dashboard() {
 
   return (
     <div className="space-y-8">
+      {showConstruction ? (
       <div className="border border-line bg-panel px-4 py-3 text-sm">
         {copy.construction}
       </div>
+      ) : null}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="title">{copy.title}</h1>

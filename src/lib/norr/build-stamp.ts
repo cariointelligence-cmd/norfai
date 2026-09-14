@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-boot-keep";
+export const NORF_BUILD = "2026-09-14-banner-timer";
 
 export function vercelDeployProbe() {
   const env = process.env;
