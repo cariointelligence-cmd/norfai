@@ -1,5 +1,25 @@
 import { getSql } from "@/lib/db";
 import { rowsToCsv, projectCsvRows } from "./exporters.ts";
+import { canonicalCompanyWebsite } from "./normalize.ts";
+import { emailBelongsToCompany, isBillingEmail, isJunkEmail, isRecruitingEmail } from "./contacts.ts";
+import { isJunkCompanyPhone } from "./phones.ts";
+import { cleanPersonName, plausiblePersonName } from "./extract.ts";
+
+function keepEmail(email: string | null | undefined, name: string, website: string | null): boolean {
+  const v = String(email ?? "").trim();
+  if (!v) return false;
+  if (isJunkEmail(v) || isBillingEmail(v) || isRecruitingEmail(v)) return false;
+  return emailBelongsToCompany(v, { name, website });
+}
+
+function keepPhone(raw: string | null | undefined): boolean {
+  return Boolean(raw) && !isJunkCompanyPhone(raw);
+}
+
+function keepPerson(fullName: string | null | undefined): boolean {
+  const n = cleanPersonName(fullName) ?? String(fullName ?? "").trim();
+  return plausiblePersonName(n);
+}
 
 export async function exportRunCsv(opts: {
   userId: string;
@@ -34,23 +54,33 @@ export async function exportRunCsv(opts: {
     : [];
   const mapped = rows.map((c: Record<string, unknown>) => {
     const id = String(c.id ?? "");
-    const ppl = people.filter((p: { company_id: string }) => p.company_id === id);
+    const name = String(c.name ?? "");
+    const website = canonicalCompanyWebsite(String(c.website ?? "")) ?? "";
+    const ppl = people.filter((p: { company_id: string; full_name: string }) => p.company_id === id && keepPerson(p.full_name));
     const cts = contacts.filter((x: { company_id: string }) => x.company_id === id);
-    const emailsPub = cts.filter((x: { kind: string; classification?: string }) => x.kind === "email" && x.classification === "published").map((x: { value: string }) => x.value);
-    const emailsInf = cts.filter((x: { kind: string; classification?: string }) => x.kind === "email" && x.classification === "inferred").map((x: { value: string }) => x.value);
-    const phones = cts.filter((x: { kind: string }) => x.kind === "phone").map((x: { value: string }) => x.value);
-    if (!emailsPub.length && c.general_email) emailsPub.push(String(c.general_email));
-    if (!phones.length && c.phone) phones.push(String(c.phone));
+    const emailsPub = cts
+      .filter((x: { kind: string; classification?: string; value: string }) => x.kind === "email" && x.classification === "published" && keepEmail(x.value, name, website || null))
+      .map((x: { value: string }) => x.value);
+    const emailsInf = cts
+      .filter((x: { kind: string; classification?: string; value: string }) => x.kind === "email" && x.classification === "inferred" && keepEmail(x.value, name, website || null))
+      .map((x: { value: string }) => x.value);
+    const phones = cts
+      .filter((x: { kind: string; value: string }) => x.kind === "phone" && keepPhone(x.value))
+      .map((x: { value: string }) => x.value);
+    if (!emailsPub.length && keepEmail(String(c.general_email ?? ""), name, website || null)) {
+      emailsPub.push(String(c.general_email));
+    }
+    if (!phones.length && keepPhone(String(c.phone ?? ""))) phones.push(String(c.phone));
     return {
       canonical_company_id: id,
-      name: String(c.name ?? ""),
+      name,
       business_id: String(c.business_id ?? ""),
       vat_id: String(c.vat_id ?? ""),
       country: String(c.country ?? ""),
       municipality: String(c.municipality ?? ""),
       street: String(c.street ?? ""),
       postal_code: String(c.postal_code ?? ""),
-      website: String(c.website ?? ""),
+      website,
       industry_code: String(c.industry_code ?? ""),
       industry_label: String(c.industry_label ?? ""),
       legal_form: String(c.legal_form ?? ""),
@@ -61,10 +91,13 @@ export async function exportRunCsv(opts: {
       seo_score: c.seo_score ?? "",
       opportunity_score: c.commercial_opportunity ?? "",
       match_score: c.match_score ?? "",
-      email_published: emailsPub.join("; "),
-      email_inferred: emailsInf.join("; "),
-      phone: phones.join("; "),
-      people: ppl.map((p: { full_name: string; title?: string }) => `${p.full_name}${p.title ? " · " + p.title : ""}`).join("; "),
+      email_published: [...new Set(emailsPub)].join("; "),
+      email_inferred: [...new Set(emailsInf)].join("; "),
+      phone: [...new Set(phones)].join("; "),
+      people: ppl.map((p: { full_name: string; title?: string }) => {
+        const n = cleanPersonName(p.full_name) ?? p.full_name;
+        return `${n}${p.title ? " · " + p.title : ""}`;
+      }).join("; "),
       last_verified: String(c.last_verified_at ?? ""),
       run_id: runId,
       exported_at: new Date().toISOString(),

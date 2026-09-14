@@ -80,11 +80,11 @@ import { ensureWorker } from "./worker.ts";
 import { compareEntities } from "./dedupe.ts";
 import { isRecruitingEmail, isBillingEmail, isJunkEmail, emailBelongsToCompany, needsEmailRecovery } from "./contacts.ts";
 import { isJunkCompanyPhone } from "./phones.ts";
-import { cleanPersonName } from "./extract.ts";
+import { cleanPersonName, plausiblePersonName } from "./extract.ts";
 import { rowsToCsv, rowsToXlsx, rowsToCrmCsv, projectCsvRows } from "./exporters.ts";
 import { interpretTargetPrompt, applyPresetToCriteria } from "./targeting/parser.ts";
 import { OPPORTUNITY_PRESETS } from "./targeting/spec.ts";
-import { normalizeBusinessId, normalizeDomain, isJunkCompanyWebsite } from "./normalize.ts";
+import { normalizeBusinessId, normalizeDomain, isJunkCompanyWebsite, canonicalCompanyWebsite } from "./normalize.ts";
 import { scoped } from "./tenant.ts";
 import { countRunFacts } from "./search-run-read.ts";
 import { isoTime } from "@/lib/format.ts";
@@ -1865,11 +1865,15 @@ export const buildExport = createServerFn({ method: "POST" }).middleware([authMi
     }).slice(0, remaining);
     const mapped = allowed.map((c) => {
       const id = String(c.id);
-      const ppl = people.filter((p) => p.company_id === id);
+      const website = canonicalCompanyWebsite(c.website) ?? "";
+      const ppl = people.filter((p) => p.company_id === id && plausiblePersonName(cleanPersonName(p.full_name) ?? p.full_name));
       const cts = contacts.filter((x) => {
         if (x.company_id !== id) return false;
-        if (x.kind === "email" && (block.has(`email:${x.value.toLowerCase()}`) || isRecruitingEmail(x.value))) return false;
-        if (x.kind === "phone" && block.has(`phone:${x.value.toLowerCase()}`)) return false;
+        if (x.kind === "email") {
+          if (block.has(`email:${x.value.toLowerCase()}`) || isRecruitingEmail(x.value) || isJunkEmail(x.value) || isBillingEmail(x.value)) return false;
+          if (!emailBelongsToCompany(x.value, { name: c.name, website: website || null })) return false;
+        }
+        if (x.kind === "phone" && (block.has(`phone:${x.value.toLowerCase()}`) || isJunkCompanyPhone(x.value))) return false;
         return true;
       });
       const rec = {
@@ -1881,7 +1885,7 @@ export const buildExport = createServerFn({ method: "POST" }).middleware([authMi
         municipality: c.municipality ?? "",
         street: c.street ?? "",
         postal_code: c.postal_code ?? "",
-        website: c.website ?? "",
+        website,
         industry_code: c.industry_code ?? "",
         industry_label: c.industry_label ?? "",
         legal_form: c.legal_form ?? "",
