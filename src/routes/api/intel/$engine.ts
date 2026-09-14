@@ -5,8 +5,11 @@ import { intelEngineIds, runIntelEngine } from "@/lib/norr/vercel-intel";
 export const Route = createFileRoute("/api/intel/$engine")({
   server: {
     handlers: {
-      GET: async ({ params }) => {
+      GET: async ({ request, params }) => {
         if (params.engine === "catalog") {
+          const signed = verifyServiceRequest(request.headers, "", "enrichment.company");
+          const cronOk = verifyCronBearer(request.headers);
+          if (!signed.ok && !cronOk) return new Response("not found", { status: 404 });
           return Response.json({ ok: true, engines: intelEngineIds() });
         }
         return new Response("not found", { status: 404 });

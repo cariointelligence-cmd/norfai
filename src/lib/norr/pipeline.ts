@@ -2,7 +2,7 @@
 import type { Sql } from "@/lib/db";
 import { nid } from "@/lib/utils";
 import type { ContactHit, DiscoveredCompany, ObservationInput, PersonHit, SearchCriteria } from "./types.ts";
-import { passesLocalFilters, valuesOf } from "./criteria.ts";
+import { passesLocalFilters, valuesOf, firstValue } from "./criteria.ts";
 import { assertSearchQuota, assertCompanyQuota, ensurePlatformIdentity, readPlatformIdentity, perSearchLimitFor, clampRequestedLeads, ENGINE_SEARCH_CEILING, isUnlimitedQuota, companiesLimitFor } from "./platform.ts";
 import {
   audit,
@@ -28,7 +28,7 @@ import { extractFinancialMentions } from "./targeting/website.ts";
 import { extractParentMention } from "./group.ts";
 import { classifyPhoneRole, extractPhonesWithRole, pickCompanyPhone, isJunkCompanyPhone } from "./phones.ts";
 import { matchesExclusion, type ExclusionRow } from "./exclusions.ts";
-import { prhBisLookup } from "./sources/prh-bis.ts";
+import { prhBisLookup, prhBisSearch } from "./sources/prh-bis.ts";
 import { takeCompanySnapshot } from "./ops-store.ts";
 import { ensureOpsSchema } from "./tenant.ts";
 import { targetHasConstraint } from "./targeting/spec.ts";
@@ -367,6 +367,13 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
       report.push({ source: "ytj", ok: false, skipped: true, error: "kill-switch" });
     } else {
     const inflight: Promise<void>[] = [];
+    const bisTask = prhBisSearch({
+      name: firstValue(criteria, "keyword"),
+      municipality: firstValue(criteria, "municipality"),
+      businessLine: firstValue(criteria, "industry"),
+      max: Math.min(80, discoverFillTarget(kept, want)),
+      timeoutMs: 3500,
+    }).catch(() => ({ ok: false as const, data: [] as DiscoveredCompany[] }));
     const result = await ytjDiscover(
       { ...criteria, maxResults: discoverFillTarget(kept, want) },
       {
@@ -427,6 +434,25 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
       }
       if (failed) ytjReport.failed = failed;
       report.push(ytjReport);
+    }
+    const bis = await bisTask;
+    if (bis.ok && Array.isArray(bis.data) && bis.data.length && kept < want && !quotaStopped) {
+      let bisKept = 0;
+      for (const row of bis.data) {
+        if (kept >= want || quotaStopped) break;
+        if (row.businessId && skipKeys.has(row.businessId)) continue;
+        if (row.name && skipKeys.has(row.name)) continue;
+        if (row.businessId) skipKeys.add(row.businessId);
+        if (row.name) skipKeys.add(row.name);
+        try {
+          const resultAttach = await attachDiscovered(sql, userId, runId, row, ["prh_bis"], criteria, exposure, exclusions, skipQuota);
+          if (resultAttach === "quota") quotaStopped = true;
+          else if (resultAttach === "kept") { kept += 1; stored += 1; bisKept += 1; }
+          else if (resultAttach === "excluded_seen" || resultAttach === "excluded_customer") excludedSeen += 1;
+          else if (resultAttach === "excluded_exported") excludedExported += 1;
+        } catch { failed += 1; }
+      }
+      report.push({ source: "prh_bis", ok: true, hits: bisKept, fetched: bis.data.length });
     }
     }
   }

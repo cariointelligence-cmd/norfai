@@ -1,21 +1,25 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { NORF_BUILD, vercelDeployProbe } from "@/lib/norr/build-stamp.ts";
 import { provisionCarioNorfai, vercelTokenPresent } from "@/lib/norr/vercel-provision.ts";
+import { cronHealthAuthorized, inspectApiRequest, publicHealthBody, shieldHeaders } from "@/lib/norr/api-shield.ts";
 
 export const Route = createFileRoute("/api/health")({
   server: {
     handlers: {
       GET: async ({ request }) => {
-        const cutover = new URL(request.url).searchParams.get("cutover") === "1";
-        const provision = cutover
-          ? await provisionCarioNorfai()
-          : { tokenPresent: vercelTokenPresent(), error: null };
+        const blocked = inspectApiRequest(request, { bucket: "health", max: 120 });
+        if (blocked) return blocked;
+        const url = new URL(request.url);
+        const cutover = url.searchParams.get("cutover") === "1";
+        const headers = shieldHeaders(request);
+        if (!cutover || !cronHealthAuthorized(request)) {
+          return Response.json(publicHealthBody(NORF_BUILD), { headers });
+        }
+        const provision = await provisionCarioNorfai();
         let mail: { provider: string; source: string; resendReady: boolean } = {
           provider: "none",
           source: "none",
-          resendReady: Boolean(
-            process.env.RESEND_API_KEY?.trim() || process.env.RESEND_KEY?.trim() || process.env.RESEND?.trim(),
-          ),
+          resendReady: Boolean(process.env.RESEND_API_KEY?.trim()),
         };
         try {
           const { getSql } = await import("@/lib/db");
@@ -27,14 +31,11 @@ export const Route = createFileRoute("/api/health")({
           /* health still returns */
         }
         return Response.json({
-          ok: true,
-          app: "norf",
-          build: NORF_BUILD,
-          ts: new Date().toISOString(),
-          deploy: { ...vercelDeployProbe(), resendReady: mail.resendReady || vercelDeployProbe().resendReady },
+          ...publicHealthBody(NORF_BUILD),
+          deploy: { ...vercelDeployProbe(), tokenPresent: vercelTokenPresent(), resendReady: mail.resendReady },
           mail,
-          provision,
-        });
+          provision: { tokenPresent: provision.tokenPresent, error: provision.error ? "provision_error" : null },
+        }, { headers });
       },
     },
   },

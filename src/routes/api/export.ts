@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { inspectApiRequest } from "@/lib/norr/api-shield.ts";
 import { exportRunCsv } from "@/lib/norr/export-csv.ts";
 
 export const Route = createFileRoute("/api/export")({
@@ -8,6 +9,8 @@ export const Route = createFileRoute("/api/export")({
 });
 
 async function handle({ request }: { request: Request }) {
+  const blocked = inspectApiRequest(request, { bucket: "export", max: 30 });
+  if (blocked) return blocked;
   const url = new URL(request.url);
   const runId = url.searchParams.get("runId") ?? "";
   const preset = url.searchParams.get("preset") ?? "full";

@@ -318,8 +318,9 @@ export function isTrustedOrigin(origin: string | null | undefined): boolean {
     if (TRUSTED_ORIGINS.includes(u.origin)) return true;
     const host = u.hostname.toLowerCase();
     if (host === "localhost" || host === "127.0.0.1") return true;
-    if (host.endsWith(".grok.com") || host.endsWith(".grok-sandbox.com")) return true;
-    if (host.endsWith(".norf.fi") || host.endsWith(".norfai.com")) return true;
+    if (host === "norfai.com" || host === "www.norfai.com" || host === "norf.fi" || host === "www.norf.fi") return true;
+    if (host === "norfai.vercel.app" || host === "norfai-cario.vercel.app") return true;
+    if (host.endsWith(".grok.com") || host.endsWith(".grok-sandbox.com") || host.endsWith(".grok.me")) return true;
     return false;
   } catch {
     return false;

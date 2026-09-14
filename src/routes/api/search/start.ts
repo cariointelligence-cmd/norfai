@@ -1,15 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createQueuedSearch, latestSearchId } from "@/lib/norr/search-intake.ts";
+import { inspectApiRequest, shieldHeaders } from "@/lib/norr/api-shield.ts";
+import { corsHeaders as originCors } from "@/lib/norr/security.ts";
 
 function corsHeaders(request: Request): HeadersInit {
-  const origin = request.headers.get("origin") ?? "";
-  const allow = origin === "https://www.norfai.com" || origin === "https://norfai.com";
   return {
     "content-type": "application/json",
-    "access-control-allow-credentials": "true",
     "access-control-allow-headers": "content-type",
     "access-control-allow-methods": "GET,POST,OPTIONS",
-    ...(allow ? { "access-control-allow-origin": origin } : {}),
+    ...originCors(request.headers.get("origin")),
+    ...shieldHeaders(request),
   };
 }
 
@@ -44,6 +44,8 @@ function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
 
 async function start({ request }: { request: Request }) {
   const t0 = Date.now();
+  const blocked = inspectApiRequest(request, { bucket: "search-start", max: 20, maxBytes: 80_000 });
+  if (blocked) return blocked;
   const headers = corsHeaders(request);
   const json = (status: number, body: Record<string, unknown>) =>
     Response.json({ ...body, ms: Date.now() - t0 }, { status, headers });

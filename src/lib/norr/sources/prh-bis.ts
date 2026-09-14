@@ -1,4 +1,4 @@
-import type { AdapterResult, ContactHit, ObservationInput } from "../types.ts";
+import type { AdapterResult, ContactHit, DiscoveredCompany, ObservationInput } from "../types.ts";
 import { getJson } from "../http.ts";
 import { normalizeBusinessId, normalizePhone, normalizeWebsite } from "../normalize.ts";
 import { classifyPhoneRole } from "../phones.ts";
@@ -130,4 +130,70 @@ export async function prhBisLookup(businessId: string, opts?: { timeoutMs?: numb
     observations,
     sourceUrl: url,
   };
+}
+
+function bisToDiscovered(c: BisCompany): DiscoveredCompany | null {
+  const name = String(c.name ?? "").trim();
+  const bid = normalizeBusinessId(c.businessId);
+  if (!name || name.length < 2) return null;
+  const addr = c.addresses?.[0];
+  const line = c.businessLines?.[0];
+  let website: string | null = null;
+  for (const d of c.contactDetails ?? []) {
+    if (typeOf(String(d.type ?? "")) === "website") {
+      website = normalizeWebsite(d.value ?? "") ?? website;
+    }
+  }
+  return {
+    name,
+    businessId: bid,
+    country: "FI",
+    legalForm: c.companyForm ?? null,
+    registrationDate: c.registrationDate ?? null,
+    industryCode: line?.code ?? null,
+    industryLabel: line?.name ?? null,
+    street: addr?.street ?? null,
+    postalCode: addr?.postCode ?? null,
+    municipality: addr?.city || addr?.postOffice || null,
+    website,
+  };
+}
+
+/** Official PRH BIS list search. Complements YTJ v3 — same register, different index. */
+export async function prhBisSearch(opts: {
+  name?: string | null;
+  municipality?: string | null;
+  businessLine?: string | null;
+  max?: number;
+  timeoutMs?: number;
+}): Promise<AdapterResult<DiscoveredCompany[]>> {
+  const max = Math.min(100, Math.max(1, opts.max ?? 40));
+  const params = new URLSearchParams({
+    totalResults: "false",
+    maxResults: String(max),
+    resultsFrom: "0",
+  });
+  const name = String(opts.name ?? "").trim().slice(0, 80);
+  const office = String(opts.municipality ?? "").trim().slice(0, 40);
+  const line = String(opts.businessLine ?? "").replace(/\D/g, "").slice(0, 5);
+  if (name.length >= 3) params.set("name", name);
+  if (office.length >= 2) params.set("registeredOffice", office);
+  if (line.length >= 2) params.set("businessLine", line);
+  if (!params.has("name") && !params.has("registeredOffice") && !params.has("businessLine")) {
+    return { ok: true, data: [] };
+  }
+  const url = `${BASE}?${params.toString()}`;
+  const r = await getJson<{ results?: BisCompany[] }>(url, { timeoutMs: opts.timeoutMs ?? 3500 });
+  if (!r.ok) return { ok: false, error: r.error, state: r.status === 429 ? "rate_limited" : "temporarily_unavailable" };
+  const out: DiscoveredCompany[] = [];
+  const seen = new Set<string>();
+  for (const raw of r.data?.results ?? []) {
+    const row = bisToDiscovered(raw);
+    if (!row) continue;
+    const key = row.businessId || row.name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(row);
+  }
+  return { ok: true, data: out, sourceUrl: url };
 }
