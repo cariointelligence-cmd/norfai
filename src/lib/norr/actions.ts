@@ -204,6 +204,11 @@ async function ctxSql(context) {
   return s.sql;
 }
 
+async function rawSql(context) {
+  const { getSql } = await import("@/lib/db");
+  return getSql();
+}
+
 async function gate(sql, userId, op, opts) {
   await ensureSecuritySchema(sql);
   const identity = await ensurePlatformIdentity(sql, userId);
@@ -267,7 +272,7 @@ export const getBootstrap = createServerFn({ method: "POST" }).middleware([authM
     stripeReady: false
   };
   try {
-    const sql = await ctxSql(context);
+    const sql = await rawSql(context);
     const uid = context.userId;
     const ws = await ensureWorkspace(sql, uid);
     const identity = await readPlatformIdentity(sql, uid);
@@ -681,7 +686,7 @@ export const getRun = createServerFn({ method: "GET" }).middleware([authMiddlewa
 
 export const listCompanies = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d ?? {}).handler(async ({ context, data }) => {
   try {
-  const sql = await ctxSql(context);
+  const sql = await rawSql(context);
   const q = boundedString(data.q?.trim() ?? "", 80);
   const sortBy = allowSort(data.sortBy);
   const limit = clampInt(data.limit, 1, 80, 80);
@@ -971,7 +976,7 @@ export const getPerson = createServerFn({ method: "GET" }).middleware([authMiddl
 
 export const listPeople = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d ?? {}).handler(async ({ context }) => {
   try {
-    const sql = await ctxSql(context);
+    const sql = await rawSql(context);
     const people = await sql`
       select p.id, p.full_name, p.title, p.company_id, c.name as company_name, p.work_email, p.work_email_class, p.confidence, p.source_page
       from people p join companies c on c.id = p.company_id
@@ -1054,7 +1059,7 @@ export const listProfiles = createServerFn({ method: "GET" }).middleware([authMi
 
 export const listRuns = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d ?? {}).handler(async ({ context, data }) => {
   try {
-    const sql = await ctxSql(context);
+    const sql = await rawSql(context);
     const q = boundedString(data?.q?.trim?.() ?? "", 80);
     const status = boundedString(data?.status ?? "", 24);
     const sinceDays = clampInt(data?.sinceDays, 0, 3650, 0);

@@ -95,23 +95,15 @@ export function AppShell() {
   });
   const boot = useQuery({
     queryKey: ["bootstrap"],
-    queryFn: () => getBootstrap({ data: {} }),
-    enabled: Boolean(user),
-    retry: 0,
-    staleTime: 8_000,
-    placeholderData: {
-      workspace: { id: "pending", onboarded_at: "pending", name: "Workspace", lawful_basis: null, purpose: null, retention_days: 730, country_allowlist: "FI" },
-      counts: { companies: 0, people: 0, runs: 0, openReview: 0, jobsRunning: 0, contacts: 0, sourcesConnected: 0, sourcesTotal: 0 },
-      recentRuns: [],
-      recentCompanies: [],
-      isAdmin: true,
-      plan: "unlimited",
-      searchesUsed: 0,
-      searchesLimit: -1,
-      seedOpen: true,
-      hasStripeCustomer: false,
-      stripeReady: false,
+    queryFn: async () => {
+      const r = await fetch("/api/workspace/boot", { credentials: "include", headers: { accept: "application/json" } });
+      const j = await r.json();
+      if (!j?.ok) throw new Error(j?.error || "boot failed");
+      return j;
     },
+    enabled: Boolean(user),
+    retry: 1,
+    staleTime: 8_000,
   });
 
   useEffect(() => {
