@@ -94,6 +94,12 @@ export function clampRequestedLeads(requested: number | undefined, planCap: numb
   return Math.min(floor, Math.max(1, planCap));
 }
 
+export function withBonus(base: number, bonus: number): number {
+  if (isUnlimitedQuota(base)) return base;
+  const extra = Number.isFinite(bonus) ? Math.max(0, Math.floor(bonus)) : 0;
+  return base + extra;
+}
+
 export function searchesLimitFor(plan: PlanId, isAdmin: boolean): number {
   if (isAdmin) return -1;
   const spec = PLANS[plan];
@@ -160,6 +166,8 @@ export async function ensurePlatformSchema(sql: Sql): Promise<void> {
     await sql.query("alter table workspaces add column if not exists plan_source text not null default 'self'");
     await sql.query("alter table workspaces add column if not exists gifted_by text");
     await sql.query("alter table workspaces add column if not exists gifted_at timestamptz");
+    await sql.query("alter table workspaces add column if not exists bonus_searches integer not null default 0");
+    await sql.query("alter table workspaces add column if not exists bonus_leads integer not null default 0");
     await sql.query(`create table if not exists platform_admins (
       user_id text primary key,
       email text not null unique,
@@ -244,6 +252,8 @@ const FALLBACK_IDENTITY = {
   plan: "free" as PlanId,
   searchesUsed: 0,
   searchesLimit: PLANS.free.searchesPerMonth,
+  bonusSearches: 0,
+  bonusLeads: 0,
 };
 
 /** Hot-path identity: no schema DDL. Admin seed emails are unlimited. */
@@ -261,19 +271,33 @@ export async function readPlatformIdentity(sql: Sql, userId: string) {
     }
     let plan: PlanId = isAdmin ? "unlimited" : "free";
     let used = 0;
+    let bonusSearches = 0;
+    let bonusLeads = 0;
     try {
-      const ws = await sql<{ plan: string; searches_used: number }>`
-        select plan, searches_used from workspaces where user_id = ${userId} limit 1`;
+      const ws = await sql<{ plan: string; searches_used: number; bonus_searches?: number; bonus_leads?: number }>`
+        select plan, searches_used, coalesce(bonus_searches, 0) as bonus_searches, coalesce(bonus_leads, 0) as bonus_leads
+        from workspaces where user_id = ${userId} limit 1`;
       if (!isAdmin) plan = normalizePlanId(ws[0]?.plan);
       used = Number(ws[0]?.searches_used ?? 0);
-    } catch { /* defaults */ }
+      bonusSearches = Number(ws[0]?.bonus_searches ?? 0);
+      bonusLeads = Number(ws[0]?.bonus_leads ?? 0);
+    } catch {
+      try {
+        const ws = await sql<{ plan: string; searches_used: number }>`
+          select plan, searches_used from workspaces where user_id = ${userId} limit 1`;
+        if (!isAdmin) plan = normalizePlanId(ws[0]?.plan);
+        used = Number(ws[0]?.searches_used ?? 0);
+      } catch { /* defaults */ }
+    }
     return {
       isAdmin,
       email,
       seedOpen: true,
       plan,
       searchesUsed: used,
-      searchesLimit: searchesLimitFor(plan, isAdmin),
+      searchesLimit: withBonus(searchesLimitFor(plan, isAdmin), bonusSearches),
+      bonusSearches,
+      bonusLeads,
     };
   } catch {
     return { ...FALLBACK_IDENTITY };
@@ -305,13 +329,19 @@ export async function ensurePlatformIdentity(sql: Sql, userId: string) {
     const isAdmin = await isPlatformAdmin(sql, userId);
     let plan: PlanId = "free";
     let used = 0;
+    let bonusSearches = 0;
+    let bonusLeads = 0;
     try {
-      const ws = await sql<{ plan: string; plan_period_start: string; searches_used: number }>`
-        select plan, plan_period_start, searches_used from workspaces where user_id = ${userId} limit 1`;
+      const ws = await sql<{ plan: string; plan_period_start: string; searches_used: number; bonus_searches?: number; bonus_leads?: number }>`
+        select plan, plan_period_start, searches_used,
+          coalesce(bonus_searches, 0) as bonus_searches, coalesce(bonus_leads, 0) as bonus_leads
+        from workspaces where user_id = ${userId} limit 1`;
       plan = normalizePlanId(ws[0]?.plan);
       const period = ws[0]?.plan_period_start ? new Date(ws[0].plan_period_start) : new Date();
       const monthAgo = Date.now() - 32 * 24 * 3600 * 1000;
       used = ws[0]?.searches_used ?? 0;
+      bonusSearches = Number(ws[0]?.bonus_searches ?? 0);
+      bonusLeads = Number(ws[0]?.bonus_leads ?? 0);
       if (period.getTime() < monthAgo) {
         used = 0;
         await sql`update workspaces set searches_used = 0, plan_period_start = now(), updated_at = now() where user_id = ${userId}`;
@@ -334,7 +364,9 @@ export async function ensurePlatformIdentity(sql: Sql, userId: string) {
       seedOpen: await seedSignupOpen(sql),
       plan,
       searchesUsed: used,
-      searchesLimit: searchesLimitFor(plan, isAdmin),
+      searchesLimit: withBonus(searchesLimitFor(plan, isAdmin), bonusSearches),
+      bonusSearches,
+      bonusLeads,
     };
   } catch (err) {
     console.error("[norf] identity", err);
@@ -418,14 +450,15 @@ export async function companyUsage(sql: Sql, userId: string): Promise<{
 
 export async function assertCompanyQuota(sql: Sql, userId: string): Promise<{ ok: true } | { ok: false; error: string }> {
   const id = await ensurePlatformIdentity(sql, userId);
-  const totalCap = companiesLimitFor(id.plan, id.isAdmin);
-  const monthlyCap = companiesPerMonthFor(id.plan, id.isAdmin);
+  const extra = Number(id.bonusLeads ?? 0);
+  const totalCap = withBonus(companiesLimitFor(id.plan, id.isAdmin), extra);
+  const monthlyCap = withBonus(companiesPerMonthFor(id.plan, id.isAdmin), extra);
   if (isUnlimitedQuota(totalCap) && isUnlimitedQuota(monthlyCap)) return { ok: true };
   const usage = await companyUsage(sql, userId);
   const slots = remainingCompanySlots({
     totalCap,
     monthlyCap,
-    perSearch: perSearchLimitFor(id.plan, id.isAdmin),
+    perSearch: withBonus(perSearchLimitFor(id.plan, id.isAdmin), extra),
     stored: usage.stored,
     storedThisPeriod: usage.storedThisPeriod,
   });

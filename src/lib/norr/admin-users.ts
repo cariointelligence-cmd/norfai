@@ -14,6 +14,7 @@ import {
   generateTempPassword,
   isPlanId,
   parseCreateUserInput,
+  parseQuotaGrant,
 } from "./admin-user-input.ts";
 
 export {
@@ -21,6 +22,7 @@ export {
   isPlanId,
   parseAdminEmail,
   parseCreateUserInput,
+  parseQuotaGrant,
   type CreateUserInput,
 } from "./admin-user-input.ts";
 
@@ -37,6 +39,8 @@ export type PlatformUserRow = {
   companies: number;
   companiesThisPeriod: number;
   giftedAt: string | null;
+  bonusSearches: number;
+  bonusLeads: number;
 };
 
 export async function listPlatformUsers(sql: Sql, granterId: string, q = ""): Promise<{ ok: true; users: PlatformUserRow[] } | { ok: false; error: string }> {
@@ -49,6 +53,7 @@ export async function listPlatformUsers(sql: Sql, granterId: string, q = ""): Pr
     rows = await sql`
       select u.id, u.email, u.name, u."createdAt" as created_at,
         coalesce(w.plan, 'free') as plan, w.plan_source, coalesce(w.searches_used, 0) as searches_used,
+        coalesce(w.bonus_searches, 0) as bonus_searches, coalesce(w.bonus_leads, 0) as bonus_leads,
         w.gifted_at, pa.role as admin_role,
         (select count(*)::int from companies c where c.user_id = u.id and c.deleted_at is null) as companies,
         (select count(*)::int from companies c where c.user_id = u.id and c.deleted_at is null
@@ -90,6 +95,8 @@ export async function listPlatformUsers(sql: Sql, granterId: string, q = ""): Pr
       companies: Number(r.companies ?? 0) || 0,
       companiesThisPeriod: Number(r.companies_this_period ?? r.companies ?? 0) || 0,
       giftedAt: isoTime(r.gifted_at),
+      bonusSearches: Number(r.bonus_searches ?? 0) || 0,
+      bonusLeads: Number(r.bonus_leads ?? 0) || 0,
     })),
   };
 }
@@ -180,6 +187,44 @@ export async function giftWorkspacePlan(
     console.error("[norf] plan gifted mail", err);
   }
   return { ok: true, plan };
+}
+
+export async function grantWorkspaceQuota(
+  sql: Sql,
+  granterId: string,
+  raw: unknown,
+): Promise<{ ok: true; searches: number; leads: number; bonusSearches: number; bonusLeads: number } | { ok: false; error: string }> {
+  if (!(await isPlatformAdmin(sql, granterId))) return { ok: false, error: "Admin only" };
+  const parsed = parseQuotaGrant(raw);
+  if (!parsed.ok) return parsed;
+  const user = await sql<{ id: string }>`select id from "user" where id = ${parsed.userId} limit 1`;
+  if (!user[0]) return { ok: false, error: "User not found" };
+  await ensureWorkspace(sql, parsed.userId);
+  await ensurePlatformSchema(sql);
+  try {
+    await sql`update workspaces set
+      bonus_searches = coalesce(bonus_searches, 0) + ${parsed.searches},
+      bonus_leads = coalesce(bonus_leads, 0) + ${parsed.leads},
+      updated_at = now()
+      where user_id = ${parsed.userId}`;
+  } catch {
+    return { ok: false, error: "Could not add quota. Try again." };
+  }
+  const row = await sql<{ bonus_searches: number; bonus_leads: number }>`
+    select coalesce(bonus_searches, 0) as bonus_searches, coalesce(bonus_leads, 0) as bonus_leads
+    from workspaces where user_id = ${parsed.userId} limit 1`.catch(() => []);
+  try {
+    await sql`insert into audit_events (id, user_id, action, entity_type, entity_id, meta)
+      values (${nid()}, ${granterId}, ${"admin.quota_grant"}, ${"user"}, ${parsed.userId},
+        ${JSON.stringify({ searches: parsed.searches, leads: parsed.leads })}::jsonb)`;
+  } catch { /* audit optional */ }
+  return {
+    ok: true,
+    searches: parsed.searches,
+    leads: parsed.leads,
+    bonusSearches: Number(row[0]?.bonus_searches ?? parsed.searches),
+    bonusLeads: Number(row[0]?.bonus_leads ?? parsed.leads),
+  };
 }
 
 export async function grantAdminByUserId(

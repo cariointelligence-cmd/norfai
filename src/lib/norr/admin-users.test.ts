@@ -5,8 +5,9 @@ import {
   isPlanId,
   parseAdminEmail,
   parseCreateUserInput,
+  parseQuotaGrant,
 } from "./admin-user-input.ts";
-import { normalizePlanId } from "./platform.ts";
+import { normalizePlanId, withBonus } from "./platform.ts";
 
 describe("admin user create input", () => {
   it("accepts email, optional password, plan and admin flag", () => {
@@ -53,6 +54,29 @@ describe("plan gifts", () => {
     assert.equal(isPlanId("enterprise"), false);
     assert.equal(normalizePlanId("scale"), "unlimited");
     assert.equal(normalizePlanId("nope"), "free");
+  });
+});
+
+describe("admin quota grant", () => {
+  it("accepts a positive search or lead count", () => {
+    const a = parseQuotaGrant({ userId: "u1", searches: "25", leads: 0 });
+    assert.equal(a.ok, true);
+    if (a.ok) {
+      assert.equal(a.searches, 25);
+      assert.equal(a.leads, 0);
+    }
+    const b = parseQuotaGrant({ userId: "u1", searches: 0, leads: 100 });
+    assert.equal(b.ok, true);
+    if (b.ok) assert.equal(b.leads, 100);
+    assert.equal(parseQuotaGrant({ userId: "u1" }).ok, false);
+    assert.equal(parseQuotaGrant({ userId: "", searches: 1 }).ok, false);
+    assert.equal(parseQuotaGrant({ userId: "u1", searches: -3 }).ok, false);
+    assert.equal(parseQuotaGrant({ userId: "u1", searches: 200000 }).ok, false);
+  });
+
+  it("adds bonus on top of a finite plan and ignores it for unlimited", () => {
+    assert.equal(withBonus(50, 20), 70);
+    assert.equal(withBonus(-1, 999), -1);
   });
 });
 

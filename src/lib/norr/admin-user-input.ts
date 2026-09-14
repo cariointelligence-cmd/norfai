@@ -39,3 +39,17 @@ export function parseCreateUserInput(data: Record<string, unknown>): { ok: true;
   const makeAdmin = data.makeAdmin === true || data.makeAdmin === "true";
   return { ok: true, value: { email, name, password, plan, makeAdmin } };
 }
+
+export function parseQuotaGrant(raw: unknown): { ok: true; userId: string; searches: number; leads: number } | { ok: false; error: string } {
+  const d = (raw ?? {}) as { userId?: unknown; searches?: unknown; leads?: unknown };
+  const userId = String(d.userId ?? "").trim().slice(0, 128);
+  if (!userId) return { ok: false, error: "User not found" };
+  const searches = Math.floor(Number(d.searches ?? 0));
+  const leads = Math.floor(Number(d.leads ?? 0));
+  if (!Number.isFinite(searches) || !Number.isFinite(leads) || searches < 0 || leads < 0) {
+    return { ok: false, error: "Enter a positive number." };
+  }
+  if (searches === 0 && leads === 0) return { ok: false, error: "Add searches or leads." };
+  if (searches > 100_000 || leads > 100_000) return { ok: false, error: "Cap is 100 000 per grant." };
+  return { ok: true, userId, searches, leads };
+}

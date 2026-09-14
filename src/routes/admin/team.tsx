@@ -9,6 +9,7 @@ import {
   adminCreateUser,
   adminGiftPlan,
   adminGrantAdmin,
+  adminGrantQuota,
   adminInvite,
   adminListUsers,
   adminRevoke,
@@ -36,6 +37,7 @@ function AdminUsers() {
   const [created, setCreated] = useState<{ email: string; password: string | null } | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
   const [giftPlan, setGiftPlan] = useState<Record<string, PlanId>>({});
+  const [quotaDraft, setQuotaDraft] = useState<Record<string, { searches: string; leads: string }>>({});
 
   const create = useMutation({
     mutationFn: () =>
@@ -77,6 +79,19 @@ function AdminUsers() {
       } else toast.error(r.error);
     },
   });
+  const grantQ = useMutation({
+    mutationFn: (opts: { userId: string; searches: number; leads: number }) => adminGrantQuota({ data: opts }),
+    onSuccess: (r) => {
+      if (r.ok) {
+        const bits = [
+          r.searches ? `+${r.searches} searches` : "",
+          r.leads ? `+${r.leads} leads` : "",
+        ].filter(Boolean);
+        toast.message(bits.join(" · ") || "Quota added");
+        void qc.invalidateQueries({ queryKey: ["admin-users"] });
+      } else toast.error(r.error);
+    },
+  });
   const grant = useMutation({
     mutationFn: (userId: string) => adminGrantAdmin({ data: { userId } }),
     onSuccess: (r) => {
@@ -109,8 +124,8 @@ function AdminUsers() {
       <div>
         <h1 className="text-2xl font-medium tracking-tight">Users</h1>
         <p className="mt-1 max-w-2xl text-sm text-mute">
-          Create accounts, gift a plan, or grant admin. Admin quota is unlimited while they stay admin.
-          A gifted plan stays after you revoke admin. Passwords are shown once.
+          Create accounts, gift a plan, add searches or leads, or grant admin. Admin quota is unlimited while they stay admin.
+          A gifted plan stays after you revoke admin. Extra searches and leads sit on top of the plan until used. Passwords are shown once.
         </p>
       </div>
 
@@ -221,14 +236,21 @@ function AdminUsers() {
                   companies: number;
                   companiesThisPeriod?: number;
                   searchesUsed?: number;
+                  bonusSearches?: number;
+                  bonusLeads?: number;
                   createdAt: string | null;
                 }) => {
                   const nextPlan = giftPlan[u.id] ?? u.plan;
                   const isAdm = Boolean(u.adminRole);
+                  const extraS = Number(u.bonusSearches ?? 0);
+                  const extraL = Number(u.bonusLeads ?? 0);
                   const cCap = companiesLimitFor(u.plan, isAdm);
                   const mCap = companiesPerMonthFor(u.plan, isAdm);
                   const sCap = searchesLimitFor(u.plan, isAdm);
-                  const overMonth = mCap >= 0 && (u.companiesThisPeriod ?? u.companies) > mCap;
+                  const sShown = sCap >= 0 ? sCap + extraS : sCap;
+                  const mShown = mCap >= 0 ? mCap + extraL : mCap;
+                  const overMonth = mCap >= 0 && (u.companiesThisPeriod ?? u.companies) > (mShown < 0 ? Number.POSITIVE_INFINITY : mShown);
+                  const draft = quotaDraft[u.id] ?? { searches: "50", leads: "50" };
                   return (
                     <tr key={u.id} className="border-b border-line align-top last:border-0">
                       <td className="px-3 py-2">
@@ -247,10 +269,12 @@ function AdminUsers() {
                       </td>
                       <td className="px-3 py-2 font-mono tabular">{u.companies}{cCap >= 0 ? ` / ${cCap}` : ""}</td>
                       <td className={`px-3 py-2 font-mono tabular ${overMonth ? "text-warn" : ""}`}>
-                        {u.companiesThisPeriod ?? u.companies}{mCap >= 0 ? ` / ${mCap}` : ""}
+                        {u.companiesThisPeriod ?? u.companies}{mShown >= 0 ? ` / ${mShown}` : ""}
+                        {extraL > 0 ? <div className="text-[10px] text-mute">+{extraL} leads</div> : null}
                       </td>
                       <td className="px-3 py-2 font-mono tabular">
-                        {u.searchesUsed ?? 0}{sCap >= 0 ? ` / ${sCap}` : ""}
+                        {u.searchesUsed ?? 0}{sShown >= 0 ? ` / ${sShown}` : ""}
+                        {extraS > 0 ? <div className="text-[10px] text-mute">+{extraS} searches</div> : null}
                       </td>
                       <td className="px-3 py-2 text-xs text-mute">{formatWhen(u.createdAt)}</td>
                       <td className="px-3 py-2">
@@ -272,6 +296,38 @@ function AdminUsers() {
                               onClick={() => gift.mutate({ userId: u.id, plan: nextPlan })}
                             >
                               Gift
+                            </Button>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1">
+                            <input
+                              className="h-9 w-16 border border-line bg-canvas px-2 text-xs tabular"
+                              inputMode="numeric"
+                              value={draft.searches}
+                              onChange={(e) => setQuotaDraft((m) => ({ ...m, [u.id]: { ...draft, searches: e.target.value } }))}
+                              aria-label="Searches to add"
+                            />
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={grantQ.isPending || !Number(draft.searches)}
+                              onClick={() => grantQ.mutate({ userId: u.id, searches: Number(draft.searches) || 0, leads: 0 })}
+                            >
+                              Add searches
+                            </Button>
+                            <input
+                              className="h-9 w-16 border border-line bg-canvas px-2 text-xs tabular"
+                              inputMode="numeric"
+                              value={draft.leads}
+                              onChange={(e) => setQuotaDraft((m) => ({ ...m, [u.id]: { ...draft, leads: e.target.value } }))}
+                              aria-label="Leads to add"
+                            />
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              disabled={grantQ.isPending || !Number(draft.leads)}
+                              onClick={() => grantQ.mutate({ userId: u.id, searches: 0, leads: Number(draft.leads) || 0 })}
+                            >
+                              Add leads
                             </Button>
                           </div>
                           {u.adminRole === "owner" ? (

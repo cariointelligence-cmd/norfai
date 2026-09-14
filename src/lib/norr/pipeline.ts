@@ -3,7 +3,7 @@ import type { Sql } from "@/lib/db";
 import { nid } from "@/lib/utils";
 import type { ContactHit, DiscoveredCompany, ObservationInput, PersonHit, SearchCriteria } from "./types.ts";
 import { passesLocalFilters, valuesOf, firstValue } from "./criteria.ts";
-import { assertSearchQuota, assertCompanyQuota, ensurePlatformIdentity, readPlatformIdentity, perSearchLimitFor, clampRequestedLeads, ENGINE_SEARCH_CEILING, isUnlimitedQuota, companiesLimitFor } from "./platform.ts";
+import { assertSearchQuota, assertCompanyQuota, ensurePlatformIdentity, readPlatformIdentity, perSearchLimitFor, clampRequestedLeads, ENGINE_SEARCH_CEILING, isUnlimitedQuota, companiesLimitFor, withBonus } from "./platform.ts";
 import {
   audit,
   bumpSource,
@@ -255,7 +255,7 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
   const deadline = t0 + DISCOVER_BUDGET_MS;
   const report: Array<Record<string, unknown>> = [];
   const id = await readPlatformIdentity(sql, userId);
-  const planCap = perSearchLimitFor(id.plan, id.isAdmin);
+  const planCap = withBonus(perSearchLimitFor(id.plan, id.isAdmin), Number(id.bonusLeads ?? 0));
   let want = clampRequestedLeads(criteria.maxResults, isUnlimitedQuota(planCap) ? ENGINE_SEARCH_CEILING : planCap);
   const pool = Math.min(discoverPoolSize({ ...criteria, maxResults: want }), ENGINE_SEARCH_CEILING);
   const depth = criteria.depth === "deep" ? "deep" : "normal";
@@ -1789,7 +1789,8 @@ export async function resumeDiscoverIfStarved(sql, userId, runId) {
 	const run = (await sql`select criteria, status, pause_requested, cancel_requested from search_runs where id = ${runId} and user_id = ${userId}`)?.[0];
 	if (!run) return false;
 	const ident = await readPlatformIdentity(sql, userId);
-	let want = clampRequestedLeads(Number(run.criteria?.maxResults ?? 100), isUnlimitedQuota(perSearchLimitFor(ident.plan, ident.isAdmin)) ? ENGINE_SEARCH_CEILING : perSearchLimitFor(ident.plan, ident.isAdmin));
+	const planCap = withBonus(perSearchLimitFor(ident.plan, ident.isAdmin), Number(ident.bonusLeads ?? 0));
+	let want = clampRequestedLeads(Number(run.criteria?.maxResults ?? 100), isUnlimitedQuota(planCap) ? ENGINE_SEARCH_CEILING : planCap);
 	const skipSeen = skipPreviouslyShown(run.criteria ?? {});
 	let kept = 0;
 	try {

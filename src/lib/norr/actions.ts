@@ -75,6 +75,7 @@ import {
   upsertBlogPost,
   pullStripePlanForUser,
   ENGINE_SEARCH_CEILING,
+  withBonus,
 } from "./platform.ts";
 import { ensureWorker } from "./worker.ts";
 import { compareEntities } from "./dedupe.ts";
@@ -173,7 +174,7 @@ import { limitedNewWarning, emptyNewLeadsMessage, skipPreviouslyShown, showEmpty
 import { runProgress, displayRunStatus } from "./progress.ts";
 import { faceRegisterDiagnosis } from "./face-diagnosis.ts";
 import { parseLeadPrefs, parseListRules } from "./prefs.ts";
-import { listPlatformUsers, createPlatformUser, giftWorkspacePlan, grantAdminByUserId } from "./admin-users.ts";
+import { listPlatformUsers, createPlatformUser, giftWorkspacePlan, grantAdminByUserId, grantWorkspaceQuota } from "./admin-users.ts";
 import {
   ensureSearchHardeningSchema,
   freezeRunRanking,
@@ -317,7 +318,7 @@ export const getBootstrap = createServerFn({ method: "POST" }).middleware([authM
       plan: identity.isAdmin ? "unlimited" : identity.plan,
       searchesUsed: identity.searchesUsed,
       searchesLimit: identity.searchesLimit,
-      perSearch: perSearchLimitFor(normalizePlanId(identity.plan), Boolean(identity.isAdmin)),
+      perSearch: withBonus(perSearchLimitFor(normalizePlanId(identity.plan), Boolean(identity.isAdmin)), Number(identity.bonusLeads ?? 0)),
       seedOpen: identity.seedOpen,
       hasStripeCustomer,
       stripeReady: stripeCheckoutReady()
@@ -2665,6 +2666,11 @@ export const adminCreateUser = createServerFn({ method: "POST" }).middleware([au
 export const adminGiftPlan = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d).handler(async ({ context, data }) => {
   const sql = await ctxSql(context);
   return giftWorkspacePlan(sql, context.userId, data?.userId, data?.plan);
+});
+
+export const adminGrantQuota = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d).handler(async ({ context, data }) => {
+  const sql = await ctxSql(context);
+  return grantWorkspaceQuota(sql, context.userId, data);
 });
 
 export const adminGrantAdmin = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d).handler(async ({ context, data }) => {
