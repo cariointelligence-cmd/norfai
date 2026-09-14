@@ -11,7 +11,7 @@ describe("hive sync", () => {
     assert.equal(contactHarvestDone({ emails: 0, phones: 2, depth: "normal" }), false);
     assert.equal(directoriesNeeded({ emails: 1, phones: 1, depth: "normal" }), false);
     assert.equal(directoriesNeeded({ emails: 0, phones: 3, depth: "normal" }), true);
-    assert.equal(contactPlan({ website: "https://acme.fi", depth: "normal" }).harvestBudget, 4);
+    assert.equal(contactPlan({ website: "https://acme.fi", depth: "normal" }).harvestBudget, 2);
   });
 
   it("ranks discover ahead of email so the cap fills first", () => {
@@ -26,7 +26,7 @@ describe("hive sync", () => {
   it("reclaims zombie running jobs and caps in-flight claims", () => {
     const src = readFileSync(new URL("./pipeline.ts", import.meta.url), "utf8");
     assert.match(src, /locked_at is null/);
-    assert.match(src, /Number\(live\) >= 4/);
+    assert.match(src, /Number\(live\) >= 8/);
     assert.match(src, /when 'discover' then 0/);
     assert.match(src, /supercrawlContacts/);
     assert.match(src, /insert into jobs \(id, user_id, run_id, company_id, type, payload\)/);

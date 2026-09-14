@@ -891,7 +891,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			} else await bumpSource(sql, userId, "hunter", "fail", { error: hun.error });
 		}
 	}
-	if (!hiveSkipFinancial(searchPlan) && bid) {
+	if (depth === "deep" && !hiveSkipFinancial(searchPlan) && bid) {
 		try {
 			const xbrl = await prhXbrlLookup(bid);
 			if (xbrl.ok && xbrl.data) {
@@ -909,7 +909,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			await recordCapability(sql, userId, companyId, "financial", "FAILED", { error: err instanceof Error ? err.message : "xbrl" });
 		}
 	}
-	if (!hiveSkipSignals(searchPlan)) {
+	if (depth === "deep" && !hiveSkipSignals(searchPlan)) {
 		try {
 			const jobs = await publicHiringSearch({ name, municipality: mun, businessId: bid });
 			if (jobs.ok && Array.isArray(jobs.data) && jobs.data.length) {
@@ -921,7 +921,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			await recordCapability(sql, userId, companyId, "signals", "FAILED", { error: err instanceof Error ? err.message : "hiring" });
 		}
 	}
-	if (site2 && !facts.emails.length) await enqueueJob(sql, userId, "crawl", {
+	if (site2 && !facts.emails.length && depth === "deep") await enqueueJob(sql, userId, "crawl", {
 		runId,
 		companyId,
 		payload: {
@@ -929,7 +929,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			seed: true
 		}
 	});
-	if (!hiveSkipSignals(searchPlan)) await enqueueJob(sql, userId, "signals", {
+	if (depth === "deep" && !hiveSkipSignals(searchPlan)) await enqueueJob(sql, userId, "signals", {
 		runId,
 		companyId
 	});
@@ -1478,7 +1478,7 @@ async function stealStaleJobs(sql, userId, runId) {
 async function claimNextJob(sql, userId, runId, opts) {
 	const skipDiscover = Boolean(opts?.skipDiscover);
 	const live = (await sql`select count(*)::int as n from jobs where user_id = ${userId} and status = ${"running"}`)[0]?.n ?? 0;
-	if (Number(live) >= 4) return null;
+	if (Number(live) >= 8) return null;
 	const job = (await sql`
     select id from jobs
     where user_id = ${userId} and status = 'queued' and run_after <= now()
@@ -1702,7 +1702,7 @@ export async function pumpSearch(sql, userId, runId) {
 		for (const [k, t] of pumpLocks) if (now - t > 60_000) pumpLocks.delete(k);
 	}
 	try { await stealStaleJobs(sql, userId, null); } catch { /* */ }
-	return processJobsFor(sql, userId, runId, { maxMs: 10_000, concurrency: 4, skipSchema: true });
+	return processJobsFor(sql, userId, runId, { maxMs: 10_000, concurrency: 8, skipSchema: true });
 }
 
 const kickLocks = new Map();

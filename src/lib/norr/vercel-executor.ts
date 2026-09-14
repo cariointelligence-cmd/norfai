@@ -87,7 +87,7 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
   if (opts.userId && opts.runId) {
     processed = await processJobsFor(sql, opts.userId, opts.runId, {
       maxMs,
-      concurrency: 4,
+      concurrency: 8,
       skipSchema: true,
     });
   } else if (opts.userId) {
@@ -97,7 +97,7 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
       order by created_at desc limit 1`;
     processed = await processJobsFor(sql, opts.userId, focus[0]?.id ?? null, {
       maxMs,
-      concurrency: 4,
+      concurrency: 8,
       skipSchema: true,
     });
     try { await processDueSchedules(sql, opts.userId); } catch { /* */ }
@@ -110,7 +110,7 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
     for (const r of focus) {
       processed += await processJobsFor(sql, r.user_id, r.id, {
         maxMs: 8_000,
-        concurrency: 4,
+        concurrency: 8,
         skipSchema: true,
       });
     }

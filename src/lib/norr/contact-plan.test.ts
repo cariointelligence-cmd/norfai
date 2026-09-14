@@ -7,7 +7,7 @@ describe("contact plan", () => {
   it("skips search engines when a website is already known", () => {
     const p = contactPlan({ website: "https://katto.fi", depth: "normal" });
     assert.equal(p.skipSearch, true);
-    assert.equal(p.harvestBudget, 4);
+    assert.equal(p.harvestBudget, 2);
     assert.equal(p.probeGuesses, false);
   });
   it("guesses domains only when the register has no website", () => {
