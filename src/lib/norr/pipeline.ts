@@ -1644,11 +1644,14 @@ export async function processJobsFor(sql, userId, runId, opts) {
 }
 
 /** Run-page pump: no schema DDL. Steal stale locks, then process this run. */
+const pumpLocks = new Map();
 export async function pumpSearch(sql, userId, runId) {
 	if (!runId || !userId) return 0;
-	try { await sql.query("SET statement_timeout TO 20000"); } catch { /* */ }
+	const now = Date.now();
+	if (now - (pumpLocks.get(runId) ?? 0) < 8_000) return 0;
+	pumpLocks.set(runId, now);
 	try { await stealStaleJobs(sql, userId, null); } catch { /* */ }
-	return processJobsFor(sql, userId, runId, { maxMs: 16_000, concurrency: 2, skipSchema: true });
+	return processJobsFor(sql, userId, runId, { maxMs: 10_000, concurrency: 2, skipSchema: true });
 }
 
 const kickLocks = new Map();

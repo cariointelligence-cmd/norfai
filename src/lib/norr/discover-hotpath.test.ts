@@ -12,10 +12,11 @@ describe("discover hot path", () => {
     assert.match(fn, /ytjDiscover/);
   });
 
-  it("pump skips schema and raises statement timeout", () => {
+  it("pump skips schema and does not pin a pooled statement_timeout", () => {
     const src = readFileSync(new URL("./pipeline.ts", import.meta.url), "utf8");
     const fn = src.slice(src.indexOf("export async function pumpSearch"), src.indexOf("export async function kickSearchExecution"));
     assert.match(fn, /skipSchema: true/);
-    assert.match(fn, /statement_timeout TO 20000/);
+    assert.doesNotMatch(fn, /SET statement_timeout/);
+    assert.match(fn, /scheduleBackground|maxMs: 10_000/);
   });
 });

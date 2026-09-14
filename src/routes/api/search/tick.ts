@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getSql } from "@/lib/db";
 import { pumpSearch } from "@/lib/norr/pipeline.ts";
+import { scheduleBackground } from "@/lib/norr/hybrid.ts";
 
 export const maxDuration = 30;
 
@@ -25,8 +26,8 @@ async function handle({ request }: { request: Request }) {
   if (!runId) return Response.json({ ok: false, processed: 0, error: "Missing runId" }, { status: 400 });
   try {
     const sql = await getSql();
-    const processed = await pumpSearch(sql, userId, runId);
-    return Response.json({ ok: true, processed });
+    scheduleBackground(() => pumpSearch(sql, userId, runId));
+    return Response.json({ ok: true, accepted: true, processed: 0 });
   } catch (err) {
     console.error("[norf] /api/search/tick", err);
     return Response.json({ ok: false, processed: 0 }, { status: 200 });

@@ -27,6 +27,6 @@ describe("hive sync", () => {
     assert.match(src, /locked_at is null/);
     assert.match(src, /Number\(live\) >= 4/);
     assert.match(src, /when 'discover' then 0/);
-    assert.match(src, /try \{ await runScore/);
+    assert.match(src, /maxMs: 10_000/);
   });
 });

@@ -164,24 +164,18 @@ function RunView() {
   useEffect(() => {
     if (runStatus !== "running" && runStatus !== "queued") return;
     let stop = false;
-    let inflight = false;
-    const pulse = async () => {
-      if (stop || inflight) return;
-      inflight = true;
-      try {
-        await fetch("/api/search/tick", {
-          method: "POST",
-          credentials: "include",
-          headers: { "content-type": "application/json", accept: "application/json" },
-          body: JSON.stringify({ runId }),
-        });
-        if (!stop) await q.refetch();
-      } finally {
-        inflight = false;
-      }
+    const pulse = () => {
+      if (stop) return;
+      void fetch("/api/search/tick", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ runId }),
+        signal: AbortSignal.timeout(4000),
+      }).catch(() => {});
     };
-    void pulse();
-    const t = setInterval(() => { void pulse(); }, 900);
+    pulse();
+    const t = setInterval(pulse, 2500);
     return () => {
       stop = true;
       clearInterval(t);
