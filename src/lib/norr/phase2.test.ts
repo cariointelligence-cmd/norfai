@@ -137,6 +137,14 @@ describe("hiring engine", () => {
     assert.equal(classifyHiring({ confirmedListings: 0, indicatedOnSite: true }), "HIRING_INDICATED");
   });
 
+  it("skips JSON-LD parse when the page has no ld+json marker", () => {
+    const fat = `${"x".repeat(80_000)}<p>no structured data</p>${"y".repeat(80_000)}`;
+    const t0 = Date.now();
+    const ld = extractJsonLd(fat);
+    assert.equal(ld.orgs.length, 0);
+    assert.ok(Date.now() - t0 < 25);
+  });
+
   it("confirms first-party JSON-LD JobPosting and rejects a different employer", () => {
     const html = `<script type="application/ld+json">{"@type":"JobPosting","title":"Myyntipäällikkö","datePosted":"2026-09-01","hiringOrganization":{"name":"Solita Oy"},"url":"https://www.solita.fi/careers/myynti"}</script>`;
     const ld = extractJsonLd(html);
@@ -453,7 +461,7 @@ describe("workspace quota is not multiplied by seats", () => {
 
 describe("build stamp", () => {
   it("is phase 2", () => {
-    assert.match(NORF_BUILD, /2026-09-13/);
+    assert.match(NORF_BUILD, /2026-09-1[34]/);
   });
 });
 

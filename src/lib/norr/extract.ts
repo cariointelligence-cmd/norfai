@@ -153,15 +153,30 @@ export function extractJsonLd(html: string): { persons: JsonLdPerson[]; orgs: Js
   const orgs: JsonLdOrg[] = [];
   const jobPostings: JsonLdJobPosting[] = [];
   const raw: unknown[] = [];
+  if (!html) return { persons, orgs, jobPostings, raw };
+  const hay = html.length > 140_000 ? html.slice(0, 80_000) + "\n" + html.slice(-40_000) : html;
+  if (!hay.includes("ld+json") && !hay.includes("LD+JSON")) return { persons, orgs, jobPostings, raw };
   const re = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
   let m: RegExpExecArray | null;
-  while ((m = re.exec(html))) {
+  let scripts = 0;
+  while (scripts < 8 && (m = re.exec(hay))) {
+    scripts += 1;
+    const body = (m[1] ?? "").trim();
+    if (body.length < 8 || body.length > 80_000) continue;
+    if (
+      !body.includes("email")
+      && !body.includes("telephone")
+      && !body.includes("Person")
+      && !body.includes("Organization")
+      && !body.includes("JobPosting")
+      && !body.includes("LocalBusiness")
+    ) continue;
     try {
-      const parsed = JSON.parse(m[1]!.replace(/[\u0000]/g, ""));
-      const nodes = Array.isArray(parsed) ? parsed : parsed["@graph"] ? parsed["@graph"] : [parsed];
+      const parsed = JSON.parse(body.replace(/[\u0000]/g, ""));
+      const nodes = Array.isArray(parsed) ? parsed : parsed && typeof parsed === "object" && parsed["@graph"] ? parsed["@graph"] : [parsed];
       for (const n of nodes) {
         if (!n || typeof n !== "object") continue;
-        raw.push(n);
+        if (raw.length < 12) raw.push(n);
         const rec = n as Record<string, unknown>;
         const type = jsonLdType(rec);
         if (/\bperson\b/.test(type)) {

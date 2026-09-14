@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-email-harvest";
+export const NORF_BUILD = "2026-09-14-jsonld-fast";
 
 export function vercelDeployProbe() {
   const env = process.env;
