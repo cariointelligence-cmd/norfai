@@ -96,6 +96,8 @@ function RunView() {
         runAgain: "Aja uudelleen",
         duplicate: "Kopioi ehdot",
         compare: "Vertaa edelliseen",
+        queueWait: "Jonossa sija {n}. Kone tekee yhden haun kerrallaan: admin, unlimited, pro, starter, ilmainen.",
+        queueActive: "Tämä haku on vuorossa. Kaikki kapasiteetti on tässä.",
       },
       en: {
         findMissing: "Find missing emails ({n})",
@@ -112,6 +114,8 @@ function RunView() {
         runAgain: "Run again",
         duplicate: "Duplicate",
         compare: "Compare with previous",
+        queueWait: "Queue position {n}. One search at a time: admin, unlimited, pro, starter, then free.",
+        queueActive: "This search is in the lane. Full capacity is on it.",
       },
       sv: {
         findMissing: "Hitta saknade e-postadresser ({n})",
@@ -128,6 +132,8 @@ function RunView() {
         runAgain: "Kör igen",
         duplicate: "Kopiera villkor",
         compare: "Jämför med föregående",
+        queueWait: "Köplats {n}. En sökning i taget: admin, unlimited, pro, starter, sedan free.",
+        queueActive: "Denna sökning körs. All kapacitet går hit.",
       },
     },
     locale,
@@ -399,6 +405,13 @@ function RunView() {
         <Pill tone={run.status === "completed" ? "good" : run.status === "failed" ? "bad" : "info"}>{run.status}</Pill>
         {run.error ? <span className="text-sm text-bad">{run.error}</span> : null}
       </div>
+      {q.data.queue && (run.status === "running" || run.status === "queued") ? (
+        <p className="text-sm text-mute">
+          {q.data.queue.active
+            ? copy.queueActive
+            : copy.queueWait.replace("{n}", String(q.data.queue.position ?? 1))}
+        </p>
+      ) : null}
       <div className="panel p-4">
         <ProgressRail
           value={progress.pct}

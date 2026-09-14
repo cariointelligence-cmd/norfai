@@ -40,6 +40,7 @@ describe("hive sync", () => {
 
   it("Face search tick actually drains jobs for the run", () => {
     const tick = readFileSync(new URL("../../routes/api/search/tick.ts", import.meta.url), "utf8");
+    assert.match(tick, /searchQueueView/);
     assert.match(tick, /processJobsFor/);
     assert.match(tick, /resumeDiscoverIfStarved/);
     assert.match(tick, /maxMs: 14_000/);

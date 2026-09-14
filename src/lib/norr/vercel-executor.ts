@@ -82,40 +82,25 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
           )`;
     }
   } catch { /* */ }
-  const maxMs = 12_000;
+  const maxMs = 14_000;
   let processed = 0;
-  if (opts.userId && opts.runId) {
-    processed = await processJobsFor(sql, opts.userId, opts.runId, {
+  const { pickFocusSearch } = await import("./search-queue.ts");
+  const focus = await pickFocusSearch(sql);
+  const targetUser = focus?.userId ?? opts.userId ?? null;
+  const targetRun = focus?.runId ?? opts.runId ?? null;
+  if (targetUser && targetRun) {
+    processed = await processJobsFor(sql, targetUser, targetRun, {
       maxMs,
       concurrency: 8,
       skipSchema: true,
     });
-  } else if (opts.userId) {
-    const focus = await sql<{ id: string }>`
-      select id from search_runs
-      where user_id = ${opts.userId} and status in ('running','queued')
-      order by created_at desc limit 1`;
-    processed = await processJobsFor(sql, opts.userId, focus[0]?.id ?? null, {
-      maxMs,
-      concurrency: 8,
-      skipSchema: true,
-    });
-    try { await processDueSchedules(sql, opts.userId); } catch { /* */ }
-  } else {
-    const focus = await sql<{ user_id: string; id: string }>`
-      select user_id, id from search_runs
-      where status in ('running','queued')
-      order by created_at desc
-      limit 3`;
-    for (const r of focus) {
-      processed += await processJobsFor(sql, r.user_id, r.id, {
-        maxMs: 8_000,
-        concurrency: 8,
-        skipSchema: true,
-      });
+    if (opts.userId && opts.userId === targetUser) {
+      try { await processDueSchedules(sql, opts.userId); } catch { /* */ }
     }
+  } else if (opts.userId) {
+    try { await processDueSchedules(sql, opts.userId); } catch { /* */ }
   }
-  const remaining = await countDueJobs(opts.userId, opts.runId);
+  const remaining = await countDueJobs(targetUser, targetRun);
   return { processed, remaining };
 }
 

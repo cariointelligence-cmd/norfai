@@ -23,15 +23,29 @@ async function handle({ request }: { request: Request }) {
   }
   if (!runId) return Response.json({ ok: false, processed: 0, error: "Missing runId" }, { status: 400 });
   let processed = 0;
+  let waiting = false;
+  let position = 1;
+  let lane: string | null = null;
+  let focusRunId = runId;
+  let focusUserId = userId;
   try {
     const { getSql } = await import("@/lib/db");
     const { processJobsFor, resumeDiscoverIfStarved } = await import("@/lib/norr/pipeline.ts");
+    const { searchQueueView } = await import("@/lib/norr/search-queue.ts");
     const sql = await getSql();
-    processed = await processJobsFor(sql, userId, runId, { maxMs: 14_000, concurrency: 8, skipSchema: true });
-    try { await resumeDiscoverIfStarved(sql, userId, runId); } catch { /* keep */ }
+    const queue = await searchQueueView(sql, userId, runId);
+    lane = queue.lane;
+    position = queue.position;
+    if (queue.focus) {
+      focusRunId = queue.focus.runId;
+      focusUserId = queue.focus.userId;
+      waiting = !queue.active;
+    }
+    processed = await processJobsFor(sql, focusUserId, focusRunId, { maxMs: 14_000, concurrency: 8, skipSchema: true });
+    try { await resumeDiscoverIfStarved(sql, focusUserId, focusRunId); } catch { /* keep */ }
   } catch (err) {
     console.warn("[norf] search.tick", err instanceof Error ? err.message : err);
   }
-  dispatchVercelExecution({ userId, runId, reason: "search.tick" });
-  return Response.json({ ok: true, accepted: true, processed });
+  dispatchVercelExecution({ userId: focusUserId, runId: focusRunId, reason: "search.tick" });
+  return Response.json({ ok: true, accepted: true, processed, waiting, position, lane });
 }

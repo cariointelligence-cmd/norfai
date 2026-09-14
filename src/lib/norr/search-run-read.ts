@@ -43,6 +43,12 @@ export async function readSearchRun(userId: string, runId: string, cursor?: stri
   const unique = companies.map((c) => ({ ...c, website: canonicalCompanyWebsite(c.website) ?? null }));
   const jobsLive = jobs.some((j: { status?: string }) => j.status === "running" || j.status === "queued");
   const viewStatus = displayRunStatus(String(run.status ?? ""), jobsLive);
+  let queue: { active: boolean; position: number; ahead: number; lane: string | null } = { active: jobsLive, position: 1, ahead: 0, lane: null };
+  try {
+    const { searchQueueView } = await import("./search-queue.ts");
+    const qv = await searchQueueView(sql, userId, runId);
+    queue = { active: qv.active, position: qv.position, ahead: qv.ahead, lane: qv.lane };
+  } catch { /* queue view optional */ }
   const missingEmail = unique.filter((c) => !c.general_email).length;
   const foundEmail = unique.filter((c) => c.general_email).length;
   const foundPhone = unique.filter((c) => c.phone).length;
@@ -58,6 +64,7 @@ export async function readSearchRun(userId: string, runId: string, cursor?: stri
     jobs,
     companies: unique,
     nextCursor: null,
+    queue,
     summary: {
       matched,
       newToYou: unique.filter((c) => !c.seen_before).length,
