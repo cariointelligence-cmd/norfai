@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-fast-attach";
+export const NORF_BUILD = "2026-09-14-no-timeout-fast";
 
 export function vercelDeployProbe() {
   const env = process.env;

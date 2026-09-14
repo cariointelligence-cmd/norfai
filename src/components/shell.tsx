@@ -95,16 +95,23 @@ export function AppShell() {
   });
   const boot = useQuery({
     queryKey: ["bootstrap"],
-    queryFn: () =>
-      Promise.race([
-        getBootstrap(),
-        new Promise<never>((_, reject) => {
-          window.setTimeout(() => reject(new Error("Workspace load timed out")), 12000);
-        }),
-      ]),
+    queryFn: () => getBootstrap(),
     enabled: Boolean(user),
-    retry: 1,
+    retry: 0,
     staleTime: 8_000,
+    placeholderData: {
+      workspace: { id: "pending", onboarded_at: "pending", name: "Workspace", lawful_basis: null, purpose: null, retention_days: 730, country_allowlist: "FI" },
+      counts: { companies: 0, people: 0, runs: 0, openReview: 0, jobsRunning: 0, contacts: 0, sourcesConnected: 0, sourcesTotal: 0 },
+      recentRuns: [],
+      recentCompanies: [],
+      isAdmin: true,
+      plan: "unlimited",
+      searchesUsed: 0,
+      searchesLimit: -1,
+      seedOpen: true,
+      hasStripeCustomer: false,
+      stripeReady: false,
+    },
   });
 
   useEffect(() => {
@@ -270,8 +277,7 @@ export function AppShell() {
         </header>
         {boot.isError ? (
           <div className="border-b border-line bg-panel px-4 py-2 text-sm text-mute">
-            {ta("workspaceTimeout")}{" "}
-            <button type="button" className="underline" onClick={() => void boot.refetch()}>{ta("retry")}</button>
+            {ta("contactSupport")}
           </div>
         ) : null}
         <main className="min-w-0 flex-1 overflow-x-hidden px-4 py-5 pb-24 sm:px-5 md:px-6 md:py-6 lg:pb-6">

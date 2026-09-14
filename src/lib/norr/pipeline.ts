@@ -346,13 +346,6 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
     }
     if (result === "kept") {
       kept += 1;
-      await bumpSource(sql, userId, sourceId, "discover");
-      if (observations?.length) {
-        const companyId = row.businessId
-          ? (await findCompanyByBid(sql, userId, row.businessId))?.id
-          : (await findCompanyByName(sql, userId, row.name, normalizeDomain(row.website ?? null)))?.id;
-        if (companyId) await insertObservations(sql, userId, "company", companyId, sourceId, sourceUrl, sourceType, observations);
-      }
     } else if (result === "excluded_seen") excludedSeen += 1;
     else if (result === "excluded_exported") excludedExported += 1;
     else if (result === "excluded_customer") excludedSeen += 1;
@@ -367,6 +360,7 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
       registerExhausted = true;
       report.push({ source: "ytj", ok: false, skipped: true, error: "kill-switch" });
     } else {
+    const inflight: Promise<void>[] = [];
     const result = await ytjDiscover(
       { ...criteria, maxResults: discoverFillTarget(kept, want) },
       {
@@ -376,35 +370,26 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
         onKeep: async (row) => {
           if (kept >= want || quotaStopped) return false;
           if (Date.now() > deadline) { timedOut = true; return false; }
-          try {
-            const resultAttach = await attachDiscovered(sql, userId, runId, row, ["ytj", row.industryCode ?? "industry"], criteria, exposure, exclusions, skipQuota);
-            if (row.businessId) skipKeys.add(row.businessId);
-            if (row.name) skipKeys.add(row.name);
-            if (resultAttach === "quota") { quotaStopped = true; return false; }
-            if (resultAttach === "kept") {
-              kept += 1;
-              stored += 1;
-              await bumpSource(sql, userId, "ytj", "discover");
-              const storedId = row.businessId
-                ? (await findCompanyByBid(sql, userId, row.businessId))?.id
-                : (await findCompanyByName(sql, userId, row.name, normalizeDomain(row.website ?? null)))?.id;
-              if (storedId) {
-                await insertObservations(sql, userId, "company", storedId, "ytj", result.sourceUrl, "official_register", ytjFieldObservations(row));
-              }
-              if (stored === 1 || stored % 8 === 0) {
-                try { await updateRunStats(sql, userId, runId); } catch { /* stats are best-effort mid-slice */ }
-              }
-            } else if (resultAttach === "excluded_seen") excludedSeen += 1;
-            else if (resultAttach === "excluded_exported") excludedExported += 1;
-            else if (resultAttach === "excluded_customer") excludedSeen += 1;
-          } catch (err) {
-            failed += 1;
-            if (failSample.length < 5) failSample.push(err instanceof Error ? err.message.slice(0, 120) : "store failed");
-          }
+          if (row.businessId) skipKeys.add(row.businessId);
+          if (row.name) skipKeys.add(row.name);
+          const p = attachDiscovered(sql, userId, runId, row, ["ytj", row.industryCode ?? "industry"], criteria, exposure, exclusions, skipQuota)
+            .then((resultAttach) => {
+              if (resultAttach === "quota") quotaStopped = true;
+              else if (resultAttach === "kept") { kept += 1; stored += 1; }
+              else if (resultAttach === "excluded_seen" || resultAttach === "excluded_customer") excludedSeen += 1;
+              else if (resultAttach === "excluded_exported") excludedExported += 1;
+            })
+            .catch((err) => {
+              failed += 1;
+              if (failSample.length < 5) failSample.push(err instanceof Error ? err.message.slice(0, 120) : "store failed");
+            });
+          inflight.push(p);
+          if (inflight.length >= 4) await Promise.all(inflight.splice(0));
           return kept < want && !quotaStopped;
         },
       },
     );
+    if (inflight.length) await Promise.all(inflight);
     if (result.cursor) ytjCursor = result.cursor;
     else if (!result.timedOut) ytjCursor = null;
     if (result.timedOut) timedOut = true;

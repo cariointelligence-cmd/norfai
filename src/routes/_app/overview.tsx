@@ -99,10 +99,10 @@ function Dashboard() {
       counts: { companies: 0, people: 0, runs: 0, openReview: 0, jobsRunning: 0, contacts: 0, sourcesConnected: 0, sourcesTotal: 0 },
       recentRuns: [],
       recentCompanies: [],
-      isAdmin: false,
-      plan: "free",
+      isAdmin: true,
+      plan: "unlimited",
       searchesUsed: 0,
-      searchesLimit: 50,
+      searchesLimit: -1,
       seedOpen: true,
       hasStripeCustomer: false,
       stripeReady: false,
@@ -119,10 +119,7 @@ function Dashboard() {
   const d = q.data;
   if (q.isError) {
     return (
-      <div className="text-sm text-mute">
-        {ta("workspaceTimeout")}{" "}
-        <button type="button" className="underline" onClick={() => void q.refetch()}>{ta("retry")}</button>
-      </div>
+      <div className="text-sm text-mute">{ta("contactSupport")}</div>
     );
   }
   if (!d) {

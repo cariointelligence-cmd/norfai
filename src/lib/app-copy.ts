@@ -53,7 +53,8 @@ const APP = {
     navGroupOps: "Toiminnot",
     navGroupAccount: "Tili",
     findPlaceholder: "Hae yritystä, henkilöä, hakua…",
-    workspaceTimeout: "Työtilan tilastot eivät ehtineet. Voit silti hakea.",
+    workspaceTimeout: "Jokin meni pieleen. Ota yhteys tukeen.",
+    contactSupport: "Jokin meni pieleen. Ota yhteys tukeen.",
   },
   en: {
     navOverview: "Overview",
@@ -107,7 +108,8 @@ const APP = {
     navGroupOps: "Operations",
     navGroupAccount: "Account",
     findPlaceholder: "Find a company, person, search…",
-    workspaceTimeout: "Workspace stats timed out. You can still search.",
+    workspaceTimeout: "Something went wrong. Contact support.",
+    contactSupport: "Something went wrong. Contact support.",
   },
   sv: {
     navOverview: "Översikt",
@@ -161,7 +163,8 @@ const APP = {
     navGroupOps: "Drift",
     navGroupAccount: "Konto",
     findPlaceholder: "Sök företag, person, sökning…",
-    workspaceTimeout: "Arbetsytans statistik tog för lång tid. Du kan ändå söka.",
+    workspaceTimeout: "Något gick fel. Kontakta supporten.",
+    contactSupport: "Något gick fel. Kontakta supporten.",
   },
 } as const;
 
