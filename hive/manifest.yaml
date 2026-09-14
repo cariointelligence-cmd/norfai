@@ -43,6 +43,8 @@ layers:
     - src/lib/norr/targeting
     - src/lib/norr/engines.ts
     - src/lib/norr/sources/register-plan.ts
+    - src/lib/norr/hive-llm.ts
+    - src/lib/norr/junk-hosts.ts
   nerve:
     - src/lib/norr/pipeline.ts
     - src/lib/norr/worker.ts

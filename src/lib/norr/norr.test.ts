@@ -1,5 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { identityLooksForeign, applyLlmVerdict, llmFilterIdentity } from "./hive-llm.ts";
 import { extractEmails, isJunkEmail, isBillingEmail, isRecruitingEmail, validEmailSyntax, decodeCfEmail, inferGeneralMailbox, inferPersonMailbox, emailMatchesPerson, websiteFromPublishedEmail, websiteFromPublishedEmails, isConsumerMailboxDomain, emailBelongsToCompany, needsEmailRecovery } from "./contacts.ts";
 import { extractPeopleFromHtml, extractPageContacts, plausiblePersonName, cleanPersonName, decodeHtmlEntities } from "./extract.ts";
 import { businessIdChecksumOk, normalizeBusinessId, normalizeDomain, normalizeName, toVatId, fromVatId, canonicalCompanyWebsite, isJunkCompanyWebsite, storedWebsiteUnusable } from "./normalize.ts";
@@ -1005,6 +1006,40 @@ describe("contacts hygiene", () => {
     assert.equal(needsEmailRecovery("heidi.antinkari@almamedia.fi", { name: "Takoa Invest Oy" }), true);
     assert.equal(needsEmailRecovery("anni.hyokyvaara@toc.fi", { name: "The Orange Company Oy", website: "https://www.toc.fi" }), false);
     assert.equal(needsEmailRecovery(null, { name: "Takoa Invest Oy" }), true);
+  });
+});
+
+describe("hive llm filter", () => {
+  it("flags media and directory identity as foreign", () => {
+    assert.equal(identityLooksForeign({ name: "Basemedia Oy", website: "https://www.iltalehti.fi", emails: ["il.toimitus@iltalehti.fi"] }), true);
+    assert.equal(identityLooksForeign({ name: "Roditec Oy", website: "https://roditec.net", emails: ["roditec@roditec.net"] }), false);
+  });
+  it("applies drop lists without inventing replacements", () => {
+    const out = applyLlmVerdict({
+      website: "https://www.iltalehti.fi",
+      emails: [{ value: "il.toimitus@iltalehti.fi" }, { value: "info@basemedia.net" }],
+      phones: [{ value: "+35810665100" }],
+      people: [{ fullName: "Ahlstrand Kennet" }],
+      verdict: {
+        dropWebsite: true,
+        dropEmails: ["il.toimitus@iltalehti.fi"],
+        dropPhones: ["+35810665100"],
+        dropPeople: [],
+        reason: "news leak",
+        used: true,
+      },
+    });
+    assert.equal(out.website, null);
+    assert.deepEqual(out.emails.map((e) => e.value), ["info@basemedia.net"]);
+    assert.equal(out.phones.length, 0);
+    assert.equal(out.people.length, 1);
+  });
+  it("does not call xAI without a key", async () => {
+    const prev = process.env.XAI_API_KEY;
+    delete process.env.XAI_API_KEY;
+    const v = await llmFilterIdentity({ name: "Basemedia Oy", website: "https://www.iltalehti.fi", emails: ["il.toimitus@iltalehti.fi"] });
+    if (prev) process.env.XAI_API_KEY = prev;
+    assert.equal(v, null);
   });
 });
 

@@ -47,6 +47,7 @@ import { northdataLookup } from "./sources/northdata.ts";
 import { supercrawlContacts } from "./sources/contact-supercrawl.ts";
 import { linkedinLookup } from "./sources/linkedin.ts";
 import { grokBudgetRemaining, grokContactSearch } from "./sources/groksearch.ts";
+import { llmFilterIdentity, applyLlmVerdict } from "./hive-llm.ts";
 import { federatedCompanySearch } from "./sources/discovery.ts";
 import { homemadeRegisterDiscover } from "./sources/directories.ts";
 import { acceptDiscovered, looksLikeCompanyName } from "./sources/register-gate.ts";
@@ -599,20 +600,20 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			const drop = stored.filter((r) => (r.kind === "email" && isJunkEmail(r.value)) || (r.kind === "phone" && isJunkCompanyPhone(r.value))).map((r) => r.id);
 			if (drop.length) await sql`delete from contacts where user_id = ${userId} and company_id = ${companyId} and id = any(${drop})`;
 		} catch { /* keep persist going */ }
+		const src = hits.websiteSource ?? "website";
+		let incoming = hits.website ? canonicalCompanyWebsite(hits.website) : null;
 		if (hits.website) {
-			const incoming = canonicalCompanyWebsite(hits.website);
 			if (incoming && !isDirectoryHost(incoming)) await sql`update companies set website = ${incoming}, website_domain = ${normalizeDomain(incoming)} where id = ${companyId} and user_id = ${userId}`;
 			else if (isJunkCompanyWebsite(hits.website) || isDirectoryHost(hits.website)) {
 				await sql`update companies set website = null, website_domain = null
           where id = ${companyId} and user_id = ${userId}`;
+				incoming = null;
 			}
 			else if (!incoming && /closed\.html?/i.test(hits.website)) await sql`update companies set website = null, website_domain = null
           where id = ${companyId} and user_id = ${userId}
             and (website is null or website ~* 'closed\\.html?')`;
 		}
-		const src = hits.websiteSource ?? "website";
 		const people = (hits.people ?? []).slice(0, 12);
-		if (people.length) await Promise.all(people.map((p) => upsertPerson(sql, userId, companyId, p)));
 		const seenMail = new Set();
 		const emails = [];
 		const siteForMail = canonicalCompanyWebsite(hits.website) ?? canonicalCompanyWebsite(loadedCo?.website) ?? null;
@@ -631,8 +632,40 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			seenPhone.add(k);
 			phones.push(p);
 		}
+		let websiteOut = incoming ?? null;
+		let emailsOut = emails;
+		let phonesOut = phones;
+		let peopleOut = people;
+		try {
+			const judged = await llmFilterIdentity({
+				name,
+				businessId: bid,
+				website: websiteOut || siteForMail,
+				emails: emailsOut.map((e) => e.value),
+				phones: phonesOut.map((p) => p.value),
+				people: peopleOut.map((p) => p.fullName ?? p.full_name ?? ""),
+			});
+			const applied = applyLlmVerdict({
+				website: websiteOut,
+				emails: emailsOut,
+				phones: phonesOut,
+				people: peopleOut,
+				verdict: judged,
+			});
+			websiteOut = applied.website;
+			emailsOut = applied.emails;
+			phonesOut = applied.phones;
+			peopleOut = applied.people;
+			if (judged?.dropWebsite && websiteOut == null) {
+				await sql`update companies set website = null, website_domain = null where id = ${companyId} and user_id = ${userId}`;
+			}
+		} catch { /* deterministic persist still runs */ }
+		if (websiteOut && websiteOut !== incoming) {
+			await sql`update companies set website = ${websiteOut}, website_domain = ${normalizeDomain(websiteOut)} where id = ${companyId} and user_id = ${userId}`;
+		}
+		if (peopleOut.length) await Promise.all(peopleOut.map((p) => upsertPerson(sql, userId, companyId, p)));
 		await Promise.all([
-			...emails.map((e) => upsertContact(sql, userId, companyId, {
+			...emailsOut.map((e) => upsertContact(sql, userId, companyId, {
 				kind: "email",
 				value: e.value,
 				classification: e.classification,
@@ -641,7 +674,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 				evidence: e.evidence ?? "Public page",
 				confidence: e.confidence
 			}, { skipRefresh: true })),
-			...phones.map((p) => upsertContact(sql, userId, companyId, {
+			...phonesOut.map((p) => upsertContact(sql, userId, companyId, {
 				kind: "phone",
 				value: p.value,
 				classification: "published",
@@ -651,7 +684,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 				confidence: p.confidence
 			}, { skipRefresh: true })),
 		]);
-		if (emails.length || phones.length) await refreshCompanyContactFields(sql, userId, companyId);
+		if (emailsOut.length || phonesOut.length) await refreshCompanyContactFields(sql, userId, companyId);
 	};
 	const loadedCo = await loadCompany(sql, userId, companyId);
 	if (loadedCo?.website && (isJunkCompanyWebsite(loadedCo.website) || isDirectoryHost(loadedCo.website))) {
@@ -876,6 +909,22 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		if (nd.profile.businessId) await sql`update companies set business_id = coalesce(business_id, ${nd.profile.businessId}) where id = ${companyId} and user_id = ${userId}`;
 		await harvestNewSite(nd.profile.website, "northdata");
 		await bumpSource(sql, userId, "northdata", "enrich", { confidence: 80 });
+	}
+	if (emailRecovery && facts.emails.length < 1 && grokBudgetRemaining() > 0) {
+		try {
+			const grok = await grokContactSearch({ name, businessId: bid, municipality: mun });
+			if (grok.observations.length) await insertObservations(sql, userId, "company", companyId, "grok_search", grok.website ?? void 0, "search_api", grok.observations);
+			if (grok.used) {
+				await persistHits({
+					website: grok.website,
+					websiteSource: "grok_search",
+					people: grok.people,
+					emails: grok.emails,
+					phones: grok.phones,
+				});
+				if (grok.emails?.length) facts.emails.push(...grok.emails);
+			}
+		} catch { /* last-resort only */ }
 	}
 	if (emailRecovery) return;
 	if (depth === "deep") {
