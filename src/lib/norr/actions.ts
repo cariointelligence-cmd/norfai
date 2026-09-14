@@ -81,7 +81,7 @@ import { compareEntities } from "./dedupe.ts";
 import { isRecruitingEmail, isBillingEmail, isJunkEmail, emailBelongsToCompany, needsEmailRecovery } from "./contacts.ts";
 import { isJunkCompanyPhone } from "./phones.ts";
 import { cleanPersonName } from "./extract.ts";
-import { rowsToCsv, rowsToXlsx, rowsToCrmCsv } from "./exporters.ts";
+import { rowsToCsv, rowsToXlsx, rowsToCrmCsv, projectCsvRows } from "./exporters.ts";
 import { interpretTargetPrompt, applyPresetToCriteria } from "./targeting/parser.ts";
 import { OPPORTUNITY_PRESETS } from "./targeting/spec.ts";
 import { normalizeBusinessId, normalizeDomain, isJunkCompanyWebsite } from "./normalize.ts";
