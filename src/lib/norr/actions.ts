@@ -78,7 +78,7 @@ import {
 } from "./platform.ts";
 import { ensureWorker } from "./worker.ts";
 import { compareEntities } from "./dedupe.ts";
-import { isRecruitingEmail, isBillingEmail, isJunkEmail } from "./contacts.ts";
+import { isRecruitingEmail, isBillingEmail, isJunkEmail, emailBelongsToCompany, needsEmailRecovery } from "./contacts.ts";
 import { cleanPersonName } from "./extract.ts";
 import { rowsToCsv, rowsToXlsx, rowsToCrmCsv } from "./exporters.ts";
 import { interpretTargetPrompt, applyPresetToCriteria } from "./targeting/parser.ts";
@@ -803,15 +803,16 @@ export const reEnrichCompanies = createServerFn({ method: "POST" }).middleware([
     if (!owned[0]) return { ok: false, error: "Search not found", queued: 0, runId: null };
     const cap = runReenrichCap();
     rows = await sql`
-      select c.id, c.website
+      select c.id, c.website, c.general_email, c.name
       from run_companies rc
       join companies c on c.id = rc.company_id
       where rc.user_id = ${context.userId} and rc.run_id = ${existingRunId}
         and c.user_id = ${context.userId} and c.deleted_at is null
-        and (${data.missingOnly === false ? 1 : 0} = 1
-          or c.general_email is null)
       order by rc.rank_position nulls last, c.updated_at desc
       limit ${cap}`;
+    if (data.missingOnly !== false) {
+      rows = rows.filter((c) => needsEmailRecovery(c.general_email, { name: c.name, website: c.website }));
+    }
     targetRunId = existingRunId;
   } else if (ids.length) {
     rows = [];
@@ -842,6 +843,11 @@ export const reEnrichCompanies = createServerFn({ method: "POST" }).middleware([
       await sql`update companies set website = null, website_domain = null, updated_at = now()
         where id = ${row.id} and user_id = ${context.userId}`;
     }
+    if (needsEmailRecovery(row.general_email, { name: row.name, website: row.website })) {
+      await sql`update companies set general_email = null, general_email_class = null, updated_at = now()
+        where id = ${row.id} and user_id = ${context.userId}
+          and (general_email is not null)`;
+    }
     if (!targetRunId) {
       await sql`insert into run_companies (user_id, run_id, company_id, match_reasons, is_new)
         values (${context.userId}, ${runId}, ${row.id}, ${JSON.stringify(["re-enrich"])}::jsonb, ${false})
@@ -850,11 +856,9 @@ export const reEnrichCompanies = createServerFn({ method: "POST" }).middleware([
     await enqueueJob(sql, context.userId, "email", { runId, companyId: row.id });
   }
   dispatchVercelExecution({ userId: context.userId, runId, reason: "email.recovery" });
-  try {
-    await processJobsFor(sql, context.userId, runId, { maxMs: interactiveBudgetMs("enrich"), concurrency: 16, skipDiscover: true });
-  } catch (err) {
+  void processJobsFor(sql, context.userId, runId, { maxMs: interactiveBudgetMs("enrich"), concurrency: 16, skipDiscover: true }).catch((err) => {
     console.warn("[norf] reenrich tick", err);
-  }
+  });
   await updateRunStats(sql, context.userId, runId);
   await audit(sql, context.userId, "search.reenrich", "search_run", runId, { queued: rows.length, existingRun: Boolean(targetRunId) });
   return { ok: true, queued: rows.length, runId };

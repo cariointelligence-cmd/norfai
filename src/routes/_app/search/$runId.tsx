@@ -187,6 +187,13 @@ function RunView() {
       }
       toast.message(copy.queued.replace("{n}", String(r.queued)));
       void q.refetch();
+      void fetch("/api/search/tick", {
+        method: "POST",
+        credentials: "include",
+        headers: { "content-type": "application/json", accept: "application/json" },
+        body: JSON.stringify({ runId }),
+        signal: AbortSignal.timeout(25000),
+      }).catch(() => {});
     },
     onError: () => toast.error("Re-enrich was refused."),
   });
@@ -371,8 +378,9 @@ function RunView() {
           <Button variant="secondary" onClick={() => void runAgain()}>{copy.runAgain}</Button>
           <Button variant="secondary" onClick={() => duplicate()}>{copy.duplicate}</Button>
           <Button
+            type="button"
             variant="secondary"
-            disabled={enrich.isPending || emailQueued > 0}
+            disabled={enrich.isPending}
             onClick={() => enrich.mutate()}
           >
             {missingEmail > 0 ? copy.findMissing.replace("{n}", String(missingEmail)) : copy.searchAgain}

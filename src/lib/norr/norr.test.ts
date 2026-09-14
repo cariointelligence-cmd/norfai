@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { extractEmails, isJunkEmail, isBillingEmail, isRecruitingEmail, validEmailSyntax, decodeCfEmail, inferGeneralMailbox, inferPersonMailbox, emailMatchesPerson, websiteFromPublishedEmail, websiteFromPublishedEmails, isConsumerMailboxDomain, emailBelongsToCompany } from "./contacts.ts";
+import { extractEmails, isJunkEmail, isBillingEmail, isRecruitingEmail, validEmailSyntax, decodeCfEmail, inferGeneralMailbox, inferPersonMailbox, emailMatchesPerson, websiteFromPublishedEmail, websiteFromPublishedEmails, isConsumerMailboxDomain, emailBelongsToCompany, needsEmailRecovery } from "./contacts.ts";
 import { extractPeopleFromHtml, extractPageContacts, plausiblePersonName, cleanPersonName, decodeHtmlEntities } from "./extract.ts";
 import { businessIdChecksumOk, normalizeBusinessId, normalizeDomain, normalizeName, toVatId, fromVatId, canonicalCompanyWebsite, isJunkCompanyWebsite, storedWebsiteUnusable } from "./normalize.ts";
 import { isDirectoryHost } from "./sources/webdiscover.ts";
@@ -990,6 +990,9 @@ describe("contacts hygiene", () => {
     assert.equal(emailBelongsToCompany("heidi.antinkari@almamedia.fi", { name: "Takoa Invest Oy" }), false);
     assert.equal(canonicalCompanyWebsite("https://www.almainights.fi"), null);
     assert.equal(isJunkCompanyWebsite("https://www.almainights.fi"), true);
+    assert.equal(needsEmailRecovery("heidi.antinkari@almamedia.fi", { name: "Takoa Invest Oy" }), true);
+    assert.equal(needsEmailRecovery("anni.hyokyvaara@toc.fi", { name: "The Orange Company Oy", website: "https://www.toc.fi" }), false);
+    assert.equal(needsEmailRecovery(null, { name: "Takoa Invest Oy" }), true);
   });
 });
 

@@ -174,6 +174,15 @@ export function emailBelongsToCompany(
   return false;
 }
 
+export function needsEmailRecovery(
+  email: string | null | undefined,
+  opts: { name?: string | null; website?: string | null },
+): boolean {
+  if (!email || !String(email).trim()) return true;
+  if (isJunkEmail(email) || isBillingEmail(email) || isRecruitingEmail(email)) return true;
+  return !emailBelongsToCompany(email, opts);
+}
+
 export function isBillingEmail(email: string): boolean {
   const v = email.toLowerCase().trim();
   const local = v.split("@")[0] ?? "";
