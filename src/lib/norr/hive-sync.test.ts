@@ -36,7 +36,8 @@ describe("hive sync", () => {
     assert.ok(finderPersist > 0 && rec > finderPersist);
     assert.match(src, /insert into jobs \(id, user_id, run_id, company_id, type, payload\)/);
     assert.doesNotMatch(src.slice(src.indexOf("async function attachDiscovered"), src.indexOf("export async function runDiscover")), /insertCompany\(/);
-    assert.match(src, /Number\(live\) >= 16/);
+    assert.match(src, /discoverSlots/);
+    assert.match(src, /skipDiscover = opts\?\.skipDiscover \|\| discoverSlots <= 0/);
     assert.doesNotMatch(src, /emailOnly/);
   });
 

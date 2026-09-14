@@ -91,7 +91,11 @@ export function runProgressFromCounts(
   };
 }
 
-export function runProgress(jobs: JobLite[] | null | undefined, runStatus: string): ReturnType<typeof runProgressFromCounts> {
+export function runProgress(
+  jobs: JobLite[] | null | undefined,
+  runStatus: string,
+  hint?: { matched?: number; want?: number },
+): ReturnType<typeof runProgressFromCounts> {
   const map = new Map<string, number>();
   for (const j of jobs ?? []) {
     const k = `${j.type || "score"}\t${j.status || ""}`;
@@ -102,7 +106,21 @@ export function runProgress(jobs: JobLite[] | null | undefined, runStatus: strin
     const [type, status] = k.split("\t");
     counts.push({ type, status, n });
   }
-  return runProgressFromCounts(counts, runStatus);
+  const base = runProgressFromCounts(counts, runStatus);
+  const matched = Math.max(0, Number(hint?.matched ?? 0));
+  if (matched > 0 && base.running && (base.stage === "discover" || base.done === 0)) {
+    const want = Math.max(Number(hint?.want ?? 0), matched);
+    const fill = Math.min(90, Math.round(18 + (72 * matched) / Math.max(want, 1)));
+    return {
+      ...base,
+      stage: "enrich",
+      label: want > matched ? `Found ${matched} of ${want}` : `Found ${matched}`,
+      pct: Math.max(base.pct, fill),
+      done: Math.max(base.done, matched),
+      total: Math.max(base.total, want),
+    };
+  }
+  return base;
 }
 
 void TERMINAL;

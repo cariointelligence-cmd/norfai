@@ -61,8 +61,9 @@ export async function readSearchRun(userId: string, runId: string, cursor?: stri
   const foundEmail = unique.filter((c) => c.general_email).length;
   const foundPhone = unique.filter((c) => c.phone).length;
   const foundDecisionMaker = unique.filter((c) => c.decision_maker).length;
-  const progress = runProgress(jobs, viewStatus);
   const matched = Number(run.new_leads_count ?? 0) + Number(run.previously_seen_count ?? 0) || unique.length;
+  const want = Number((run.criteria as { maxResults?: number } | undefined)?.maxResults ?? 0) || unique.length;
+  const progress = runProgress(jobs, viewStatus, { matched, want });
 
   return {
     ok: true as const,

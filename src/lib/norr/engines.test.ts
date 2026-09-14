@@ -101,4 +101,17 @@ describe("search progress rail", () => {
     assert.equal(displayRunStatus("queued", true), "running");
     assert.equal(displayRunStatus("running", false), "running");
   });
+  it("matched companies move the rail off fake 45% registers", () => {
+    const p = runProgress(
+      [
+        { type: "discover", status: "running" },
+        ...Array.from({ length: 16 }, () => ({ type: "enrich", status: "queued" as const })),
+      ],
+      "running",
+      { matched: 16, want: 1000 },
+    );
+    assert.equal(p.stage, "enrich");
+    assert.match(p.label, /Found 16 of 1000/);
+    assert.ok(p.done >= 16);
+  });
 });

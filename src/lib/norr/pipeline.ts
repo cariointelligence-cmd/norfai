@@ -1729,8 +1729,11 @@ export async function processJobsFor(sql, userId, runId, opts) {
 	let processed = 0;
 	let emptyWaves = 0;
 	const running = new Set();
+	let discoverSlots = opts?.skipDiscover ? 0 : 1;
 	const launch = () => {
-		const task = processNextJob(sql, userId, runId, opts).then((r) => {
+		const skipDiscover = opts?.skipDiscover || discoverSlots <= 0;
+		if (!skipDiscover) discoverSlots -= 1;
+		const task = processNextJob(sql, userId, runId, { ...opts, skipDiscover }).then((r) => {
 			running.delete(task);
 			return r;
 		});
