@@ -66,7 +66,7 @@ export function parseDirectoryContactHtml(html: string, sourceUrl: string, sourc
   return { emails, phones, people, website, sourceUrl, sourceId };
 }
 
-async function fetchHtml(url: string, timeoutMs = 2500): Promise<string | null> {
+async function fetchHtml(url: string, timeoutMs = 1800): Promise<string | null> {
   try {
     const res = await safeFetch(url, {
       timeoutMs,

@@ -344,7 +344,7 @@ async function harvestSiteLive(
   const emails: ContactHit[] = [];
   const phones: ContactHit[] = [];
   const people: PersonHit[] = [];
-  let home = await fetchPage(origin, opts.depth === "deep" ? 6000 : 2800);
+  let home = await fetchPage(origin, opts.depth === "deep" ? 6000 : 1800);
   if (!home.ok && opts.depth === "deep" && playwrightAvailable()) {
     const rendered = await fetchRendered(origin, { waitMs: 800, timeoutMs: 9000 });
     if (rendered.ok) home = { ok: true, url: rendered.url ?? origin, html: rendered.html, status: 200 };
@@ -396,7 +396,7 @@ async function harvestSiteLive(
     } catch { return false; }
   }).slice(0, budget);
 
-  const pages = await poolMap(urls, 4, async (url) => fetchPage(url, 2200));
+  const pages = await poolMap(urls, 4, async (url) => fetchPage(url, 1800));
   for (const page of pages) {
     if (!page.ok) continue;
     const contacts = extractPageContacts(page.html, page.url);

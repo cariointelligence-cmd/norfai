@@ -428,12 +428,22 @@ async function fillFromQuery(
   const sliceEnd = ytjSliceEnd(cursor);
   let deadBatches = 0;
   let liveThisQuery = 0;
+  let pending: Promise<Awaited<ReturnType<typeof ytjSearchQueryRetry>>[]> | null = null;
   while (cursor < sliceEnd && (onKeep || kept.length < maxWanted)) {
     if (deadline && Date.now() > deadline) return { ok: true, total, timedOut: true, nextPage: cursor, drained: false, filtered };
     const liveBefore = liveThisQuery;
-    const pages = await Promise.all(
-      Array.from({ length: BATCH }, (_, i) => ytjSearchQueryRetry(q, pageSize, cursor + i)),
-    );
+    const pages = pending
+      ? await pending
+      : await Promise.all(
+        Array.from({ length: BATCH }, (_, i) => ytjSearchQueryRetry(q, pageSize, cursor + i)),
+      );
+    if (cursor + BATCH < sliceEnd) {
+      pending = Promise.all(
+        Array.from({ length: BATCH }, (_, i) => ytjSearchQueryRetry(q, pageSize, cursor + BATCH + i)),
+      );
+    } else {
+      pending = null;
+    }
     let anyRaw = false;
     let rateLimited = false;
     let okPages = 0;

@@ -593,25 +593,27 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
             and (website is null or website ~* 'closed\\.html?')`;
 		}
 		const src = hits.websiteSource ?? "website";
-		for (const p of hits.people ?? []) await upsertPerson(sql, userId, companyId, p);
-		for (const e of hits.emails ?? []) await upsertContact(sql, userId, companyId, {
-			kind: "email",
-			value: e.value,
-			classification: e.classification,
-			sourceId: e.sourceId ?? src,
-			sourceUrl: e.sourceUrl ?? void 0,
-			evidence: e.evidence ?? "Public page",
-			confidence: e.confidence
-		});
-		for (const p of hits.phones ?? []) await upsertContact(sql, userId, companyId, {
-			kind: "phone",
-			value: p.value,
-			classification: "published",
-			sourceId: p.sourceId ?? src,
-			sourceUrl: p.sourceUrl ?? void 0,
-			evidence: p.evidence ?? "Public page",
-			confidence: p.confidence
-		});
+		await Promise.all([
+			...(hits.people ?? []).map((p) => upsertPerson(sql, userId, companyId, p)),
+			...(hits.emails ?? []).map((e) => upsertContact(sql, userId, companyId, {
+				kind: "email",
+				value: e.value,
+				classification: e.classification,
+				sourceId: e.sourceId ?? src,
+				sourceUrl: e.sourceUrl ?? void 0,
+				evidence: e.evidence ?? "Public page",
+				confidence: e.confidence
+			})),
+			...(hits.phones ?? []).map((p) => upsertContact(sql, userId, companyId, {
+				kind: "phone",
+				value: p.value,
+				classification: "published",
+				sourceId: p.sourceId ?? src,
+				sourceUrl: p.sourceUrl ?? void 0,
+				evidence: p.evidence ?? "Public page",
+				confidence: p.confidence
+			})),
+		]);
 	};
 	const site = canonicalCompanyWebsite((await loadCompany(sql, userId, companyId))?.website);
 	const facts = await collectFastContacts({

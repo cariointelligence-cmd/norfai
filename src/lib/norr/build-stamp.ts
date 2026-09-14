@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-enrich-burst";
+export const NORF_BUILD = "2026-09-14-prefetch";
 
 export function vercelDeployProbe() {
   const env = process.env;
