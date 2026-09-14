@@ -620,7 +620,14 @@ export async function collectFastContacts(opts: {
       websiteSource = null;
     }
     try {
-      const hyper = await hypercrawlSite({ website, country: opts.country, companyName: opts.name });
+      const hyper = await hypercrawlSite({
+        website,
+        country: opts.country,
+        companyName: opts.name,
+        skipHome: true,
+        haveEmail: emails.length > 0,
+        havePhone: phones.length > 0,
+      });
       mergeUniqueEmails(emails, hyper.emails);
       mergeUniquePhones(phones, hyper.phones);
       mergeUniquePeople(people, hyper.people);

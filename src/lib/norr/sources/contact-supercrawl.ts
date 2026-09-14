@@ -8,7 +8,9 @@ import { extractJsonLd, extractPeopleFromHtml } from "../extract.ts";
 import { canonicalCompanyWebsite, normalizePhone } from "../normalize.ts";
 import { BROWSER_UA, safeFetch } from "../ssrf.ts";
 import { isDirectoryHost } from "./webdiscover.ts";
-import { countryEnv, nationOf } from "../countries/env.ts";
+import { nationOf } from "../countries/env.ts";
+import { cacheGet, cacheSet, cacheKey, CACHE_TTL } from "../intel-cache.ts";
+import { swedenHelper, norwayHelper } from "./nation-helpers.ts";
 
 export type SuperCrawlHits = {
   emails: ContactHit[];
@@ -119,16 +121,13 @@ async function supercrawlLive(opts: {
   const name = opts.name.trim();
   if (name.length < 2) return { ...EMPTY };
   const nation = nationOf(opts.country);
-  if (nation !== "FI") {
-    const env = countryEnv(nation);
-    const q = encodeURIComponent([name, opts.municipality].filter(Boolean).join(" "));
-    const primary: Array<{ url: string; id: string }> = nation === "SE"
-      ? [{ url: `https://www.allabolag.se/what/${q}`, id: "bolagsverket" }]
-      : [{ url: `https://data.brreg.no/enhetsregisteret/oppslag/enheter?skipsok=false&navn=${q}`, id: "brreg" }];
-    const pages = await Promise.all(primary.map((u) => fetchParse(u.url, u.id)));
-    const out: SuperCrawlHits = { emails: [], phones: [], people: [], website: null, sourceUrl: null, sourceId: `${env.nation}-supercrawl` };
-    for (const p of pages) mergeHits(out, p);
-    return out;
+  if (nation === "SE") {
+    const h = await swedenHelper({ name, municipality: opts.municipality });
+    return { emails: h.emails, phones: h.phones, people: h.people, website: h.website, sourceUrl: null, sourceId: h.sourceId };
+  }
+  if (nation === "NO") {
+    const h = await norwayHelper({ name, municipality: opts.municipality });
+    return { emails: h.emails, phones: h.phones, people: h.people, website: h.website, sourceUrl: null, sourceId: h.sourceId };
   }
   const q = encodeURIComponent([name, opts.municipality].filter(Boolean).join(" "));
   const bid = (opts.businessId ?? "").replace(/\s/g, "");

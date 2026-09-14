@@ -2,6 +2,8 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { countryEnv, sourcesAllowedFor } from "./countries/env.ts";
 import { attachDecisionContacts, isDecisionTitle } from "./sources/decision-contacts.ts";
+import { scoreCountryPath, countryLinksFromHtml } from "./sources/hypercrawl.ts";
+import { parseAllabolagCard } from "./sources/nation-helpers.ts";
 import { workLanes } from "./progress.ts";
 import { identityLooksForeign, applyLlmVerdict, llmFilterIdentity } from "./hive-llm.ts";
 import { extractEmails, isJunkEmail, isBillingEmail, isRecruitingEmail, validEmailSyntax, decodeCfEmail, inferGeneralMailbox, inferPersonMailbox, emailMatchesPerson, websiteFromPublishedEmail, websiteFromPublishedEmails, isConsumerMailboxDomain, emailBelongsToCompany, needsEmailRecovery } from "./contacts.ts";
@@ -1070,6 +1072,27 @@ describe("country isolation and decision contacts", () => {
       website: "https://aura.fi",
     });
     assert.equal(people[0]?.workEmail, "matti.virtanen@aura.fi");
+  });
+  it("scores Finnish contact paths above Swedish ones for FI crawls", () => {
+    assert.ok(scoreCountryPath("/yhteystiedot", "FI") > scoreCountryPath("/ledning", "FI"));
+    assert.ok(scoreCountryPath("/kontakt", "SE") >= 10);
+    assert.ok(scoreCountryPath("/privacy", "FI") < 0);
+    const links = countryLinksFromHtml(
+      `<a href="/yhteystiedot">x</a><a href="https://evil.se/kontakt">no</a><a href="/tiimi">t</a>`,
+      "https://aura.fi",
+      "FI",
+    );
+    assert.ok(links.some((u) => u.includes("/yhteystiedot")));
+    assert.equal(links.some((u) => u.includes("evil.se")), false);
+  });
+  it("does not keep Allabolag mailbox as a company email", () => {
+    const card = parseAllabolagCard(`<a href="mailto:info@volvo.se">x</a><a href="mailto:support@allabolag.se">y</a><a href="https://www.volvo.se">s</a>`, "https://www.allabolag.se/5560360793");
+    assert.ok(card.emails.some((e) => e.value === "info@volvo.se"));
+    assert.equal(card.emails.some((e) => e.value.includes("allabolag")), false);
+    assert.equal(card.website, "https://www.volvo.se");
+  });
+  it("drops maventa scan mailboxes as billing", () => {
+    assert.equal(isBillingEmail("fi-04965811@scan.maventa.com"), true);
   });
   it("exposes four simple work lanes", () => {
     const lanes = workLanes(

@@ -30,8 +30,8 @@ const FI: CountryEnv = {
   acceptLanguage: "fi-FI,fi;q=0.9,en;q=0.4",
   phoneRegion: "FI",
   sitePaths: [
-    "/yhteystiedot", "/tiimi", "/johto", "/hallitus", "/meista", "/meistä",
-    "/contact", "/henkilosto", "/henkilöstö", "/yritys",
+    "/yhteystiedot", "/fi/yhteystiedot", "/tiimi", "/johto", "/hallitus",
+    "/henkilosto", "/contact", "/en/contact",
   ],
 };
 
@@ -44,8 +44,8 @@ const SE: CountryEnv = {
   acceptLanguage: "sv-SE,sv;q=0.9,en;q=0.4",
   phoneRegion: "SE",
   sitePaths: [
-    "/kontakt", "/kontakta-oss", "/om-oss", "/ledning", "/ledningen",
-    "/styrelsen", "/medarbetare", "/personal", "/om",
+    "/kontakt", "/sv/kontakt", "/kontakta-oss", "/om-oss", "/ledning",
+    "/styrelsen", "/medarbetare",
   ],
 };
 
@@ -58,8 +58,7 @@ const NO: CountryEnv = {
   acceptLanguage: "nb-NO,nb;q=0.9,no;q=0.8,en;q=0.4",
   phoneRegion: "NO",
   sitePaths: [
-    "/kontakt", "/kontakt-oss", "/om-oss", "/ledelsen", "/ledelse",
-    "/styret", "/ansatte", "/om", "/personer",
+    "/kontakt", "/kontakt-oss", "/om-oss", "/ledelsen", "/styret", "/ansatte", "/no/kontakt",
   ],
 };
 

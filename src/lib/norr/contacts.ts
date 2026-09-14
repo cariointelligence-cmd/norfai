@@ -15,7 +15,7 @@ const PREFERRED_ROLE_LOCAL = new Set([
   "yhteys", "contact", "office", "toimisto", "hello",
 ]);
 
-const RECRUITING_LOCAL = new Set(["apply", "jobs", "careers", "rekry", "rekrytointi", "hr", "tyopaikat"]);
+const RECRUITING_LOCAL = new Set(["apply", "jobs", "careers", "rekry", "rekrytointi", "hr", "tyopaikat", "bewerbung", "jobb", "career"]);
 
 const DISPOSABLE = new Set([
   "mailinator.com", "guerrillamail.com", "10minutemail.com", "tempmail.com",
@@ -198,7 +198,7 @@ export function isBillingEmail(email: string): boolean {
   const domain = v.split("@")[1] ?? "";
   if (!domain) return true;
   if (BILLING_EMAIL_DOMAINS.has(domain)) return true;
-  if (domain.endsWith(".posti.com") || domain.endsWith(".kollektor.fi") || domain.endsWith(".fennoa.com")) return true;
+  if (domain.endsWith(".posti.com") || domain.endsWith(".kollektor.fi") || domain.endsWith(".fennoa.com") || domain.endsWith(".maventa.com") || domain.endsWith(".maventa.fi")) return true;
   if (/^(invoice|lasku|laskutus|billing|einvoice|e-invoice|verkkolasku|fennoa)([._+\-]|$)/i.test(local)) return true;
   if (local.includes("invoice") || local.includes("lasku") || local.startsWith("fennoa.")) return true;
   return false;
