@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { buildExport, compareSearchRuns, controlRun, reEnrichCompanies, startSearch } from "@/lib/norr/actions";
+import { compareSearchRuns, controlRun, reEnrichCompanies, startSearch } from "@/lib/norr/actions";
 import { Button } from "@/components/ui/button";
 import { Pill, Stat, Empty } from "@/components/status";
 import { ScoreBits, asCompanyIntel, contactFaceValue, decisionMakerFace } from "@/components/intel";
@@ -15,16 +15,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useI18n } from "@/lib/i18n";
 import { loc } from "@/lib/content/locale";
-
-function download(filename: string, mime: string, body: string) {
-  const blob = new Blob([body], { type: mime });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+import { triggerUrlDownload } from "@/lib/download";
 
 type RunCompany = {
   id: string;
@@ -317,18 +308,10 @@ function RunView() {
     }
   }
 
-  async function exportRun() {
-    try {
-      const r = await buildExport({ data: { format: "csv", runId, includeProvenance: true, scope: "run", preset: csvPreset } });
-      if (r.error) {
-        toast.error(r.error);
-        return;
-      }
-      download(r.filename, r.mime, r.body);
-      toast.message(`${r.rowCount} rows exported from this search`);
-    } catch {
-      toast.error("Export failed");
-    }
+  function exportRun() {
+    const href = `/api/export?runId=${encodeURIComponent(runId)}&preset=${encodeURIComponent(csvPreset)}`;
+    triggerUrlDownload(href, `norf-export-${runId.slice(0, 8)}.csv`);
+    toast.message("CSV latautuu");
   }
 
   async function runAgain() {
@@ -375,7 +358,7 @@ function RunView() {
             <option value="financial">CSV: financial</option>
             <option value="marketing">CSV: marketing</option>
           </select>
-          <Button variant="secondary" onClick={() => void exportRun()}>{copy.exportRun}</Button>
+          <Button variant="secondary" type="button" onClick={exportRun}>{copy.exportRun}</Button>
           <Button variant="secondary" onClick={() => void runAgain()}>{copy.runAgain}</Button>
           <Button variant="secondary" onClick={() => duplicate()}>{copy.duplicate}</Button>
           <Button
