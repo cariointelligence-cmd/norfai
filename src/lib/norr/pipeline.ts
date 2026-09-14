@@ -18,7 +18,7 @@ import {
   type CompanyRow,
 } from "./repo.ts";
 import { canonicalCompanyWebsite, isJunkCompanyWebsite, normalizeDomain, normalizeName } from "./normalize.ts";
-import { emailPreferenceRank, isBillingEmail, isDisposableDomain, isJunkEmail, isRecruitingEmail, isRoleAddress, inferEmail, inferGeneralMailbox, decodeEmailCandidate, isTemplateEmail, materializeTemplateEmail, cleanExtractedEmail, isGarbageEmail, validEmailSyntax, websiteFromPublishedEmails } from "./contacts.ts";
+import { emailPreferenceRank, isBillingEmail, isDisposableDomain, isJunkEmail, isRecruitingEmail, isRoleAddress, inferEmail, inferGeneralMailbox, decodeEmailCandidate, isTemplateEmail, materializeTemplateEmail, cleanExtractedEmail, isGarbageEmail, validEmailSyntax, websiteFromPublishedEmails, emailBelongsToCompany } from "./contacts.ts";
 import { cleanPersonName, CONTACT_SEED_PATHS } from "./extract.ts";
 import { coreCompanyName, isDistinctiveCoreName, stripPlaceSuffixDisplay } from "./dedupe.ts";
 import { crawlPage, discoverSitemapUrls, pickNextUrls, readRobots, robotsAllows } from "./crawler.ts";
@@ -26,7 +26,7 @@ import { explanationText, scoreCompany, DEFAULT_WEIGHTS } from "./scoring.ts";
 import { buildCompanyIntel, websiteIntelFromStored } from "./targeting/hydrate.ts";
 import { extractFinancialMentions } from "./targeting/website.ts";
 import { extractParentMention } from "./group.ts";
-import { classifyPhoneRole, extractPhonesWithRole, pickCompanyPhone } from "./phones.ts";
+import { classifyPhoneRole, extractPhonesWithRole, pickCompanyPhone, isJunkCompanyPhone } from "./phones.ts";
 import { matchesExclusion, type ExclusionRow } from "./exclusions.ts";
 import { prhBisLookup } from "./sources/prh-bis.ts";
 import { takeCompanySnapshot } from "./ops-store.ts";
@@ -601,9 +601,11 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		if (people.length) await Promise.all(people.map((p) => upsertPerson(sql, userId, companyId, p)));
 		const seenMail = new Set();
 		const emails = [];
+		const siteForMail = canonicalCompanyWebsite(hits.website) ?? canonicalCompanyWebsite(loadedCo?.website) ?? null;
 		for (const e of hits.emails ?? []) {
 			const k = String(e.value ?? "").toLowerCase();
 			if (!k || seenMail.has(k)) continue;
+			if (isJunkEmail(k) || !emailBelongsToCompany(k, { name, website: siteForMail })) continue;
 			seenMail.add(k);
 			emails.push(e);
 		}
@@ -611,7 +613,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		const phones = [];
 		for (const p of hits.phones ?? []) {
 			const k = String(p.value ?? "");
-			if (!k || seenPhone.has(k)) continue;
+			if (!k || seenPhone.has(k) || isJunkCompanyPhone(k)) continue;
 			seenPhone.add(k);
 			phones.push(p);
 		}
@@ -1110,7 +1112,8 @@ async function refreshCompanyContactFields(sql, userId, companyId) {
     select value, classification, person_id, role_address from contacts
     where user_id = ${userId} and company_id = ${companyId} and kind = 'email'`).filter((e) => {
 		const v = decodeEmailCandidate(e.value);
-		return !isJunkEmail(v) && !isBillingEmail(v) && !isRecruitingEmail(v) && !isTemplateEmail(v) && !isGarbageEmail(v);
+		return !isJunkEmail(v) && !isBillingEmail(v) && !isRecruitingEmail(v) && !isTemplateEmail(v) && !isGarbageEmail(v)
+			&& emailBelongsToCompany(v, { name: co?.name, website: co?.website });
 	}).map((e) => ({
 		e,
 		rank: emailPreferenceRank(e.value, {
@@ -1127,14 +1130,17 @@ async function refreshCompanyContactFields(sql, userId, companyId) {
       when coalesce(seniority,'') = 'executive' then 1
       else 2 end, confidence desc nulls last
     limit 1`)[0]?.work_phone ?? null;
+	if (isJunkCompanyPhone(phone)) phone = null;
 	if (!phone) phone = (await sql`
       select value from contacts
       where user_id = ${userId} and company_id = ${companyId} and kind = 'phone' and person_id is not null
       order by confidence desc nulls last limit 1`)[0]?.value ?? null;
+	if (isJunkCompanyPhone(phone)) phone = null;
 	if (!phone) phone = (await sql`
       select value from contacts
       where user_id = ${userId} and company_id = ${companyId} and kind = 'phone'
       order by confidence desc nulls last limit 1`)[0]?.value ?? null;
+	if (isJunkCompanyPhone(phone)) phone = null;
 	await sql`update companies set
     general_email = ${bestEmail?.value ?? null},
     general_email_class = ${bestEmail?.classification ?? null},

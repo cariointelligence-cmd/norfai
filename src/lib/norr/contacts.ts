@@ -48,6 +48,7 @@ const JUNK_EMAIL_DOMAINS = new Set([
   "wikipedia.org", "wikimedia.org",
   "vainu.com", "vainu.io", "finder.fi", "fonecta.fi",
   "k5a.io", "zaraz.com", "cloudflareinsights.com",
+  "almamedia.fi", "almainights.fi", "almainsights.fi", "almatalent.fi", "kauppalehti.fi",
 ]);
 
 const BILLING_EMAIL_DOMAINS = new Set([

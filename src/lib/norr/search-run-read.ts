@@ -1,6 +1,8 @@
 import { getSql } from "@/lib/db";
 import { runProgress, displayRunStatus } from "./progress.ts";
 import { canonicalCompanyWebsite } from "./normalize.ts";
+import { emailBelongsToCompany, isJunkEmail } from "./contacts.ts";
+import { isJunkCompanyPhone } from "./phones.ts";
 
 export async function readSearchRun(userId: string, runId: string, cursor?: string | null) {
   const sql = await getSql();
@@ -40,7 +42,13 @@ export async function readSearchRun(userId: string, runId: string, cursor?: stri
     companies = [];
   }
 
-  const unique = companies.map((c) => ({ ...c, website: canonicalCompanyWebsite(c.website) ?? null }));
+  const unique = companies.map((c) => {
+    const website = canonicalCompanyWebsite(c.website) ?? null;
+    const email = String(c.general_email ?? "");
+    const keepEmail = email && !isJunkEmail(email) && emailBelongsToCompany(email, { name: c.name, website });
+    const phone = isJunkCompanyPhone(c.phone) ? null : (c.phone ?? null);
+    return { ...c, website, general_email: keepEmail ? c.general_email : null, phone };
+  });
   const jobsLive = jobs.some((j: { status?: string }) => j.status === "running" || j.status === "queued");
   const viewStatus = displayRunStatus(String(run.status ?? ""), jobsLive);
   let queue: { active: boolean; position: number; ahead: number; lane: string | null } = { active: jobsLive, position: 1, ahead: 0, lane: null };

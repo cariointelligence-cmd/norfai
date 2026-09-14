@@ -986,6 +986,10 @@ describe("contacts hygiene", () => {
     assert.equal(emailBelongsToCompany("info@ajk.fi", { name: "Arkkitehtitoimisto AJK Oy" }), true);
     assert.equal(emailBelongsToCompany("heidi.vanhatalo@ravintolaneilikka.fi", { name: "Asuntotekniikka Oy", website: "https://asuntotekniikka.fi" }), false);
     assert.equal(emailBelongsToCompany("info@asuntotekniikka.fi", { name: "Asuntotekniikka Oy", website: "https://asuntotekniikka.fi" }), true);
+    assert.equal(isJunkEmail("heidi.antinkari@almamedia.fi"), true);
+    assert.equal(emailBelongsToCompany("heidi.antinkari@almamedia.fi", { name: "Takoa Invest Oy" }), false);
+    assert.equal(canonicalCompanyWebsite("https://www.almainights.fi"), null);
+    assert.equal(isJunkCompanyWebsite("https://www.almainights.fi"), true);
   });
 });
 
