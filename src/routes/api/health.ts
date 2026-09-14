@@ -10,12 +10,29 @@ export const Route = createFileRoute("/api/health")({
         const provision = cutover
           ? await provisionCarioNorfai()
           : { tokenPresent: vercelTokenPresent(), error: null };
+        let mail: { provider: string; source: string; resendReady: boolean } = {
+          provider: "none",
+          source: "none",
+          resendReady: Boolean(
+            process.env.RESEND_API_KEY?.trim() || process.env.RESEND_KEY?.trim() || process.env.RESEND?.trim(),
+          ),
+        };
+        try {
+          const { getSql } = await import("@/lib/db");
+          const { resolveMailer } = await import("@/lib/norr/mailer.ts");
+          const sql = await getSql();
+          const t = await resolveMailer(sql);
+          mail = { provider: t.provider, source: t.source, resendReady: t.provider === "resend" };
+        } catch {
+          /* health still returns */
+        }
         return Response.json({
           ok: true,
           app: "norf",
           build: NORF_BUILD,
           ts: new Date().toISOString(),
-          deploy: vercelDeployProbe(),
+          deploy: { ...vercelDeployProbe(), resendReady: mail.resendReady || vercelDeployProbe().resendReady },
+          mail,
           provision,
         });
       },

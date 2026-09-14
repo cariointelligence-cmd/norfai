@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-mail-stripe-queue";
+export const NORF_BUILD = "2026-09-14-resend-bind";
 
 export function vercelDeployProbe() {
   const env = process.env;

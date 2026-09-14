@@ -122,7 +122,10 @@ async function syncProjectEnv(projectId: string, teamId: string): Promise<string
       wanted[key] = "https://www.norfai.com";
       continue;
     }
-    const value = process.env[key]?.trim();
+    const value = process.env[key]?.trim()
+      || (key === "RESEND_API_KEY"
+        ? (process.env.RESEND_KEY?.trim() || process.env.RESEND?.trim() || "")
+        : "");
     if (value) wanted[key] = value;
   }
   wanted.VITE_AUTH_ENABLED = "true";
@@ -285,6 +288,17 @@ export async function provisionCarioNorfai(): Promise<VercelProvisionResult> {
       installCommand: "npm install",
     }),
   });
+
+  try {
+    if (!process.env.RESEND_API_KEY?.trim()) {
+      const { getSql } = await import("@/lib/db");
+      const sql = await getSql();
+      const rows = await sql<{ resend_api_key: string | null }>`
+        select resend_api_key from mail_settings where id = ${"default"} limit 1`;
+      const fromDb = rows[0]?.resend_api_key?.trim();
+      if (fromDb) process.env.RESEND_API_KEY = fromDb;
+    }
+  } catch { /* optional */ }
 
   empty.envCopied = await syncProjectEnv(empty.projectId, cario.id);
 

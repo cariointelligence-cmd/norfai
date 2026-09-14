@@ -91,7 +91,11 @@ export type OutboxRow = {
 
 function env(name: string): string | undefined {
   const v = process.env[name]?.trim();
-  return v || undefined;
+  if (v) return v;
+  if (name === "RESEND_API_KEY") {
+    return process.env.RESEND_KEY?.trim() || process.env.RESEND?.trim() || undefined;
+  }
+  return undefined;
 }
 
 export function publicMailOrigin(): string {
