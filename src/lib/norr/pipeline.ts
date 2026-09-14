@@ -784,6 +784,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			emails: finder.profile.emails,
 			phones: finder.profile.phones
 		});
+		if (finder.profile.emails?.length) facts.emails.push(...finder.profile.emails);
 		await harvestNewSite(finder.profile.website, "finder");
 		await bumpSource(sql, userId, "finder", "enrich", { confidence: 84 });
 	} else if (!finder.ok) await bumpSource(sql, userId, "finder", "fail", { error: finder.error });
@@ -831,8 +832,8 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 	});
 	await harvestNewSite(li.website, "linkedin");
 	await bumpSource(sql, userId, "linkedin", "enrich", { confidence: li.companyUrl ? 64 : 40 });
-	const afterLi = await loadCompany(sql, userId, companyId);
-	if ((!afterLi?.website || !afterLi?.general_email || !afterLi?.phone) && grokBudgetRemaining() > 0) {
+	}
+	if (facts.emails.length < 1 && grokBudgetRemaining() > 0) {
 		const grok = await grokContactSearch({
 			name,
 			businessId: bid,
@@ -847,6 +848,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 				emails: grok.emails,
 				phones: grok.phones
 			});
+			if (grok.emails?.length) facts.emails.push(...grok.emails);
 			await harvestNewSite(grok.website, "grok_search");
 			await bumpSource(sql, userId, "grok_search", grok.error ? "fail" : "enrich", {
 				error: grok.error,
@@ -854,9 +856,8 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			});
 		}
 	}
-	}
 	const site2 = canonicalCompanyWebsite((await loadCompany(sql, userId, companyId))?.website);
-	if (site2 && process.env.HUNTER_API_KEY) {
+	if (site2 && process.env.HUNTER_API_KEY && facts.emails.length < 1) {
 		const domain = normalizeDomain(site2);
 		if (domain) {
 			const hun = await hunterDomainSearch(domain);

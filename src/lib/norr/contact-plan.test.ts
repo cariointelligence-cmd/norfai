@@ -18,7 +18,7 @@ describe("contact plan", () => {
   it("does not hit Finder/KL/Northdata after a published email", () => {
     assert.equal(directoriesNeeded({ emails: 1, phones: 0, website: "https://x.fi" }), false);
     assert.equal(directoriesNeeded({ emails: 0, phones: 0, website: null }), true);
-    assert.equal(directoriesNeeded({ emails: 0, phones: 1, website: "https://x.fi" }), false);
+    assert.equal(directoriesNeeded({ emails: 0, phones: 1, website: "https://x.fi" }), true);
   });
   it("infers a role mailbox on a live company domain", () => {
     const r = inferGeneralMailbox("hasan.fi", []);

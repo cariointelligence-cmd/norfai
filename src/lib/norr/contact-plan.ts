@@ -17,8 +17,7 @@ export function directoriesNeeded(opts: {
   depth?: "normal" | "deep" | string | null;
   emailRecovery?: boolean;
 }): boolean {
-  if (opts.emailRecovery || opts.depth === "deep") return opts.emails < 1;
-  return opts.emails < 1 && opts.phones < 1;
+  return opts.emails < 1;
 }
 
 /** Stop crawling extra pages once outreach has a real contact path. */
