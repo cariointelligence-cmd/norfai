@@ -689,7 +689,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			sourceUrl: "",
 			observations: []
 		})),
-		supercrawlContacts({ name, businessId: bid, municipality: mun }).catch(() => ({
+		supercrawlContacts({ name, businessId: bid, municipality: mun, fresh: emailRecovery }).catch(() => ({
 			emails: [], phones: [], people: [], website: null, sourceUrl: null, sourceId: "supercrawl",
 		})),
 		]);
@@ -1500,12 +1500,17 @@ async function stealStaleJobs(sql, userId, runId) {
 async function claimNextJob(sql, userId, runId, opts) {
 	const skipDiscover = Boolean(opts?.skipDiscover);
 	const live = (await sql`select count(*)::int as n from jobs where user_id = ${userId} and status = ${"running"}`)[0]?.n ?? 0;
-	if (Number(live) >= 8) return null;
+	const emailOnly = Number(live) >= 8;
+	if (emailOnly) {
+		const emailLive = (await sql`select count(*)::int as n from jobs where user_id = ${userId} and status = ${"running"} and type = ${"email"}`)[0]?.n ?? 0;
+		if (Number(emailLive) >= 8) return null;
+	}
 	const job = (await sql`
     select id from jobs
     where user_id = ${userId} and status = 'queued' and run_after <= now()
       and (${runId ?? null}::text is null or run_id = ${runId ?? null})
       and (${!skipDiscover} or type <> ${"discover"})
+      and (${!emailOnly} or type = ${"email"})
       and (
         run_id is null
         or type = ${"email"}

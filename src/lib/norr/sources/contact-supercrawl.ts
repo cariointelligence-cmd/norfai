@@ -8,7 +8,7 @@ import { extractJsonLd, extractPeopleFromHtml } from "../extract.ts";
 import { canonicalCompanyWebsite, normalizePhone } from "../normalize.ts";
 import { BROWSER_UA, safeFetch } from "../ssrf.ts";
 import { isDirectoryHost } from "./webdiscover.ts";
-import { cacheCoalesce, cacheKey, CACHE_TTL } from "../intel-cache.ts";
+import { cacheGet, cacheSet, cacheKey, CACHE_TTL } from "../intel-cache.ts";
 
 export type SuperCrawlHits = {
   emails: ContactHit[];
@@ -137,8 +137,15 @@ export async function supercrawlContacts(opts: {
   name: string;
   businessId?: string | null;
   municipality?: string | null;
+  fresh?: boolean;
 }): Promise<SuperCrawlHits> {
   const bid = (opts.businessId ?? "").replace(/\s/g, "");
   const key = cacheKey(["supercrawl", bid || opts.name.trim().toLowerCase(), opts.municipality ?? ""]);
-  return cacheCoalesce(key, CACHE_TTL.contacts, () => supercrawlLive(opts));
+  if (!opts.fresh) {
+    const hit = cacheGet<SuperCrawlHits>(key);
+    if (hit?.emails?.length) return hit;
+  }
+  const live = await supercrawlLive(opts);
+  if (live.emails.length) cacheSet(key, live, CACHE_TTL.contacts);
+  return live;
 }
