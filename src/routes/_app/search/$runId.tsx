@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Pill, Stat, Empty } from "@/components/status";
 import { ScoreBits, asCompanyIntel, contactFaceValue, decisionMakerFace } from "@/components/intel";
 import { ProgressRail, ProgressRailPulse } from "@/components/progress-rail";
-import { runProgress } from "@/lib/norr/progress";
+import { runProgress, workLanes } from "@/lib/norr/progress";
 import { formatQueueAge } from "@/lib/norr/queue-monitor";
 import type { SearchCriteria } from "@/lib/norr/types";
 import { describeCriteria } from "@/lib/norr/criteria";
@@ -286,6 +286,14 @@ function RunView() {
   const criteria = (run.criteria ?? {}) as SearchCriteria;
   const progress = (q.data as { progress?: ReturnType<typeof runProgress> }).progress
     ?? runProgress(jobs as Array<{ type?: string; status?: string }>, run.status);
+  const lanes = workLanes(jobs as Array<{ type?: string; status?: string }>, run.status, {
+    matched,
+    want: Number((criteria as { maxResults?: number }).maxResults ?? matched),
+    foundEmail,
+    missingEmail,
+    foundDecisionMaker,
+    missingDecisionMaker,
+  });
   const diagnosis = summary?.diagnosis
     ?? faceRegisterDiagnosis(report, { companyCount: companies.length, status: run.status });
   const emptyCopy = searchRunEmptyCopy({
@@ -409,19 +417,11 @@ function RunView() {
             : copy.queueWait.replace("{n}", String(q.data.queue.position ?? 1))}
         </p>
       ) : null}
-      <div className="panel p-4">
-        <ProgressRail
-          value={progress.pct}
-          label={progress.label}
-          running={progress.running}
-          hint={
-            progress.running
-              ? `${progress.done} of ${progress.total} jobs. Registers, websites and contacts usually land within a few minutes.`
-              : progress.total
-                ? `${progress.done} jobs finished.`
-                : undefined
-          }
-        />
+      <div className="panel grid gap-4 p-4 sm:grid-cols-2">
+        <p className="kicker sm:col-span-2">{progress.label}</p>
+        {lanes.map((lane) => (
+          <ProgressRail key={lane.key} value={lane.pct} label={lane.label} running={lane.running} hint={lane.hint} />
+        ))}
       </div>
       {emailJobs.length > 0 ? (
         <p className="text-sm text-mute">

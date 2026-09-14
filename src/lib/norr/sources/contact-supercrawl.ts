@@ -8,7 +8,7 @@ import { extractJsonLd, extractPeopleFromHtml } from "../extract.ts";
 import { canonicalCompanyWebsite, normalizePhone } from "../normalize.ts";
 import { BROWSER_UA, safeFetch } from "../ssrf.ts";
 import { isDirectoryHost } from "./webdiscover.ts";
-import { cacheGet, cacheSet, cacheKey, CACHE_TTL } from "../intel-cache.ts";
+import { countryEnv, nationOf } from "../countries/env.ts";
 
 export type SuperCrawlHits = {
   emails: ContactHit[];
@@ -114,7 +114,22 @@ async function supercrawlLive(opts: {
   name: string;
   businessId?: string | null;
   municipality?: string | null;
+  country?: string | null;
 }): Promise<SuperCrawlHits> {
+  const name = opts.name.trim();
+  if (name.length < 2) return { ...EMPTY };
+  const nation = nationOf(opts.country);
+  if (nation !== "FI") {
+    const env = countryEnv(nation);
+    const q = encodeURIComponent([name, opts.municipality].filter(Boolean).join(" "));
+    const primary: Array<{ url: string; id: string }> = nation === "SE"
+      ? [{ url: `https://www.allabolag.se/what/${q}`, id: "bolagsverket" }]
+      : [{ url: `https://data.brreg.no/enhetsregisteret/oppslag/enheter?skipsok=false&navn=${q}`, id: "brreg" }];
+    const pages = await Promise.all(primary.map((u) => fetchParse(u.url, u.id)));
+    const out: SuperCrawlHits = { emails: [], phones: [], people: [], website: null, sourceUrl: null, sourceId: `${env.nation}-supercrawl` };
+    for (const p of pages) mergeHits(out, p);
+    return out;
+  }
   const name = opts.name.trim();
   if (name.length < 2) return { ...EMPTY };
   const q = encodeURIComponent([name, opts.municipality].filter(Boolean).join(" "));
@@ -136,9 +151,11 @@ export async function supercrawlContacts(opts: {
   businessId?: string | null;
   municipality?: string | null;
   fresh?: boolean;
+  country?: string | null;
 }): Promise<SuperCrawlHits> {
   const bid = (opts.businessId ?? "").replace(/\s/g, "");
-  const key = cacheKey(["supercrawl", bid || opts.name.trim().toLowerCase(), opts.municipality ?? ""]);
+  const nation = nationOf(opts.country);
+  const key = cacheKey(["supercrawl", nation, bid || opts.name.trim().toLowerCase(), opts.municipality ?? ""]);
   if (!opts.fresh) {
     const hit = cacheGet<SuperCrawlHits>(key);
     if (hit?.emails?.length) return hit;

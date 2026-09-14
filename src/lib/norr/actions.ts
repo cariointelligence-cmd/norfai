@@ -704,6 +704,7 @@ export const listCompanies = createServerFn({ method: "POST" }).middleware([auth
   where c.user_id = ${context.userId} and c.deleted_at is null
   and (${q} = '' or c.name ilike ${"%" + q + "%"} or coalesce(c.business_id,'') ilike ${"%" + q + "%"} or coalesce(c.municipality,'') ilike ${"%" + q + "%"})
   and (${data.status ?? ""} = '' or c.record_status = ${data.status ?? ""})
+  and (${data.country ?? ""} = '' or c.country = ${data.country ?? ""})
   and (${data.hasEmail ? 1 : 0} = 0 or c.general_email is not null)
   order by coalesce(c.match_score, c.overall_confidence) desc nulls last, c.updated_at desc, c.id
   limit ${limit} offset ${offset}`;

@@ -138,8 +138,8 @@ export function planRegisterQuery(criteria: SearchCriteria): RegisterQueryPlan {
   if (country === "DK" && nameSeeds.length) homemade.push("cvr");
   if (country === "SE") homemade.push("bolagsverket");
   if (country === "GB" || country === "UK") homemade.push("companies_house");
-  if (nameSeeds.length) homemade.push(...NAME_DIRECTORIES);
-  if (nameSeeds.length) federated.push("gleif");
+  if (country === "FI" && nameSeeds.length) homemade.push(...NAME_DIRECTORIES);
+  if (country === "FI" && nameSeeds.length) federated.push("gleif");
 
   return {
     country,

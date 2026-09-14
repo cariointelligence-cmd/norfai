@@ -17,7 +17,9 @@ import { analyzeWebsite, type WebsiteIntel } from "../targeting/website.ts";
 import { poolMap } from "../engines.ts";
 import { RUNTIME } from "../runtime.ts";
 import { pickFanOutUrls } from "../job-budget.ts";
-import { contactPlan, contactHarvestDone } from "../contact-plan.ts";
+import { hypercrawlSite } from "./hypercrawl.ts";
+import { attachDecisionContacts } from "./decision-contacts.ts";
+import { countryEnv } from "../countries/env.ts";
 import { isJunkHost } from "../junk-hosts.ts";
 
 const GENERIC_TOKENS = new Set([
@@ -537,11 +539,12 @@ export async function collectFastContacts(opts: {
   let website = canonicalCompanyWebsite(opts.website ?? null);
   let websiteSource: string | null = website ? "existing" : null;
   const existingDead = Boolean(opts.website) && !website;
+  const env = countryEnv(opts.country);
   const plan = contactPlan({ website, depth: opts.emailRecovery ? "deep" : opts.depth });
   if (opts.emailRecovery) plan.harvestBudget = 6;
   let finderProfileUrl: string | null = null;
   if (!plan.skipSearch) {
-  const contactQuery = [opts.name, opts.municipality, "yhteystiedot"].filter(Boolean).join(" ");
+  const contactQuery = [opts.name, opts.municipality, env.contactQueryWord].filter(Boolean).join(" ");
   sourcesChecked.push("wikipedia", "duckduckgo");
   const [wiki, instant, ddgContact] = await Promise.all([
     wikipediaCompany(opts.name),
@@ -549,7 +552,7 @@ export async function collectFastContacts(opts: {
     duckDuckGoHtmlSearch(contactQuery, 4000),
   ]);
   for (const hit of ddgContact.hits) {
-    if (/finder\.fi/i.test(hit.url) && /yhteystiedot|paattajat/i.test(hit.url)) {
+    if (env.allowFiDirectories && /finder\.fi/i.test(hit.url) && /yhteystiedot|paattajat/i.test(hit.url)) {
       finderProfileUrl = hit.url.split("?")[0] ?? hit.url;
       break;
     }
@@ -616,14 +619,21 @@ export async function collectFastContacts(opts: {
       website = null;
       websiteSource = null;
     }
+    try {
+      const hyper = await hypercrawlSite({ website, country: opts.country, companyName: opts.name });
+      mergeUniqueEmails(emails, hyper.emails);
+      mergeUniquePhones(phones, hyper.phones);
+      mergeUniquePeople(people, hyper.people);
+    } catch { /* first-party extra pages optional */ }
   }
+  const peopleLinked = attachDecisionContacts({ people, emails, phones, website });
   /* Search snippets are URL evidence only — never company email/phone. */
   return {
     website,
     websiteSource,
     emails: emails.filter((e) => !isJunkEmail(e.value)),
     phones: phones.filter((p) => Boolean(normalizePhone(p.value))),
-    people,
+    people: peopleLinked,
     observations,
     sourcesChecked,
     finderProfileUrl,

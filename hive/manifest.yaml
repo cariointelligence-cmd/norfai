@@ -45,6 +45,9 @@ layers:
     - src/lib/norr/sources/register-plan.ts
     - src/lib/norr/hive-llm.ts
     - src/lib/norr/junk-hosts.ts
+    - src/lib/norr/countries/env.ts
+    - src/lib/norr/sources/hypercrawl.ts
+    - src/lib/norr/sources/decision-contacts.ts
   nerve:
     - src/lib/norr/pipeline.ts
     - src/lib/norr/worker.ts

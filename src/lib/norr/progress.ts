@@ -4,6 +4,7 @@ export function displayRunStatus(status: string, jobsLive: boolean): string {
   return status;
 }
 export type JobCountRow = { type?: string | null; status?: string | null; n?: number | null };
+type JobLite = { type?: string | null; status?: string | null };
 
 const STAGE_WEIGHT: Record<string, number> = {
   discover: 16,
@@ -134,4 +135,40 @@ export function runProgress(
   return base;
 }
 
-void TERMINAL;
+export type WorkLane = { key: string; label: string; pct: number; hint: string; running: boolean };
+
+export function workLanes(
+  jobs: JobLite[] | null | undefined,
+  runStatus: string,
+  hint?: { matched?: number; want?: number; foundEmail?: number; missingEmail?: number; foundDecisionMaker?: number; missingDecisionMaker?: number },
+): WorkLane[] {
+  const list = jobs ?? [];
+  const live = runStatus === "running" || runStatus === "queued";
+  const doneish = (st: string) => st === "done" || st === "failed" || st === "cancelled";
+  const lane = (key: string, label: string, types: string[], fallbackPct: number, hintText: string): WorkLane => {
+    const rows = list.filter((j) => types.includes(j.type || ""));
+    const total = rows.length;
+    const done = rows.filter((j) => doneish(j.status || "")).length;
+    const running = live && rows.some((j) => j.status === "queued" || j.status === "running");
+    const pct = !live && (runStatus === "completed" || runStatus === "cancelled")
+      ? 100
+      : total
+        ? Math.min(running ? 99 : 100, Math.round((100 * done) / total))
+        : live ? fallbackPct : runStatus === "completed" ? 100 : 0;
+    return { key, label, pct, hint: hintText, running };
+  };
+  const matched = Math.max(0, Number(hint?.matched ?? 0));
+  const want = Math.max(Number(hint?.want ?? 0), matched, 1);
+  const emails = Math.max(0, Number(hint?.foundEmail ?? 0));
+  const missingE = Math.max(0, Number(hint?.missingEmail ?? 0));
+  const dm = Math.max(0, Number(hint?.foundDecisionMaker ?? 0));
+  const missingDm = Math.max(0, Number(hint?.missingDecisionMaker ?? 0));
+  const discPct = live ? Math.min(90, Math.round((100 * matched) / want)) : matched ? 100 : 0;
+  return [
+    lane("discover", "Companies", ["discover"], discPct, matched ? `${matched} matched` : "Register search"),
+    lane("enrich", "Enrichment", ["enrich", "scrape", "crawl"], live && matched ? 18 : 0, "Websites and public pages"),
+    lane("email", "Emails", ["email"], emails + missingE ? Math.round((100 * emails) / Math.max(emails + missingE, 1)) : 0, `${emails} found · ${missingE} missing`),
+    lane("people", "Decision-makers", ["email", "enrich"], dm + missingDm ? Math.round((100 * dm) / Math.max(dm + missingDm, 1)) : 0, `${dm} found · ${missingDm} missing`),
+  ];
+}
+

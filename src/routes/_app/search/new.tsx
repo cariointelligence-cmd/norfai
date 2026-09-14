@@ -225,6 +225,27 @@ function NewSearch() {
         </Button>
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        {([
+          { id: "FI", label: "Finland · YTJ" },
+          { id: "SE", label: "Sweden · Bolagsverket" },
+          { id: "NO", label: "Norway · Brønnøysund" },
+        ] as const).map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            onClick={() => {
+              const rules = criteria.groups.rules.map((r) => r.field === "country" ? { ...r, value: c.id } : r);
+              if (!rules.some((r) => r.field === "country")) rules.push({ id: "country", field: "country", op: "eq", value: c.id });
+              setCriteria({ ...criteria, country: c.id, groups: { ...criteria.groups, rules } });
+            }}
+            className={`border px-3 py-1.5 text-sm ${criteria.country === c.id ? "border-ink bg-ink text-canvas" : "border-line bg-panel"}`}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+
       <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
         <Field label="Search name">
           <Input value={name} onChange={(e) => setName(e.target.value)} />

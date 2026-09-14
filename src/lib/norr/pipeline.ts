@@ -45,6 +45,8 @@ import { finderLookup } from "./sources/finder.ts";
 import { kauppalehtiLookup } from "./sources/kauppalehti.ts";
 import { northdataLookup } from "./sources/northdata.ts";
 import { supercrawlContacts } from "./sources/contact-supercrawl.ts";
+import { attachDecisionContacts } from "./sources/decision-contacts.ts";
+import { countryEnv } from "./countries/env.ts";
 import { linkedinLookup } from "./sources/linkedin.ts";
 import { grokBudgetRemaining, grokContactSearch } from "./sources/groksearch.ts";
 import { llmFilterIdentity, applyLlmVerdict } from "./hive-llm.ts";
@@ -613,7 +615,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
           where id = ${companyId} and user_id = ${userId}
             and (website is null or website ~* 'closed\\.html?')`;
 		}
-		const people = (hits.people ?? []).slice(0, 12);
+		const peopleRaw = (hits.people ?? []).slice(0, 12);
 		const seenMail = new Set();
 		const emails = [];
 		const siteForMail = canonicalCompanyWebsite(hits.website) ?? canonicalCompanyWebsite(loadedCo?.website) ?? null;
@@ -632,6 +634,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			seenPhone.add(k);
 			phones.push(p);
 		}
+		const people = attachDecisionContacts({ people: peopleRaw, emails, phones, website: siteForMail });
 		let websiteOut = incoming ?? null;
 		let emailsOut = emails;
 		let phonesOut = phones;
@@ -715,9 +718,11 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		emailRecovery,
 	});
 	const needFinder = finderNeeded({ emails: publishedN, depth, emailRecovery });
+	const env = countryEnv(country);
 	if (needDirs || needFinder) {
+		const fi = env.allowFiDirectories;
 		[finderFirst, kl, nd, superC] = await Promise.all([
-		(needFinder ? finderLookup({
+		(fi && needFinder ? finderLookup({
 			name,
 			businessId: bid,
 			municipality: mun,
@@ -728,7 +733,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			sourceUrl: "",
 			observations: []
 		})),
-		(needDirs ? kauppalehtiLookup({
+		(fi && needDirs ? kauppalehtiLookup({
 			name,
 			businessId: bid
 		}) : Promise.resolve({ ok: false, profile: null, sourceUrl: "", observations: [] })).catch(() => ({
@@ -737,7 +742,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			sourceUrl: "",
 			observations: []
 		})),
-		(depth === "deep" || emailRecovery ? northdataLookup({
+		(fi && (depth === "deep" || emailRecovery) ? northdataLookup({
 			name,
 			businessId: bid,
 			municipality: mun
@@ -747,7 +752,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			sourceUrl: "",
 			observations: []
 		})),
-		supercrawlContacts({ name, businessId: bid, municipality: mun, fresh: emailRecovery }).catch(() => ({
+		supercrawlContacts({ name, businessId: bid, municipality: mun, fresh: emailRecovery, country }).catch(() => ({
 			emails: [], phones: [], people: [], website: null, sourceUrl: null, sourceId: "supercrawl",
 		})),
 		]);

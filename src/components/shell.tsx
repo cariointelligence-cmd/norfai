@@ -41,6 +41,8 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   "/search/new": Search,
   "/search": History,
   "/companies": Building2,
+  "/sweden": Building2,
+  "/norway": Building2,
   "/people": Users,
   "/changes": Bell,
   "/accounts": ShieldBan,

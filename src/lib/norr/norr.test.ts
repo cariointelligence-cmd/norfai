@@ -1,5 +1,8 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
+import { countryEnv, sourcesAllowedFor } from "./countries/env.ts";
+import { attachDecisionContacts, isDecisionTitle } from "./sources/decision-contacts.ts";
+import { workLanes } from "./progress.ts";
 import { identityLooksForeign, applyLlmVerdict, llmFilterIdentity } from "./hive-llm.ts";
 import { extractEmails, isJunkEmail, isBillingEmail, isRecruitingEmail, validEmailSyntax, decodeCfEmail, inferGeneralMailbox, inferPersonMailbox, emailMatchesPerson, websiteFromPublishedEmail, websiteFromPublishedEmails, isConsumerMailboxDomain, emailBelongsToCompany, needsEmailRecovery } from "./contacts.ts";
 import { extractPeopleFromHtml, extractPageContacts, plausiblePersonName, cleanPersonName, decodeHtmlEntities } from "./extract.ts";
@@ -1040,6 +1043,42 @@ describe("hive llm filter", () => {
     const v = await llmFilterIdentity({ name: "Basemedia Oy", website: "https://www.iltalehti.fi", emails: ["il.toimitus@iltalehti.fi"] });
     if (prev) process.env.XAI_API_KEY = prev;
     assert.equal(v, null);
+  });
+});
+
+describe("country isolation and decision contacts", () => {
+  it("never allows Finnish directories on SE or NO", () => {
+    assert.equal(countryEnv("FI").allowFiDirectories, true);
+    assert.equal(countryEnv("SE").allowFiDirectories, false);
+    assert.equal(countryEnv("NO").allowFiDirectories, false);
+    assert.equal(sourcesAllowedFor("SE", "ytj"), false);
+    assert.equal(sourcesAllowedFor("SE", "finder"), false);
+    assert.equal(sourcesAllowedFor("NO", "kauppalehti"), false);
+    assert.equal(sourcesAllowedFor("NO", "brreg"), true);
+    assert.equal(sourcesAllowedFor("SE", "bolagsverket"), true);
+    assert.equal(sourcesAllowedFor("FI", "brreg"), false);
+    const se = planRegisterQuery(Object.assign(emptyCriteria(), { country: "SE" }));
+    assert.equal(se.homemade.includes("finder"), false);
+    assert.equal(se.official.includes("ytj"), false);
+  });
+  it("attaches a published mailbox to the CEO when the local-part matches", () => {
+    assert.equal(isDecisionTitle("Toimitusjohtaja"), true);
+    const people = attachDecisionContacts({
+      people: [{ fullName: "Matti Virtanen", title: "Toimitusjohtaja", confidence: 70 }],
+      emails: [{ kind: "email", value: "matti.virtanen@aura.fi", classification: "published" }],
+      phones: [],
+      website: "https://aura.fi",
+    });
+    assert.equal(people[0]?.workEmail, "matti.virtanen@aura.fi");
+  });
+  it("exposes four simple work lanes", () => {
+    const lanes = workLanes(
+      [{ type: "discover", status: "done" }, { type: "enrich", status: "running" }, { type: "email", status: "queued" }],
+      "running",
+      { matched: 10, want: 100, foundEmail: 2, missingEmail: 8, foundDecisionMaker: 1, missingDecisionMaker: 9 },
+    );
+    assert.equal(lanes.length, 4);
+    assert.ok(lanes.every((l) => l.label && Number.isFinite(l.pct)));
   });
 });
 
