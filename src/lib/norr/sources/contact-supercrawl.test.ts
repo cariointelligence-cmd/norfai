@@ -15,4 +15,9 @@ describe("contact supercrawl", () => {
     assert.equal(r.emails.length, 0);
     assert.equal(r.phones.length, 0);
   });
+  it("reads Kauppalehti JSON-LD Organization email", () => {
+    const html = `<script type="application/ld+json">{"@type":"Organization","email":"info@hasan.fi","telephone":"+358401234567"}</script>`;
+    const r = parseDirectoryContactHtml(html, "https://www.kauppalehti.fi/yritykset/yritys/123", "kauppalehti");
+    assert.equal(r.emails[0]?.value, "info@hasan.fi");
+  });
 });

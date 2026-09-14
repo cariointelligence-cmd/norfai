@@ -1,13 +1,14 @@
 /**
- * First-party Finnish contact crawlers. No Apify.
- * Public pages only: 020202, y-tunnus.fi. Never invent emails.
+ * First-party Finnish contact crawlers. No Apify, no Finder.
+ * Public pages only. Never invent emails.
  */
 import type { ContactHit, PersonHit } from "../types.ts";
 import { extractEmails, extractPhones, isJunkEmail, isRecruitingEmail, isBillingEmail } from "../contacts.ts";
-import { extractPeopleFromHtml } from "../extract.ts";
+import { extractJsonLd, extractPeopleFromHtml } from "../extract.ts";
 import { canonicalCompanyWebsite, normalizePhone } from "../normalize.ts";
 import { BROWSER_UA, safeFetch } from "../ssrf.ts";
 import { isDirectoryHost } from "./webdiscover.ts";
+import { cacheCoalesce, cacheKey, CACHE_TTL } from "../intel-cache.ts";
 
 export type SuperCrawlHits = {
   emails: ContactHit[];
@@ -50,27 +51,43 @@ function pushPhone(into: ContactHit[], raw: string | null | undefined, sourceUrl
 }
 
 export function parseDirectoryContactHtml(html: string, sourceUrl: string, sourceId: string): SuperCrawlHits {
+  const slice = html.length > 80_000 ? html.slice(0, 80_000) : html;
   const emails: ContactHit[] = [];
   const phones: ContactHit[] = [];
   const mailRe = /mailto:([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/gi;
   let m: RegExpExecArray | null;
-  while ((m = mailRe.exec(html))) pushEmail(emails, m[1] ?? "", sourceUrl, sourceId);
-  for (const e of extractEmails(html)) pushEmail(emails, e.value, sourceUrl, sourceId);
+  while ((m = mailRe.exec(slice))) pushEmail(emails, m[1] ?? "", sourceUrl, sourceId);
+  if (!emails.length) {
+    for (const e of extractEmails(slice)) pushEmail(emails, e.value, sourceUrl, sourceId);
+  }
   const telRe = /tel:([+\d][\d\s().\-]{6,20})/gi;
-  while ((m = telRe.exec(html))) pushPhone(phones, m[1] ?? "", sourceUrl, sourceId);
-  for (const p of extractPhones(html.replace(/<[^>]+>/g, " "), "FI")) pushPhone(phones, p, sourceUrl, sourceId);
+  while ((m = telRe.exec(slice))) pushPhone(phones, m[1] ?? "", sourceUrl, sourceId);
+  if (!phones.length) {
+    for (const p of extractPhones(slice.slice(0, 20_000).replace(/<[^>]+>/g, " "), "FI")) {
+      pushPhone(phones, p, sourceUrl, sourceId);
+    }
+  }
+  if (sourceId === "kauppalehti") {
+    const ld = extractJsonLd(slice);
+    for (const org of ld.orgs) {
+      pushEmail(emails, org.email, sourceUrl, sourceId);
+      pushPhone(phones, org.telephone, sourceUrl, sourceId);
+    }
+  }
   let website: string | null = null;
-  const site = html.match(/https?:\/\/(?!www\.(?:020202|finder|fonecta|ytunnus|asiakastieto)\.)[a-z0-9.-]+\.[a-z]{2,}/i)?.[0];
+  const site = slice.match(/https?:\/\/(?!www\.(?:020202|finder|fonecta|ytunnus|asiakastieto|kauppalehti)\.)[a-z0-9.-]+\.[a-z]{2,}/i)?.[0];
   if (site && !isDirectoryHost(site)) website = canonicalCompanyWebsite(site);
-  const people = extractPeopleFromHtml(html.slice(0, 40_000), sourceUrl).slice(0, 8);
+  const people = emails.length && phones.length
+    ? []
+    : extractPeopleFromHtml(slice.slice(0, 12_000), sourceUrl).slice(0, 6);
   return { emails, phones, people, website, sourceUrl, sourceId };
 }
 
-async function fetchHtml(url: string, timeoutMs = 1800): Promise<string | null> {
+async function fetchHtml(url: string, timeoutMs = 1600): Promise<string | null> {
   try {
     const res = await safeFetch(url, {
       timeoutMs,
-      maxBytes: 400_000,
+      maxBytes: 180_000,
       headers: { "User-Agent": BROWSER_UA, Accept: "text/html", "Accept-Language": "fi-FI,fi;q=0.9" },
     });
     if (res.status >= 400 || res.body.length < 80) return null;
@@ -80,35 +97,48 @@ async function fetchHtml(url: string, timeoutMs = 1800): Promise<string | null> 
   }
 }
 
-export async function supercrawlContacts(opts: {
+function mergeHits(into: SuperCrawlHits, p: SuperCrawlHits): void {
+  for (const e of p.emails) pushEmail(into.emails, e.value, p.sourceUrl ?? "", p.sourceId);
+  for (const ph of p.phones) pushPhone(into.phones, ph.value, p.sourceUrl ?? "", p.sourceId);
+  if (!into.website && p.website) into.website = p.website;
+  if (!into.sourceUrl && p.emails.length) into.sourceUrl = p.sourceUrl;
+  into.people.push(...p.people);
+}
+
+async function fetchParse(url: string, id: string): Promise<SuperCrawlHits> {
+  const html = await fetchHtml(url);
+  return html ? parseDirectoryContactHtml(html, url, id) : EMPTY;
+}
+
+async function supercrawlLive(opts: {
   name: string;
   businessId?: string | null;
   municipality?: string | null;
 }): Promise<SuperCrawlHits> {
   const name = opts.name.trim();
-  if (name.length < 2) return EMPTY;
+  if (name.length < 2) return { ...EMPTY };
   const q = encodeURIComponent([name, opts.municipality].filter(Boolean).join(" "));
   const bid = (opts.businessId ?? "").replace(/\s/g, "");
-  const urls: Array<{ url: string; id: string }> = [
+  const digits = /^\d{7}-\d$/.test(bid) ? bid.replace(/\D/g, "") : "";
+  const primary: Array<{ url: string; id: string }> = [
     { url: `https://www.020202.fi/haku?what=${q}`, id: "020202" },
   ];
-  if (/^\d{7}-\d$/.test(bid)) {
-    const digits = bid.replace(/\D/g, "");
-    urls.push({ url: `https://www.ytunnus.fi/${bid}`, id: "ytunnus" });
-    urls.push({ url: `https://www.kauppalehti.fi/yritykset/yritys/${digits}`, id: "kauppalehti" });
-    urls.push({ url: `https://www.asiakastieto.fi/yritykset/fi/haku?query=${encodeURIComponent(bid)}`, id: "asiakastieto" });
-  }
-  const pages = await Promise.all(urls.map(async (u) => {
-    const html = await fetchHtml(u.url);
-    return html ? parseDirectoryContactHtml(html, u.url, u.id) : EMPTY;
-  }));
+  if (digits) primary.push({ url: `https://www.kauppalehti.fi/yritykset/yritys/${digits}`, id: "kauppalehti" });
+  const pages = await Promise.all(primary.map((u) => fetchParse(u.url, u.id)));
   const out: SuperCrawlHits = { emails: [], phones: [], people: [], website: null, sourceUrl: null, sourceId: "supercrawl" };
-  for (const p of pages) {
-    for (const e of p.emails) pushEmail(out.emails, e.value, p.sourceUrl ?? "", p.sourceId);
-    for (const ph of p.phones) pushPhone(out.phones, ph.value, p.sourceUrl ?? "", p.sourceId);
-    if (!out.website && p.website) out.website = p.website;
-    if (!out.sourceUrl && p.emails.length) out.sourceUrl = p.sourceUrl;
-    out.people.push(...p.people);
+  for (const p of pages) mergeHits(out, p);
+  if (!out.emails.length && bid && /^\d{7}-\d$/.test(bid)) {
+    mergeHits(out, await fetchParse(`https://www.ytunnus.fi/${bid}`, "ytunnus"));
   }
   return out;
+}
+
+export async function supercrawlContacts(opts: {
+  name: string;
+  businessId?: string | null;
+  municipality?: string | null;
+}): Promise<SuperCrawlHits> {
+  const bid = (opts.businessId ?? "").replace(/\s/g, "");
+  const key = cacheKey(["supercrawl", bid || opts.name.trim().toLowerCase(), opts.municipality ?? ""]);
+  return cacheCoalesce(key, CACHE_TTL.contacts, () => supercrawlLive(opts));
 }
