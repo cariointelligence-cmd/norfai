@@ -29,6 +29,17 @@ export function runProgressFromCounts(
 } {
   const running = runStatus === "running" || runStatus === "queued";
   const rows = counts ?? [];
+  const coreOpen = rows.some((row) => {
+    const t = row.type || "";
+    const st = String(row.status ?? "");
+    return (t === "discover" || t === "enrich" || t === "email") && st !== "done" && st !== "failed" && st !== "cancelled";
+  });
+  const use = coreOpen
+    ? rows.filter((row) => {
+        const t = row.type || "score";
+        return t === "discover" || t === "enrich" || t === "email" || t === "scrape";
+      })
+    : rows;
   let total = 0;
   let done = 0;
   let inflight = 0;
@@ -36,7 +47,7 @@ export function runProgressFromCounts(
   let weight = 0;
   const remaining = new Map<string, number>();
   let discoverLive = false;
-  for (const row of rows) {
+  for (const row of use) {
     const n = Math.max(0, Number(row.n ?? 0));
     if (!n) continue;
     const t = row.type || "score";

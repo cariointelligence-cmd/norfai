@@ -38,7 +38,7 @@ describe("hive sync", () => {
     assert.doesNotMatch(src.slice(src.indexOf("async function attachDiscovered"), src.indexOf("export async function runDiscover")), /insertCompany\(/);
     assert.match(src, /discoverSlots/);
     assert.match(src, /skipDiscover = opts\?\.skipDiscover \|\| discoverSlots <= 0/);
-    assert.doesNotMatch(src, /emailOnly/);
+    assert.match(src, /skipHeavy/);
   });
 
   it("Face search tick actually drains jobs for the run", () => {

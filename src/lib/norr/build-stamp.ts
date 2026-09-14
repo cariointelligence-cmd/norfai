@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-discover-slot";
+export const NORF_BUILD = "2026-09-14-cap-1000";
 
 export function vercelDeployProbe() {
   const env = process.env;

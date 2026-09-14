@@ -311,6 +311,7 @@ export const getBootstrap = createServerFn({ method: "GET" }).middleware([authMi
       plan: identity.plan,
       searchesUsed: identity.searchesUsed,
       searchesLimit: identity.searchesLimit,
+      perSearch: perSearchLimitFor(normalizePlanId(identity.plan), Boolean(identity.isAdmin)),
       seedOpen: identity.seedOpen,
       hasStripeCustomer,
       stripeReady: stripeCheckoutReady()

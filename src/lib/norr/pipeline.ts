@@ -1537,11 +1537,20 @@ async function claimNextJob(sql, userId, runId, opts) {
 	const live = (await sql`select count(*)::int as n from jobs where user_id = ${userId} and status = ${"running"}
       and (${runId ?? null}::text is null or run_id = ${runId ?? null})`)[0]?.n ?? 0;
 	if (Number(live) >= 16) return null;
+	let skipHeavy = false;
+	if (runId) {
+		const coreLive = (await sql`select count(*)::int as n from jobs
+      where user_id = ${userId} and run_id = ${runId}
+        and type in (${"enrich"}, ${"email"}, ${"discover"})
+        and status in ('queued','running')`)[0]?.n ?? 0;
+		skipHeavy = Number(coreLive) > 0;
+	}
 	const job = (await sql`
     select id from jobs
     where user_id = ${userId} and status = 'queued' and run_after <= now()
       and (${runId ?? null}::text is null or run_id = ${runId ?? null})
       and (${!skipDiscover} or type <> ${"discover"})
+      and (${!skipHeavy} or type in (${"discover"}, ${"enrich"}, ${"email"}))
       and (
         run_id is null
         or type = ${"email"}
