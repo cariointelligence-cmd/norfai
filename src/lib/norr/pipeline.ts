@@ -676,6 +676,36 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		emails: facts.emails,
 		phones: facts.phones
 	});
+	if (!facts.emails.length && facts.website) {
+		const domain = normalizeDomain(facts.website);
+		if (domain) {
+			try {
+				const mx = await mxCheck(domain);
+				const inferred = inferGeneralMailbox(domain, []);
+				if (inferred && mx.mx) {
+					await persistHits({
+						emails: [{
+							kind: "email",
+							value: inferred.value,
+							classification: "inferred",
+							sourceId: "website",
+							evidence: inferred.derivationMethod,
+							confidence: null,
+							mxValid: true,
+						}],
+					});
+					facts.emails.push({
+						kind: "email",
+						value: inferred.value,
+						classification: "inferred",
+						sourceId: "website",
+						evidence: inferred.derivationMethod,
+						confidence: null,
+					});
+				}
+			} catch { /* MX optional */ }
+		}
+	}
 	if (bid && country === "FI" && (!facts.emails.length || !facts.phones.length || !facts.people.length)) {
 		try {
 			const bis = await prhBisLookup(bid, { timeoutMs: 3500 });

@@ -10,7 +10,7 @@ describe("hive sync", () => {
     assert.equal(contactHarvestDone({ emails: 1, phones: 0, depth: "normal" }), true);
     assert.equal(contactHarvestDone({ emails: 0, phones: 2, depth: "normal" }), false);
     assert.equal(directoriesNeeded({ emails: 1, phones: 1, depth: "normal" }), false);
-    assert.equal(contactPlan({ website: "https://acme.fi", depth: "normal" }).harvestBudget, 2);
+    assert.equal(contactPlan({ website: "https://acme.fi", depth: "normal" }).harvestBudget, 4);
   });
 
   it("ranks discover ahead of email so the cap fills first", () => {

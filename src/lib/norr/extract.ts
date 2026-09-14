@@ -333,6 +333,15 @@ export function extractPageContacts(html: string, pageUrl: string): {
   for (const e of extractEmails(html + " " + text)) {
     pushE(e.value, e.classification === "obfuscated" ? "obfuscated" : "published");
   }
+  try {
+    const ld = extractJsonLd(html);
+    for (const org of ld.orgs) {
+      if (org.email) pushE(org.email, "published");
+    }
+    for (const person of ld.persons) {
+      if (person.email) pushE(person.email, "published");
+    }
+  } catch { /* json-ld optional */ }
 
   const phones: Array<{ value: string }> = [];
   const seenP = new Set<string>();
