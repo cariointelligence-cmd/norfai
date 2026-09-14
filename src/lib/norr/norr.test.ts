@@ -5,6 +5,9 @@ import { attachDecisionContacts, isDecisionTitle } from "./sources/decision-cont
 import { scoreCountryPath, countryLinksFromHtml } from "./sources/hypercrawl.ts";
 import { parseAllabolagCard } from "./sources/nation-helpers.ts";
 import { fleetCounts, fleetFor, pickFleet } from "./sources/nation-fleet.ts";
+import { extractDecisionMakersFromHtml } from "./sources/dm-extract.ts";
+import { dmPathCount } from "./sources/dm-fleet.ts";
+import { intelEngineIds, runIntelEngine } from "./vercel-intel.ts";
 import { workLanes } from "./progress.ts";
 import { identityLooksForeign, applyLlmVerdict, llmFilterIdentity } from "./hive-llm.ts";
 import { extractEmails, isJunkEmail, isBillingEmail, isRecruitingEmail, validEmailSyntax, decodeCfEmail, inferGeneralMailbox, inferPersonMailbox, emailMatchesPerson, websiteFromPublishedEmail, websiteFromPublishedEmails, isConsumerMailboxDomain, emailBelongsToCompany, needsEmailRecovery } from "./contacts.ts";
@@ -1105,6 +1108,20 @@ describe("country isolation and decision contacts", () => {
     const noPick = pickFleet("NO", { name: "Equinor", businessId: "923609016" }, 8);
     assert.ok(noPick.some((c) => c.id === "no_brreg_roller"));
     assert.equal(noPick.some((c) => c.nation !== "NO"), false);
+  });
+  it("extracts a CEO mailbox from nearby mailto without inventing it", () => {
+    const html = `<p>Toimitusjohtaja Esa Korkeela <a href="mailto:esa.korkeela@aura.fi">mail</a> <a href="tel:+358401234567">puh</a></p>`;
+    const people = extractDecisionMakersFromHtml(html, "https://aura.fi/johto", "FI");
+    assert.ok(people.some((p) => /Esa/i.test(p.fullName) && p.workEmail === "esa.korkeela@aura.fi"));
+  });
+  it("has 10+ leadership paths and 20+ vercel intel engines per catalog", () => {
+    const p = dmPathCount();
+    assert.ok(p.FI >= 10 && p.SE >= 10 && p.NO >= 10);
+    assert.ok(intelEngineIds().length >= 20);
+  });
+  it("refuses a Finnish DM engine on a Swedish company", async () => {
+    const r = await runIntelEngine("dm-fi", { country: "SE", website: "https://www.nibe.se" });
+    assert.equal(r.ok, false);
   });
   it("exposes four simple work lanes", () => {
     const lanes = workLanes(

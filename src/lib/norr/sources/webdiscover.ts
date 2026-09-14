@@ -19,6 +19,7 @@ import { RUNTIME } from "../runtime.ts";
 import { pickFanOutUrls } from "../job-budget.ts";
 import { hypercrawlSite } from "./hypercrawl.ts";
 import { attachDecisionContacts } from "./decision-contacts.ts";
+import { runDecisionMakerFleet } from "./dm-fleet.ts";
 import { countryEnv } from "../countries/env.ts";
 import { isJunkHost } from "../junk-hosts.ts";
 
@@ -620,17 +621,21 @@ export async function collectFastContacts(opts: {
       websiteSource = null;
     }
     try {
-      const hyper = await hypercrawlSite({
-        website,
-        country: opts.country,
-        companyName: opts.name,
-        skipHome: true,
-        haveEmail: emails.length > 0,
-        havePhone: phones.length > 0,
-      });
+      const [hyper, dm] = await Promise.all([
+        hypercrawlSite({
+          website,
+          country: opts.country,
+          companyName: opts.name,
+          skipHome: true,
+          haveEmail: emails.length > 0,
+          havePhone: phones.length > 0,
+        }),
+        runDecisionMakerFleet({ website, country: opts.country }),
+      ]);
       mergeUniqueEmails(emails, hyper.emails);
       mergeUniquePhones(phones, hyper.phones);
       mergeUniquePeople(people, hyper.people);
+      mergeUniquePeople(people, dm.people);
     } catch { /* first-party extra pages optional */ }
   }
   const peopleLinked = attachDecisionContacts({ people, emails, phones, website });

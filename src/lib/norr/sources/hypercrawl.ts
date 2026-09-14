@@ -2,6 +2,7 @@
 import type { ContactHit, PersonHit } from "../types.ts";
 import { extractEmails, extractPhones, isJunkEmail, isBillingEmail, isRecruitingEmail } from "../contacts.ts";
 import { extractJsonLd, extractPeopleFromHtml } from "../extract.ts";
+import { extractDecisionMakersFromHtml } from "./dm-extract.ts";
 import { canonicalCompanyWebsite, normalizePhone } from "../normalize.ts";
 import { BROWSER_UA, safeFetch } from "../ssrf.ts";
 import { countryEnv, nationOf, type Nation } from "../countries/env.ts";
@@ -128,6 +129,7 @@ function ingest(
     pushPhone(phones, p, url, phoneRegion, envNation);
   }
   people.push(...extractPeopleFromHtml(slice.slice(0, 16_000), url).slice(0, 8));
+  people.push(...extractDecisionMakersFromHtml(slice, url, envNation));
 }
 
 function pushEmail(into: ContactHit[], raw: string | null | undefined, url: string, nation: Nation): void {
