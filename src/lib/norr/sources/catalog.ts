@@ -425,10 +425,13 @@ export const SOURCE_CATALOG: SourceDef[] = [
   },
 ];
 
+const KEY_REQUIRED = new Set(["hunter", "search_api", "asiakastieto", "grok_search", "apify"]);
+
 export function initialState(def: SourceDef, env: NodeJS.ProcessEnv = process.env): SourceState {
   if (!def.implemented) return def.open ? "not_implemented" : "optional_offline";
-  if (def.id === "grok_search" && !env.XAI_API_KEY?.trim()) return "optional_offline";
+  if (KEY_REQUIRED.has(def.id) && def.credentialEnv && !env[def.credentialEnv]?.trim()) return "optional_offline";
   if (!def.open && def.credentialEnv && !env[def.credentialEnv]?.trim()) return "optional_offline";
+  if (def.id === "grok_search" && !env.XAI_API_KEY?.trim()) return "optional_offline";
   return "connected";
 }
 

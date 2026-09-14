@@ -86,18 +86,36 @@ function RunView() {
         searchAgain: "Hae sähköpostit uudestaan",
         noneQueued: "Jokaisella osumalla on jo sähköposti, tai rivejä ei ole.",
         queued: "Haetaan julkaistuja osoitteita {n} yritykseltä. Hakemistot eivät kelpaa yrityksen sivuksi.",
+        pause: "Tauko",
+        resume: "Jatka",
+        cancel: "Peruuta",
+        paused: "Tauotettu",
+        resumed: "Jatkuu",
+        cancelled: "Peruttu",
       },
       en: {
         findMissing: "Find missing emails ({n})",
         searchAgain: "Search emails again",
         noneQueued: "Every match already has an email, or there are no rows.",
         queued: "Looking up published emails on {n} companies. Directory pages are not used as the company site.",
+        pause: "Pause",
+        resume: "Resume",
+        cancel: "Cancel",
+        paused: "Paused",
+        resumed: "Resumed",
+        cancelled: "Cancelled",
       },
       sv: {
         findMissing: "Hitta saknade e-postadresser ({n})",
         searchAgain: "Sök e-post igen",
         noneQueued: "Varje träff har redan e-post, eller så finns inga rader.",
         queued: "Söker publicerade adresser hos {n} bolag. Katalogsidor räknas inte som bolagets sajt.",
+        pause: "Paus",
+        resume: "Fortsätt",
+        cancel: "Avbryt",
+        paused: "Pausad",
+        resumed: "Återupptagen",
+        cancelled: "Avbruten",
       },
     },
     locale,
@@ -161,7 +179,7 @@ function RunView() {
         toast.error("error" in r && typeof r.error === "string" ? r.error : "Could not update search");
         return;
       }
-      toast.message(action === "pause" ? "Paused" : action === "resume" ? "Resumed" : "Cancelled");
+      toast.message(action === "pause" ? copy.paused : action === "resume" ? copy.resumed : copy.cancelled);
       void q.refetch();
     },
     onError: () => toast.error("Could not update search"),
@@ -354,12 +372,12 @@ function RunView() {
             </Button>
           ) : null}
           {run.status === "running" || run.status === "queued" ? (
-            <Button variant="secondary" disabled={control.isPending} onClick={() => control.mutate("pause")}>Pause</Button>
+            <Button variant="secondary" disabled={control.isPending} onClick={() => control.mutate("pause")}>{copy.pause}</Button>
           ) : run.status === "paused" ? (
-            <Button variant="secondary" disabled={control.isPending} onClick={() => control.mutate("resume")}>Resume</Button>
+            <Button variant="secondary" disabled={control.isPending} onClick={() => control.mutate("resume")}>{copy.resume}</Button>
           ) : null}
           {run.status !== "cancelled" && run.status !== "completed" && run.status !== "failed" ? (
-            <Button variant="danger" disabled={control.isPending} onClick={() => control.mutate("cancel")}>Cancel</Button>
+            <Button variant="danger" disabled={control.isPending} onClick={() => control.mutate("cancel")}>{copy.cancel}</Button>
           ) : null}
         </div>
       </div>

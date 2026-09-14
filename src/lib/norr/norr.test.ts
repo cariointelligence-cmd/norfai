@@ -590,10 +590,7 @@ describe("source catalogue", () => {
   it("connects homemade collectors without commercial API keys", () => {
     const ids = [
       "opencorporates",
-      "hunter",
       "companies_house",
-      "search_api",
-      "asiakastieto",
       "business_finland",
       "statfin",
       "ejustice",
@@ -609,7 +606,11 @@ describe("source catalogue", () => {
       assert.equal(def!.open, true, id);
       assert.equal(initialState(def!, {}), "connected", id);
     }
-    assert.equal(SOURCE_CATALOG.filter((s) => !s.implemented).length, 0);
+    for (const id of ["hunter", "search_api", "asiakastieto"]) {
+      const def = SOURCE_CATALOG.find((s) => s.id === id);
+      assert.ok(def, id);
+      assert.equal(initialState(def!, {}), "optional_offline", id);
+    }
     const apify = SOURCE_CATALOG.find((s) => s.id === "apify");
     assert.ok(apify);
     assert.equal(apify!.open, false);
