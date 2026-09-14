@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { classifyWorkload, interactiveBudgetMs, shouldBlockRequest, EXECUTION_TARGETS, vercelRuntimeInfo, scheduleBackground } from "./hybrid.ts";
-import { cacheGet, cacheSet, cacheCoalesce, cacheStats, resetIntelCacheForTests, CACHE_TTL } from "./intel-cache.ts";
+import { cacheGet, cacheSet, cacheCoalesce, cacheGetStale, cacheStats, resetIntelCacheForTests, CACHE_TTL, STORE_CAP } from "./intel-cache.ts";
 
 describe("vercel hybrid", () => {
   it("keeps discovery on the request and crawls off it", () => {
@@ -56,7 +56,30 @@ describe("vercel hybrid", () => {
 
   it("bounds hive intel cache so the memory buffer cannot grow without cap", () => {
     resetIntelCacheForTests();
-    for (let i = 0; i < 2_600; i++) cacheSet(`k${i}`, i, CACHE_TTL.domain);
-    assert.ok(cacheStats().size <= 2_500);
+    for (let i = 0; i < STORE_CAP + 200; i++) cacheSet(`k${i}`, i, CACHE_TTL.domain);
+    assert.ok(cacheStats().size <= STORE_CAP);
+  });
+
+  it("serves stale intelligence while a refresh is in flight", async () => {
+    resetIntelCacheForTests();
+    cacheSet("host|example.fi", "old", 20);
+    await new Promise((r) => setTimeout(r, 25));
+    assert.equal(cacheGet<string>("host|example.fi"), null);
+    assert.equal(cacheGetStale<string>("host|example.fi"), "old");
+    let calls = 0;
+    const first = cacheCoalesce("host|example.fi", 5_000, async () => {
+      calls += 1;
+      await new Promise((r) => setTimeout(r, 30));
+      return "new";
+    });
+    const second = cacheCoalesce("host|example.fi", 5_000, async () => {
+      calls += 1;
+      return "nope";
+    });
+    assert.equal(await first, "old");
+    assert.equal(await second, "old");
+    await new Promise((r) => setTimeout(r, 40));
+    assert.equal(cacheGet<string>("host|example.fi"), "new");
+    assert.equal(calls, 1);
   });
 });

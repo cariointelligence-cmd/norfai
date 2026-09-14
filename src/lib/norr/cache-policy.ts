@@ -30,7 +30,7 @@ export type CacheEntry<T> = {
 };
 
 const mem = new Map<string, CacheEntry<unknown>>();
-const MEM_CAP = 2_500;
+const MEM_CAP = 8_000;
 
 function pruneMem(now = Date.now()): void {
   if (mem.size <= MEM_CAP) return;
@@ -53,10 +53,15 @@ export function cacheKey(kind: CacheKind, parts: Array<string | null | undefined
 export function readCache<T>(key: string, now = Date.now()): CacheEntry<T> | null {
   const hit = mem.get(key) as CacheEntry<T> | undefined;
   if (!hit) return null;
-  if (now - hit.storedAt > hit.ttlMs) {
+  if (now - hit.storedAt > hit.ttlMs * 3) {
     mem.delete(key);
     return null;
   }
+  if (now - hit.storedAt > hit.ttlMs) {
+    return { ...hit, stale: true } as CacheEntry<T> & { stale?: boolean };
+  }
+  mem.delete(key);
+  mem.set(key, hit);
   return hit;
 }
 

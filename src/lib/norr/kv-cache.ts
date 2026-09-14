@@ -20,7 +20,7 @@ export async function kvGetJson<T>(key: string): Promise<T | null> {
   try {
     const r = await fetch(`${c.url}/get/${encodeURIComponent(key)}`, {
       headers: { Authorization: `Bearer ${c.token}` },
-      signal: AbortSignal.timeout(800),
+      signal: AbortSignal.timeout(200),
     });
     if (!r.ok) return null;
     const body = (await r.json()) as { result?: string | null };
@@ -37,12 +37,12 @@ export async function kvSetJson(key: string, value: unknown, ttlSec: number): Pr
   const ttl = Math.max(30, Math.min(Math.round(ttlSec), 7 * 24 * 3600));
   try {
     const payload = JSON.stringify(value);
-    if (payload.length > 200_000) return;
+    if (payload.length > 80_000) return;
     await fetch(`${c.url}/set/${encodeURIComponent(key)}/ex/${ttl}`, {
       method: "POST",
       headers: { Authorization: `Bearer ${c.token}`, "Content-Type": "application/json" },
       body: payload,
-      signal: AbortSignal.timeout(800),
+      signal: AbortSignal.timeout(400),
     });
   } catch {
     /* keep local cache */
