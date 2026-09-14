@@ -39,6 +39,7 @@ describe("hive sync", () => {
     assert.match(src, /discoverSlots/);
     assert.match(src, /skipDiscover = opts\?\.skipDiscover \|\| discoverSlots <= 0/);
     assert.match(src, /resumeEnrichIfStarved/);
+    assert.match(src, /pruneSidecarJobs/);
   });
 
   it("Face search tick actually drains jobs for the run", () => {

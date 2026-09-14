@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-pending-enrich";
+export const NORF_BUILD = "2026-09-14-uncap-1000-prune";
 
 export function vercelDeployProbe() {
   const env = process.env;

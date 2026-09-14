@@ -17,7 +17,7 @@ import { loc } from "@/lib/content/locale";
 
 function starterCriteria(): SearchCriteria {
   const c = emptyCriteria();
-  c.maxResults = 100;
+  c.maxResults = 1000;
   c.mode = "quick";
   return c;
 }

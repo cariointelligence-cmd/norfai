@@ -250,8 +250,17 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
   const t0 = Date.now();
   const deadline = t0 + DISCOVER_BUDGET_MS;
   const report: Array<Record<string, unknown>> = [];
-  const planCap = ENGINE_SEARCH_CEILING;
-  const want = clampRequestedLeads(criteria.maxResults, planCap);
+  const id = await readPlatformIdentity(sql, userId);
+  const planCap = perSearchLimitFor(id.plan, id.isAdmin);
+  let want = clampRequestedLeads(criteria.maxResults, isUnlimitedQuota(planCap) ? ENGINE_SEARCH_CEILING : planCap);
+  if (isUnlimitedQuota(planCap) && want <= 100) {
+    want = 1000;
+    try {
+      await sql`update search_runs
+        set criteria = jsonb_set(coalesce(criteria, '{}'::jsonb), '{maxResults}', ${JSON.stringify(1000)}::jsonb)
+        where id = ${runId} and user_id = ${userId}`;
+    } catch { /* keep running with want */ }
+  }
   const pool = Math.min(discoverPoolSize({ ...criteria, maxResults: want }), ENGINE_SEARCH_CEILING);
   const depth = criteria.depth === "deep" ? "deep" : "normal";
   const country = criteria.country || "FI";
@@ -1694,7 +1703,16 @@ export async function resumeDiscoverIfStarved(sql, userId, runId) {
 	if (!runId) return false;
 	const run = (await sql`select criteria, status, pause_requested, cancel_requested from search_runs where id = ${runId} and user_id = ${userId}`)?.[0];
 	if (!run) return false;
-	const want = Math.max(1, Number(run.criteria?.maxResults ?? 100));
+	const ident = await readPlatformIdentity(sql, userId);
+	let want = Math.max(1, Number(run.criteria?.maxResults ?? 100));
+	if (isUnlimitedQuota(perSearchLimitFor(ident.plan, ident.isAdmin)) && want <= 100) {
+		want = 1000;
+		try {
+			await sql`update search_runs
+        set criteria = jsonb_set(coalesce(criteria, '{}'::jsonb), '{maxResults}', ${JSON.stringify(1000)}::jsonb)
+        where id = ${runId} and user_id = ${userId}`;
+		} catch { /* */ }
+	}
 	const skipSeen = skipPreviouslyShown(run.criteria ?? {});
 	let kept = 0;
 	try {
@@ -1767,12 +1785,28 @@ export async function resumeEnrichIfStarved(sql, userId, runId) {
 	return n;
 }
 
+export async function pruneSidecarJobs(sql, userId, runId) {
+	if (!runId) return 0;
+	const core = Number((await sql`select count(*)::int as n from jobs
+    where user_id = ${userId} and run_id = ${runId}
+      and type in (${"enrich"}, ${"email"}, ${"discover"})
+      and status in ('queued','running')`)[0]?.n ?? 0);
+	if (core <= 0) return 0;
+	const cut = await sql`update jobs set status = ${"cancelled"}, last_error = ${"sidecar deferred"}, locked_at = null, updated_at = now()
+    where user_id = ${userId} and run_id = ${runId}
+      and type in (${"crawl"}, ${"signals"}, ${"score"}, ${"scrape"})
+      and status = ${"queued"}
+    returning id`;
+	return cut.length;
+}
+
 export async function processJobsFor(sql, userId, runId, opts) {
 	if (!opts?.skipSchema) {
 		try { await ensureOpsSchema(sql); } catch { /* */ }
 	}
 	try { if (runId) await resumeDiscoverIfStarved(sql, userId, runId); } catch { /* */ }
 	try { if (runId) await resumeEnrichIfStarved(sql, userId, runId); } catch { /* */ }
+	try { if (runId) await pruneSidecarJobs(sql, userId, runId); } catch { /* */ }
 	const maxMs = opts?.maxMs ?? RUNTIME.workerMaxMs;
 	const concurrency = clampConcurrency(opts?.concurrency);
 	const t0 = Date.now();
