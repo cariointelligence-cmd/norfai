@@ -1029,5 +1029,8 @@ describe("normalize", () => {
     assert.equal(isJunkCompanyWebsite("https://try.abtasty.com/abc.js"), true);
     assert.equal(canonicalCompanyWebsite("https://try.abtasty.com"), null);
     assert.equal(isDirectoryHost("try.abtasty.com"), true);
+    assert.equal(isJunkCompanyWebsite("https://cl-eu6.k5a.io/zaraz"), true);
+    assert.equal(canonicalCompanyWebsite("https://cl-eu6.k5a.io"), null);
+    assert.equal(storedWebsiteUnusable("https://cl-eu6.k5a.io"), true);
   });
 });

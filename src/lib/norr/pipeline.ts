@@ -588,6 +588,10 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		if (hits.website) {
 			const incoming = canonicalCompanyWebsite(hits.website);
 			if (incoming && !isDirectoryHost(incoming)) await sql`update companies set website = ${incoming}, website_domain = ${normalizeDomain(incoming)} where id = ${companyId} and user_id = ${userId}`;
+			else if (isJunkCompanyWebsite(hits.website) || isDirectoryHost(hits.website)) {
+				await sql`update companies set website = null, website_domain = null
+          where id = ${companyId} and user_id = ${userId}`;
+			}
 			else if (!incoming && /closed\.html?/i.test(hits.website)) await sql`update companies set website = null, website_domain = null
           where id = ${companyId} and user_id = ${userId}
             and (website is null or website ~* 'closed\\.html?')`;
@@ -633,7 +637,12 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		]);
 		if (emails.length || phones.length) await refreshCompanyContactFields(sql, userId, companyId);
 	};
-	const site = canonicalCompanyWebsite((await loadCompany(sql, userId, companyId))?.website);
+	const loadedCo = await loadCompany(sql, userId, companyId);
+	if (loadedCo?.website && (isJunkCompanyWebsite(loadedCo.website) || isDirectoryHost(loadedCo.website))) {
+		await sql`update companies set website = null, website_domain = null where id = ${companyId} and user_id = ${userId}`;
+		loadedCo.website = null;
+	}
+	const site = canonicalCompanyWebsite(loadedCo?.website);
 	const facts = await collectFastContacts({
 		name,
 		municipality: mun,

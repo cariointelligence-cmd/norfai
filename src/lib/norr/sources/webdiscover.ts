@@ -56,6 +56,7 @@ const DIRECTORY_HOSTS = [
   "schema.org", "w3.org",
   "abtasty.com", "sentry.io", "mixpanel.com", "intercom.io", "intercom.com",
   "hubspot.com", "optimizely.com", "fullstory.com", "cookieyes.com", "clarity.ms", "vwo.com",
+  "k5a.io", "zaraz.com", "cloudflareinsights.com",
 ];
 
 export function isDirectoryHost(urlOrHost: string): boolean {

@@ -47,6 +47,7 @@ const JUNK_EMAIL_DOMAINS = new Set([
   "duckduckgo.com", "google.com", "bing.com", "yahoo.com",
   "wikipedia.org", "wikimedia.org",
   "vainu.com", "vainu.io", "finder.fi", "fonecta.fi",
+  "k5a.io", "zaraz.com", "cloudflareinsights.com",
 ]);
 
 const BILLING_EMAIL_DOMAINS = new Set([
