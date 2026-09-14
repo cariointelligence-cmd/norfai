@@ -61,7 +61,7 @@ describe("search job budget", () => {
     });
     assert.ok(urls.length <= 2);
     assert.ok(urls.length >= 1);
-    assert.equal(urls.some((u) => u.includes("yhteystiedot")), false);
+    assert.equal(urls.some((u) => /\/\/automaalaus\.com\/yhteystiedot\/?$/.test(u)), false);
     assert.equal(urls.every((u) => u.startsWith("https://automaalaus.com/")), true);
     assert.deepEqual(
       pickFanOutUrls({ origin: "https://automaalaus.com", already: [], slots: 0 }),

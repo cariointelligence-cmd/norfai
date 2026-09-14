@@ -74,12 +74,13 @@ export function runProgressFromCounts(
     signals: "Signals",
     score: "Scoring",
   };
-  const pct = Math.max(2, Math.min(99, weight ? Math.round((100 * earned) / weight) : Math.round((100 * done) / total)));
-  const waiting = discoverLive && inflight === 0 && done === 0;
+  const waiting = discoverLive && inflight === 0 && done === 0 && runStatus === "queued";
+  const pctRaw = Math.max(2, Math.min(99, weight ? Math.round((100 * earned) / weight) : Math.round((100 * done) / total)));
+  const pct = running && discoverLive ? Math.max(12, pctRaw) : waiting ? 4 : pctRaw;
   return {
-    pct: waiting ? 4 : discoverLive && inflight ? Math.max(12, pct) : pct,
+    pct,
     stage,
-    label: waiting ? "Waiting to start" : (labels[stage] ?? "Working"),
+    label: running && discoverLive ? "Registers" : waiting ? "Waiting to start" : (labels[stage] ?? "Working"),
     done,
     total,
     running,

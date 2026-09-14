@@ -84,14 +84,15 @@ describe("search progress rail", () => {
     assert.equal(scrape.label, "Web search");
     assert.ok(scrape.pct > 10 && scrape.pct < 99);
   });
-  it("queued discover is waiting, not fake 45%", () => {
+  it("queued discover on a running search stays Registers, never 4%", () => {
     const queued = runProgress([{ type: "discover", status: "queued" }], "running");
     const live = runProgress([{ type: "discover", status: "running" }], "running");
     assert.equal(queued.stage, "discover");
-    assert.equal(queued.label, "Waiting to start");
-    assert.ok(queued.pct <= 8, `queued pct=${queued.pct}`);
+    assert.equal(queued.label, "Registers");
+    assert.ok(queued.pct >= 12, `queued pct=${queued.pct}`);
     assert.equal(live.stage, "discover");
     assert.equal(live.label, "Registers");
     assert.ok(live.pct >= 12 && live.pct <= 50, `running pct=${live.pct}`);
+    assert.equal(queued.label, live.label);
   });
 });

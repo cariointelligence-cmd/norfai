@@ -1489,6 +1489,7 @@ async function runScrape(sql, userId, runId, companyId) {
 async function stealStaleJobs(sql, userId, runId) {
 	await sql`update jobs set status = ${"queued"}, locked_at = null, run_after = now(), updated_at = now(), last_error = ${"stolen stale lock"}
     where user_id = ${userId} and status = ${"running"}
+      and type <> ${"discover"}
       and (
         locked_at is null
         or locked_at < now() - make_interval(secs => ${RUNTIME.jobStealSeconds})
@@ -1499,10 +1500,29 @@ async function stealStaleJobs(sql, userId, runId) {
 
 async function claimNextJob(sql, userId, runId, opts) {
 	const skipDiscover = Boolean(opts?.skipDiscover);
-	const live = (await sql`select count(*)::int as n from jobs where user_id = ${userId} and status = ${"running"}`)[0]?.n ?? 0;
+	if (runId && !skipDiscover) {
+		const discLive = (await sql`select count(*)::int as n from jobs where user_id = ${userId} and type = ${"discover"} and status = ${"running"}`)[0]?.n ?? 0;
+		if (Number(discLive) < 2) {
+			const disc = (await sql`
+        select id from jobs
+        where user_id = ${userId} and type = ${"discover"} and status = 'queued' and run_after <= now()
+          and run_id = ${runId}
+        order by created_at asc limit 1`)[0];
+			if (disc) {
+				const claimed = (await sql`
+          update jobs set status = ${"running"}, attempts = attempts + 1, locked_at = now(), updated_at = now()
+          where id = ${disc.id} and user_id = ${userId} and status = ${"queued"}
+          returning id, type, company_id, run_id, payload`)[0];
+				if (claimed) return claimed;
+			}
+		}
+	}
+	const live = (await sql`select count(*)::int as n from jobs where user_id = ${userId} and status = ${"running"}
+      and (${runId ?? null}::text is null or run_id = ${runId ?? null})`)[0]?.n ?? 0;
 	const emailOnly = Number(live) >= 8;
 	if (emailOnly) {
-		const emailLive = (await sql`select count(*)::int as n from jobs where user_id = ${userId} and status = ${"running"} and type = ${"email"}`)[0]?.n ?? 0;
+		const emailLive = (await sql`select count(*)::int as n from jobs where user_id = ${userId} and status = ${"running"} and type = ${"email"}
+          and (${runId ?? null}::text is null or run_id = ${runId ?? null})`)[0]?.n ?? 0;
 		if (Number(emailLive) >= 8) return null;
 	}
 	const job = (await sql`
