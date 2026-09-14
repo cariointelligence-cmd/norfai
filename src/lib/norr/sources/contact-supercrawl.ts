@@ -124,12 +124,10 @@ async function supercrawlLive(opts: {
     { url: `https://www.020202.fi/haku?what=${q}`, id: "020202" },
   ];
   if (digits) primary.push({ url: `https://www.kauppalehti.fi/yritykset/yritys/${digits}`, id: "kauppalehti" });
+  if (bid && /^\d{7}-\d$/.test(bid)) primary.push({ url: `https://www.ytunnus.fi/${bid}`, id: "ytunnus" });
   const pages = await Promise.all(primary.map((u) => fetchParse(u.url, u.id)));
   const out: SuperCrawlHits = { emails: [], phones: [], people: [], website: null, sourceUrl: null, sourceId: "supercrawl" };
   for (const p of pages) mergeHits(out, p);
-  if (!out.emails.length && bid && /^\d{7}-\d$/.test(bid)) {
-    mergeHits(out, await fetchParse(`https://www.ytunnus.fi/${bid}`, "ytunnus"));
-  }
   return out;
 }
 

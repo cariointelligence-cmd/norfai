@@ -670,7 +670,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			sourceUrl: "",
 			observations: []
 		})),
-		(depth === "deep" || emailRecovery ? kauppalehtiLookup({
+		(needDirs ? kauppalehtiLookup({
 			name,
 			businessId: bid
 		}) : Promise.resolve({ ok: false, profile: null, sourceUrl: "", observations: [] })).catch(() => ({

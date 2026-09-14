@@ -6,8 +6,8 @@ export function contactPlan(opts: {
 }): { skipSearch: boolean; harvestBudget: number; probeGuesses: boolean } {
   const hasSite = Boolean(opts.website && String(opts.website).includes("."));
   const deep = opts.depth === "deep";
-  if (hasSite) return { skipSearch: true, harvestBudget: deep ? 6 : 3, probeGuesses: false };
-  return { skipSearch: false, harvestBudget: deep ? 5 : 3, probeGuesses: true };
+  if (hasSite) return { skipSearch: true, harvestBudget: deep ? 6 : 4, probeGuesses: false };
+  return { skipSearch: false, harvestBudget: deep ? 5 : 4, probeGuesses: true };
 }
 
 export function directoriesNeeded(opts: {

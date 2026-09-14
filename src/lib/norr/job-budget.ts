@@ -5,7 +5,7 @@
  */
 export const SEARCH_WATCHDOG_MS = 20 * 60 * 1000;
 
-const FANOUT_PATHS_NORMAL = ["/yhteystiedot", "/fi/yhteystiedot", "/contact", "/yhteydenotto", "/contact-us", "/tiimi", "/johto", "/meista", "/about", "/ota-yhteytta"];
+const FANOUT_PATHS_NORMAL = ["/yhteystiedot", "/fi/yhteystiedot", "/en/contact", "/contact", "/kontakt", "/yhteydenotto", "/contact-us", "/tiimi", "/johto", "/meista", "/about", "/ota-yhteytta"];
 const FANOUT_PATHS_DEEP = ["/yhteystiedot", "/contact", "/meista", "/about", "/tiimi", "/team", "/johto", "/contact-us", "/henkilosto", "/yritys", "/ota-yhteytta"];
 const FANOUT_PATHS_HIRING = ["/tyopaikat", "/careers", "/jobs", "/ura", "/avoimet-tyopaikat", "/open-positions"];
 

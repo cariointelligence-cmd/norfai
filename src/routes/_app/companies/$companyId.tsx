@@ -35,7 +35,9 @@ const OUTCOMES = [
 function FieldRow({ label, value, obs }: { label: string; value: unknown; obs?: Array<Record<string, unknown>> }) {
   const related = (obs ?? []).filter((o) => o.field === label);
   const fromObs = related.find((o) => o.normalised_value != null && String(o.normalised_value).length)?.normalised_value;
-  const display = value == null || value === "" ? (fromObs != null ? String(fromObs) : "Not found") : String(value);
+  const financial = /^(revenue|previous_revenue|profit|equity|assets|equity_ratio)$/.test(label);
+  const empty = value == null || value === "";
+  const display = empty ? (fromObs != null ? String(fromObs) : financial ? "UNKNOWN" : "Not found") : String(value);
   return (
     <div className="grid gap-1 border-b border-line py-3 md:grid-cols-[160px_minmax(0,1fr)]">
       <div className="text-[11px] uppercase tracking-[0.14em] text-faint">{label.replaceAll("_", " ")}</div>

@@ -11,7 +11,7 @@ export function scoreLabel(n: number | null | undefined, opts?: { pending?: bool
 }
 
 export function formatEuro(n: number | string | null | undefined): string {
-  if (n == null || n === "") return "Not found";
+  if (n == null || n === "") return "UNKNOWN";
   const v = typeof n === "number" ? n : Number(n);
   if (!Number.isFinite(v)) return "Not found";
   if (v >= 1_000_000) return `€${(v / 1_000_000).toFixed(v >= 10_000_000 ? 0 : 1)}M`;
