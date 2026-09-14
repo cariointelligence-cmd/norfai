@@ -50,6 +50,7 @@ import { countryEnv } from "./countries/env.ts";
 import { linkedinLookup } from "./sources/linkedin.ts";
 import { grokBudgetRemaining, grokContactSearch } from "./sources/groksearch.ts";
 import { llmFilterIdentity, applyLlmVerdict } from "./hive-llm.ts";
+import { llmRankDecisionMakers } from "./hive-assist.ts";
 import { federatedCompanySearch } from "./sources/discovery.ts";
 import { homemadeRegisterDiscover } from "./sources/directories.ts";
 import { acceptDiscovered, looksLikeCompanyName } from "./sources/register-gate.ts";
@@ -656,6 +657,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			emailsOut = applied.emails;
 			phonesOut = applied.phones;
 			peopleOut = applied.people;
+			try { peopleOut = await llmRankDecisionMakers(peopleOut); } catch { /* keep deterministic order */ }
 			if (judged?.dropWebsite && websiteOut == null) {
 				await sql`update companies set website = null, website_domain = null where id = ${companyId} and user_id = ${userId}`;
 			}

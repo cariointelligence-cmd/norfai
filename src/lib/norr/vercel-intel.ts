@@ -9,7 +9,7 @@ import { runDecisionMakerFleet } from "./sources/dm-fleet.ts";
 import { extractDecisionMakersFromHtml } from "./sources/dm-extract.ts";
 import { attachDecisionContacts } from "./sources/decision-contacts.ts";
 import { norwayHelper, swedenHelper } from "./sources/nation-helpers.ts";
-import { BROWSER_UA, safeFetch } from "./ssrf.ts";
+import { llmRankDecisionMakers, rankDecisionMakersLocal } from "./hive-assist.ts";
 import { canonicalCompanyWebsite } from "./normalize.ts";
 
 export type IntelInput = {
@@ -85,6 +85,18 @@ export const INTEL_ENGINES: Record<string, (input: IntelInput) => Promise<IntelO
       phones: h.phones.map((p) => p.value),
     });
   },
+  "ai-dm": async (i) => {
+    const people = rankDecisionMakersLocal(
+      (i.html ? [] : []).concat(),
+    );
+    void people;
+    const ranked = await llmRankDecisionMakers(
+      i.name ? [{ fullName: i.name, title: "CEO", confidence: 50, sourcePage: i.website ?? "" }] : [],
+    );
+    return out("ai-dm", { people: ranked.map((p) => ({ name: p.fullName, title: p.title, email: p.workEmail, phone: p.workPhone })) });
+  },
+  "ai-filter": async (i) => proximity(i),
+  "ai-opportunity": (i) => dm(nation(i.country), i),
 };
 
 async function dm(n: Nation, i: IntelInput): Promise<IntelOutput> {

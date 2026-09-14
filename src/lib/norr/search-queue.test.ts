@@ -1,6 +1,6 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { compareSearchLanes, searchLane, searchLaneRank } from "./search-queue.ts";
+import { compareSearchLanes, searchLane, searchLaneRank, agedRank, laneSlots } from "./search-queue.ts";
 
 describe("search lane priority", () => {
   it("ranks admin before unlimited before paid before free", () => {
@@ -22,5 +22,13 @@ describe("search lane priority", () => {
     const a = { rank: 4, createdAt: 10 };
     const b = { rank: 4, createdAt: 20 };
     assert.ok(compareSearchLanes(a, b) < 0);
+  });
+
+  it("ages a long wait so free is not starved forever", () => {
+    assert.equal(agedRank(4, 0), 4);
+    assert.ok(agedRank(4, 90_000) < 4);
+    assert.ok(agedRank(4, 180_000) <= 2);
+    assert.equal(laneSlots("admin"), 2);
+    assert.equal(laneSlots("free"), 1);
   });
 });

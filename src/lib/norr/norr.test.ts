@@ -7,6 +7,7 @@ import { parseAllabolagCard } from "./sources/nation-helpers.ts";
 import { fleetCounts, fleetFor, pickFleet } from "./sources/nation-fleet.ts";
 import { extractDecisionMakersFromHtml } from "./sources/dm-extract.ts";
 import { dmPathCount } from "./sources/dm-fleet.ts";
+import { rankDecisionMakersLocal } from "./hive-assist.ts";
 import { intelEngineIds, runIntelEngine } from "./vercel-intel.ts";
 import { clampRequestedLeads } from "./platform.ts";
 import { opportunityEngineCount, extraPathsForPreset, opportunityEnginesFor } from "./sources/opportunity-engines.ts";
@@ -1137,6 +1138,13 @@ describe("country isolation and decision contacts", () => {
     const filled = workLanes([{ type: "discover", status: "running" }], "running", { matched: 86, want: 50 });
     assert.ok((filled.find((l) => l.key === "discover")?.pct ?? 0) >= 90);
     void companies;
+  });
+  it("ranks a CEO above a random employee locally without inventing contacts", () => {
+    const ranked = rankDecisionMakersLocal([
+      { fullName: "Matti Meikalainen", title: "Asentaja", confidence: 40 },
+      { fullName: "Esa Korkeela", title: "Toimitusjohtaja", workEmail: "esa@aura.fi", confidence: 80 },
+    ]);
+    assert.equal(ranked[0]?.fullName, "Esa Korkeela");
   });
   it("never upgrades a 50-company request to 1000 even on unlimited plans", () => {
     assert.equal(clampRequestedLeads(50, -1), 50);

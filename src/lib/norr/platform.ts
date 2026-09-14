@@ -537,6 +537,9 @@ export function resolveCheckoutOrigin(candidate: string | null | undefined): str
   ]) consider(process.env[key]);
   allowed.add("norfai.com");
   allowed.add("www.norfai.com");
+  if (host === "norfai.com" || host === "www.norfai.com" || host.endsWith(".vercel.app")) {
+    return "https://www.norfai.com";
+  }
   if (allowed.has(host) || local) return `https://${host}`;
   return null;
 }

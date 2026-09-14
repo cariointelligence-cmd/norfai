@@ -7,6 +7,7 @@ import {
   planFromStripePriceId,
   resolveStripePlan,
   stripeCheckoutReady,
+  resolveCheckoutOrigin,
 } from "./platform.ts";
 import {
   interpretStripeEvent,
@@ -139,6 +140,11 @@ describe("Stripe checkout form", () => {
       assert.equal(stripeCheckoutReady(), true);
     });
     assert.equal(stripeCheckoutReady(), false);
+  });
+  it("sends Stripe back to www.norfai.com even from vercel.app", () => {
+    assert.equal(resolveCheckoutOrigin("https://norfai.vercel.app"), "https://www.norfai.com");
+    assert.equal(resolveCheckoutOrigin("https://www.norfai.com"), "https://www.norfai.com");
+    assert.equal(resolveCheckoutOrigin("https://norfai.com"), "https://www.norfai.com");
   });
 });
 

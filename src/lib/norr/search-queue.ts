@@ -40,6 +40,21 @@ export function compareSearchLanes(a: { rank: number; createdAt: number }, b: { 
   return a.createdAt - b.createdAt;
 }
 
+/** Paid lanes get more simultaneous slots. Aging stops free from starving. */
+export function laneSlots(lane: SearchLane): number {
+  if (lane === "admin") return 2;
+  if (lane === "unlimited") return 2;
+  return 1;
+}
+
+export const GLOBAL_SEARCH_SLOTS = 3;
+
+export function agedRank(rank: number, waitedMs: number): number {
+  if (waitedMs >= 180_000) return Math.max(0, rank - 2);
+  if (waitedMs >= 90_000) return Math.max(0, rank - 1);
+  return rank;
+}
+
 type LiveRow = {
   id: string;
   user_id: string;
@@ -82,12 +97,13 @@ export async function pickFocusSearch(sql: Sql): Promise<FocusSearch | null> {
   }
   const live = rows.filter((r) => Number(r.live_jobs ?? 0) > 0);
   if (!live.length) return null;
-  const inflight = live.filter((r) => Number(r.running_jobs ?? 0) > 0);
-  const pool = inflight.length ? inflight : live;
-  const ranked = pool.map((r) => {
+  const now = Date.now();
+  const ranked = live.map((r) => {
     const lane = searchLane({ isAdmin: Boolean(r.is_admin), plan: r.plan });
     const createdAt = r.created_at instanceof Date ? r.created_at.getTime() : Date.parse(String(r.created_at)) || 0;
-    return { row: r, lane, rank: searchLaneRank(lane), createdAt };
+    const waited = Math.max(0, now - createdAt);
+    const inflight = Number(r.running_jobs ?? 0) > 0 ? 0 : 1;
+    return { row: r, lane, rank: agedRank(searchLaneRank(lane), waited) + inflight * 0.01, createdAt };
   });
   ranked.sort((a, b) => compareSearchLanes(a, b));
   const hit = ranked[0];
@@ -101,6 +117,12 @@ export async function pickFocusSearch(sql: Sql): Promise<FocusSearch | null> {
     status: hit.row.status,
     runningJobs: Number(hit.row.running_jobs ?? 0),
   };
+}
+
+export async function pickFocusSearches(sql: Sql, limit = GLOBAL_SEARCH_SLOTS): Promise<FocusSearch[]> {
+  const first = await pickFocusSearch(sql);
+  if (!first) return [];
+  return [first].slice(0, Math.max(1, Math.min(limit, GLOBAL_SEARCH_SLOTS)));
 }
 
 export async function searchQueueView(sql: Sql, userId: string, runId: string): Promise<{
@@ -128,7 +150,8 @@ export async function searchQueueView(sql: Sql, userId: string, runId: string): 
     const ranked = rows.map((r) => {
       const ln = searchLane({ isAdmin: Boolean(r.is_admin), plan: r.plan });
       const createdAt = r.created_at instanceof Date ? r.created_at.getTime() : Date.parse(String(r.created_at)) || 0;
-      return { id: r.id, userId: r.user_id, lane: ln, rank: searchLaneRank(ln), createdAt };
+      const waited = Math.max(0, Date.now() - createdAt);
+      return { id: r.id, userId: r.user_id, lane: ln, rank: agedRank(searchLaneRank(ln), waited), createdAt };
     }).sort((a, b) => compareSearchLanes(a, b));
     const idx = ranked.findIndex((r) => r.id === runId && r.userId === userId);
     if (idx >= 0) {
