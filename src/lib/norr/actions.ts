@@ -1776,19 +1776,15 @@ export const importSeeds = createServerFn({ method: "POST" }).middleware([authMi
   });
 
 export const buildExport = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d).handler(async ({ context, data }) => {
-    const sql = await ctxSql(context);
+  try {
+    const sql = await rawSql(context);
+    const fail = (error) => ({ filename: "", mime: "text/plain", body: "", rowCount: 0, error });
     const g = await gate(sql, context.userId, "export", {
       max: 12,
       windowMs: 36e5,
       capability: "company.export"
     });
-    if (!g.ok) return {
-      filename: "",
-      mime: "text/plain",
-      body: "",
-      rowCount: 0,
-      error: g.error
-    };
+    if (!g.ok) return fail(g.error);
     const requested = boundedArray((data.ids ?? []).filter(Boolean).map((id) => boundedString(id, 64)), 2e3);
     const cap = exportRowCap(g.identity.plan, g.identity.isAdmin);
     if (requested.length === 0 || requested.length > 50) {
@@ -1844,11 +1840,17 @@ export const buildExport = createServerFn({ method: "POST" }).middleware([authMi
           order by coalesce(rc.rank_position, 999999), c.id
           limit ${remaining}`
       : await sql`select id, name, business_id, vat_id, country, municipality, street, postal_code, website, website_domain, industry_code, industry_label, legal_form, record_status, overall_confidence, last_verified_at, revenue, website_score, seo_score, commercial_opportunity, match_score from companies where user_id = ${context.userId} and deleted_at is null order by name limit ${remaining}`);
-    const people = await sql`
-    select company_id, full_name, title from people where user_id = ${context.userId} and deleted_at is null`;
-    const contacts = await sql`
-    select company_id, kind, value, classification from contacts where user_id = ${context.userId}`;
-    const suppressed = await sql`select kind, value from suppression where user_id = ${context.userId}`;
+    const companyIds = rows.map((c) => String(c.id)).filter(Boolean);
+    const people = companyIds.length ? await sql`
+    select company_id, full_name, title from people where user_id = ${context.userId} and deleted_at is null and company_id = any(${companyIds})` : [];
+    const contacts = companyIds.length ? await sql`
+    select company_id, kind, value, classification from contacts where user_id = ${context.userId} and company_id = any(${companyIds})` : [];
+    let suppressed = [];
+    try {
+      suppressed = await sql`select kind, value from suppression where user_id = ${context.userId}`;
+    } catch {
+      suppressed = [];
+    }
     const block = new Set(suppressed.map((s) => `${s.kind}:${s.value.toLowerCase()}`));
     const allowed = rows.filter((c) => {
       const bid = String(c.business_id ?? "").toLowerCase();
@@ -1858,7 +1860,6 @@ export const buildExport = createServerFn({ method: "POST" }).middleware([authMi
       if (runId && data.includeRejected !== true) {
         const st = String(c.record_status ?? "");
         if (st === "rejected" || st === "excluded" || st === "failed") return false;
-        if (!(Number(c.match_score ?? 0) > 0)) return false;
       }
       return true;
     }).slice(0, remaining);
@@ -1976,6 +1977,7 @@ export const buildExport = createServerFn({ method: "POST" }).middleware([authMi
       values (${exportId}, ${context.userId}, ${data.format}, ${data.scope ?? (ids.length ? "selected" : "all")}, ${filename}, ${mapped.length}, ${data.includeProvenance !== false})`;
     }
     noteExtraction(context.userId, "export");
+    try {
     await persistSecurityEvent(sql, {
       userId: context.userId,
       action: "export.create",
@@ -1999,12 +2001,25 @@ export const buildExport = createServerFn({ method: "POST" }).middleware([authMi
       exports: mapped.length,
       ip: g.ip
     });
+    } catch (err) {
+      console.warn("[norf] export audit", err);
+    }
     return {
       filename,
       mime,
       body,
       rowCount: mapped.length
     };
+  } catch (err) {
+    console.error("[norf] buildExport", err);
+    return {
+      filename: "",
+      mime: "text/plain",
+      body: "",
+      rowCount: 0,
+      error: err instanceof Error ? err.message.slice(0, 180) : "Export failed",
+    };
+  }
   });
 
 export const startCheckout = createServerFn({ method: "POST" }).middleware([authMiddleware]).validator((d) => d).handler(async ({ context, data }) => {
