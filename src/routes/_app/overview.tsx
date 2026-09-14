@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { getBootstrap, confirmBilling } from "@/lib/norr/actions";
+import { confirmBilling } from "@/lib/norr/actions";
+import { BOOTSTRAP_QUERY } from "@/lib/client/bootstrap";
 import { Empty, Pill, Stat } from "@/components/status";
 import { ProgressRailPulse } from "@/components/progress-rail";
 import { asDisplay, formatWhen } from "@/lib/format";
@@ -117,15 +118,7 @@ function Dashboard() {
     locale,
   );
   const q = useQuery({
-    queryKey: ["bootstrap"],
-    queryFn: async () => {
-      const r = await fetch("/api/workspace/boot", { credentials: "include", headers: { accept: "application/json" } });
-      const j = await r.json();
-      if (!j?.ok) throw new Error(j?.error || "boot failed");
-      return j;
-    },
-    retry: 1,
-    staleTime: 8_000,
+    ...BOOTSTRAP_QUERY,
   });
   const qc = useQueryClient();
   const billingFlag = useRouterState({ select: (s) => s.location.searchStr.includes("billing=success") });

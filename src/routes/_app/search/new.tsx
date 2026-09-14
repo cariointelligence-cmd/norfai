@@ -4,7 +4,8 @@ import { TargetingBuilder } from "@/components/targeting-builder";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { emptyCriteria, firstValue, valuesOf } from "@/lib/norr/criteria";
-import { applyOpportunityPreset, getBootstrap, importSeeds, interpretPrompt, saveProfile } from "@/lib/norr/actions";
+import { applyOpportunityPreset, importSeeds, interpretPrompt, saveProfile } from "@/lib/norr/actions";
+import { BOOTSTRAP_QUERY } from "@/lib/client/bootstrap";
 import { OPPORTUNITY_PRESETS, OPPORTUNITY_COPY, type OpportunityPresetId } from "@/lib/norr/targeting/spec";
 import { clampRequestedLeads, perSearchFromBoot } from "@/lib/norr/platform";
 import { BEGINNER_QUESTIONS } from "@/lib/norr/icp-compiler";
@@ -95,7 +96,7 @@ function NewSearch() {
     locale,
   );
   const nav = useNavigate();
-  const boot = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap({ data: {} }) });
+  const boot = useQuery(BOOTSTRAP_QUERY);
   const perSearch = perSearchFromBoot(boot.data);
   const [criteria, setCriteria] = useState<SearchCriteria>(starterCriteria);
   const [name, setName] = useState("Finnish companies worth contacting");

@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-fi-shield";
+export const NORF_BUILD = "2026-09-14-boot-keep";
 
 export function vercelDeployProbe() {
   const env = process.env;

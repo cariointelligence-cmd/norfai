@@ -28,7 +28,8 @@ import {
   Waypoints,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { getBootstrap, findWorkspace } from "@/lib/norr/actions";
+import { findWorkspace } from "@/lib/norr/actions";
+import { BOOTSTRAP_QUERY } from "@/lib/client/bootstrap";
 import { Drawer } from "@/components/drawer";
 import { LangSwitch, NorfMark } from "@/components/marketing";
 import { ProgressRailPulse } from "@/components/progress-rail";
@@ -97,16 +98,8 @@ export function AppShell() {
     staleTime: 8_000,
   });
   const boot = useQuery({
-    queryKey: ["bootstrap"],
-    queryFn: async () => {
-      const r = await fetch("/api/workspace/boot", { credentials: "include", headers: { accept: "application/json" } });
-      const j = await r.json();
-      if (!j?.ok) throw new Error(j?.error || "boot failed");
-      return j;
-    },
+    ...BOOTSTRAP_QUERY,
     enabled: Boolean(user),
-    retry: 1,
-    staleTime: 8_000,
   });
 
   useEffect(() => {

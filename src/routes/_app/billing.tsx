@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
-import { getBootstrap, startBillingPortal, startCheckout, confirmBilling } from "@/lib/norr/actions";
+import { startBillingPortal, startCheckout, confirmBilling } from "@/lib/norr/actions";
+import { BOOTSTRAP_QUERY } from "@/lib/client/bootstrap";
 import { PLANS, formatSearchQuota, isUnlimitedQuota, perSearchFromBoot, type PlanId } from "@/lib/norr/platform";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -11,7 +12,7 @@ export const Route = createFileRoute("/_app/billing")({ component: Billing });
 function Billing() {
   const search = useRouterState({ select: (s) => s.location.searchStr });
   const qc = useQueryClient();
-  const boot = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap({ data: {} }) });
+  const boot = useQuery(BOOTSTRAP_QUERY);
   const success = search.includes("billing=success");
   useEffect(() => {
     if (!success) return;

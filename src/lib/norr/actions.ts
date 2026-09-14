@@ -325,7 +325,7 @@ export const getBootstrap = createServerFn({ method: "POST" }).middleware([authM
     return payload;
   } catch (err) {
     console.error("[norf] bootstrap", err);
-    return fallback;
+    throw err;
   }
 });
 

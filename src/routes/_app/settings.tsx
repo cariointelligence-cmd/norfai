@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getBootstrap, saveLeadPrefs, saveWorkspace } from "@/lib/norr/actions";
+import { saveLeadPrefs, saveWorkspace } from "@/lib/norr/actions";
+import { BOOTSTRAP_QUERY } from "@/lib/client/bootstrap";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Textarea } from "@/components/ui/field";
 import { useEffect, useState } from "react";
@@ -51,7 +52,7 @@ function Settings() {
     locale,
   );
   const qc = useQueryClient();
-  const q = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap({ data: {} }) });
+  const q = useQuery(BOOTSTRAP_QUERY);
   const [name, setName] = useState("Workspace");
   const [retentionDays, setRetentionDays] = useState(730);
   const [countryAllowlist, setCountryAllowlist] = useState("FI");

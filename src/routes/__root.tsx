@@ -9,7 +9,16 @@ import appCss from "../styles.css?url";
 
 const APP_NAME = "Norf";
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 4000, refetchOnWindowFocus: true, retry: 1 } },
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      gcTime: 30 * 60_000,
+      refetchOnWindowFocus: false,
+      refetchOnReconnect: true,
+      retry: 1,
+      placeholderData: (previousData: unknown) => previousData,
+    },
+  },
 });
 
 export const Route = createRootRoute({

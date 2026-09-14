@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { buildExport, getBootstrap, listCompanies, reEnrichCompanies, tickSearch } from "@/lib/norr/actions";
+import { buildExport, listCompanies, reEnrichCompanies, tickSearch } from "@/lib/norr/actions";
+import { BOOTSTRAP_QUERY } from "@/lib/client/bootstrap";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/field";
 import { Empty, Pill } from "@/components/status";
@@ -49,7 +50,7 @@ function Companies() {
   const [outcome, setOutcome] = useState("");
   const [sortBy, setSortBy] = useState("match");
   const qc = useQueryClient();
-  const boot = useQuery({ queryKey: ["bootstrap"], queryFn: () => getBootstrap({ data: {} }) });
+  const boot = useQuery(BOOTSTRAP_QUERY);
   const jobsRunning = boot.data?.counts.jobsRunning ?? 0;
   const list = useQuery({
     queryKey: ["companies", q, status, email, sortBy, outcome],
