@@ -40,6 +40,26 @@ export function hiveSkipSignals(plan: SearchPlan): boolean {
   return plan.engines.signals === "skip";
 }
 
+export const HIVE_JOB_RANK: Record<string, number> = {
+  discover: 0,
+  email: 1,
+  enrich: 2,
+  scrape: 3,
+  score: 4,
+  crawl: 5,
+  signals: 6,
+};
+
+/** Nerve order: fill the register before contact jobs, never starve discover. */
+export function hiveJobRank(type: string | null | undefined): number {
+  return HIVE_JOB_RANK[String(type ?? "")] ?? 8;
+}
+
+export function hiveSkipJob(type: string, plan: SearchPlan): boolean {
+  if (type === "signals" && hiveSkipSignals(plan)) return true;
+  return false;
+}
+
 export function hiveSourceReport(plan: SearchPlan) {
   return {
     source: "search_plan",

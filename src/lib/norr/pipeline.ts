@@ -1446,8 +1446,8 @@ async function claimNextJob(sql, userId, runId, opts) {
         )
       )
     order by case type
-        when 'email' then 0
-        when 'discover' then 1
+        when 'discover' then 0
+        when 'email' then 1
         when 'enrich' then 2
         when 'scrape' then 3
         when 'score' then 4
@@ -1505,9 +1505,19 @@ async function processNextJob(sql, userId, runId, opts) {
 		} else if (job.type === "enrich" && job.company_id && job.run_id) await runEnrich(sql, userId, job.run_id, job.company_id);
 		else if (job.type === "email" && job.company_id && job.run_id) await runEnrich(sql, userId, job.run_id, job.company_id, { emailRecovery: true });
 		else if (job.type === "scrape" && job.company_id) await runScrape(sql, userId, job.run_id, job.company_id);
-		else if (job.type === "crawl" && job.company_id && job.payload?.url) await runCrawl(sql, userId, job.run_id, job.company_id, job.payload.url, Boolean(job.payload.seed));
-		else if (job.type === "signals" && job.company_id) await runSignals(sql, userId, job.company_id, job.run_id);
+		else if (job.type === "crawl" && job.company_id && job.payload?.url) {
+			const already = (await sql`select general_email from companies where id = ${job.company_id} and user_id = ${userId}`)?.[0];
+			if (already?.general_email) { /* hive: skip crawl when CORE_SALES email exists */ }
+			else await runCrawl(sql, userId, job.run_id, job.company_id, job.payload.url, Boolean(job.payload.seed));
+		}
+		else if (job.type === "signals" && job.company_id) {
+			const runRow = (await sql`select criteria from search_runs where id = ${job.run_id} and user_id = ${userId}`)?.[0];
+			const plan = hivePlan({ criteria: runRow?.criteria, depth: runRow?.criteria?.depth, country: runRow?.criteria?.country ?? "FI" });
+			if (!hiveSkipSignals(plan)) await runSignals(sql, userId, job.company_id, job.run_id);
+		}
 		else if (job.type === "score" && job.company_id && job.run_id) {
+			const scored = (await sql`select match_score from companies where id = ${job.company_id} and user_id = ${userId}`)?.[0];
+			if (scored?.match_score == null) {
 			const slice = await sql`select type, status from jobs where user_id = ${userId} and run_id = ${job.run_id} and company_id = ${job.company_id}`;
 			const gate = scoreMayProceed(slice);
 			if (gate !== "score") {
@@ -1517,6 +1527,7 @@ async function processNextJob(sql, userId, runId, opts) {
 				return { did: true, type: job.type, incomplete: true };
 			}
 			await runScore(sql, userId, job.run_id, job.company_id);
+			}
 		}
 		else if (job.type === "refresh" && job.company_id) await runRefresh(sql, userId, job.company_id);
 		else {
@@ -1525,7 +1536,7 @@ async function processNextJob(sql, userId, runId, opts) {
 			return { did: true, type: job.type, error: "Unknown job type" };
 		}
 		await sql`update jobs set status = ${"done"}, updated_at = now() where id = ${job.id} and user_id = ${userId}`;
-		if (job.company_id && job.run_id && (job.type === "scrape" || job.type === "crawl" || job.type === "signals")) {
+		if (job.company_id && job.run_id && job.type === "scrape") {
 			await enqueueScore(sql, userId, job.run_id, job.company_id);
 		}
 		if (job.run_id) await updateRunStats(sql, userId, job.run_id);
