@@ -3,7 +3,7 @@ import type { Sql } from "@/lib/db";
 import { nid } from "@/lib/utils";
 import type { ContactHit, DiscoveredCompany, ObservationInput, PersonHit, SearchCriteria } from "./types.ts";
 import { passesLocalFilters, valuesOf } from "./criteria.ts";
-import { assertSearchQuota, assertCompanyQuota, ensurePlatformIdentity, perSearchLimitFor, clampRequestedLeads, ENGINE_SEARCH_CEILING } from "./platform.ts";
+import { assertSearchQuota, assertCompanyQuota, ensurePlatformIdentity, readPlatformIdentity, perSearchLimitFor, clampRequestedLeads, ENGINE_SEARCH_CEILING, isUnlimitedQuota, companiesLimitFor } from "./platform.ts";
 import {
   audit,
   bumpSource,
@@ -161,6 +161,7 @@ async function attachDiscovered(
   criteria?: SearchCriteria,
   exposure?: Map<string, ExposureRow>,
   exclusions?: ExclusionRow[],
+  skipQuota = false,
 ): Promise<"kept" | "filtered" | "excluded_seen" | "excluded_exported" | "excluded_customer" | "duplicate" | "quota"> {
   if (criteria) {
     const cheap = cheapDiscoverReject(row, criteria);
@@ -185,7 +186,7 @@ async function attachDiscovered(
   const existing =
     (row.businessId ? await findCompanyByBid(sql, userId, row.businessId) : null)
     ?? (await findCompanyByName(sql, userId, row.name, normalizeDomain(row.website ?? null)));
-  if (!existing) {
+  if (!existing && !skipQuota) {
     const quota = await assertCompanyQuota(sql, userId);
     if (!quota.ok) return "quota";
   }
@@ -229,7 +230,6 @@ async function attachDiscovered(
     returning company_id`;
   if (!inserted[0]) return "duplicate";
   await enqueueJob(sql, userId, "enrich", { runId, companyId });
-  if (row.website) await ensureScrapeJob(sql, userId, runId, companyId);
   return "kept";
 }
 
@@ -273,6 +273,11 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
       exclusions = [];
     }
   }
+  let skipQuota = false;
+  try {
+    const ident = await readPlatformIdentity(sql, userId);
+    skipQuota = ident.isAdmin || isUnlimitedQuota(companiesLimitFor(ident.plan, ident.isAdmin));
+  } catch { skipQuota = false; }
   const flags = await (async () => {
     try { return await loadSourceFlags(sql, userId); } catch { return []; }
   })();
@@ -322,7 +327,7 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
   const ingestRow = async (row: DiscoveredCompany, sourceId: string, reasons: string[], observations?: ObservationInput[], sourceUrl?: string, sourceType = "official_register") => {
     if (kept >= want) return;
     if (Date.now() > deadline) { timedOut = true; return; }
-    const result = await attachDiscovered(sql, userId, runId, row, reasons, criteria, exposure, exclusions);
+    const result = await attachDiscovered(sql, userId, runId, row, reasons, criteria, exposure, exclusions, skipQuota);
     if (result === "quota") {
       quotaStopped = true;
       return;
@@ -360,7 +365,7 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
           if (kept >= want || quotaStopped) return false;
           if (Date.now() > deadline) { timedOut = true; return false; }
           try {
-            const resultAttach = await attachDiscovered(sql, userId, runId, row, ["ytj", row.industryCode ?? "industry"], criteria, exposure, exclusions);
+            const resultAttach = await attachDiscovered(sql, userId, runId, row, ["ytj", row.industryCode ?? "industry"], criteria, exposure, exclusions, skipQuota);
             if (row.businessId) skipKeys.add(row.businessId);
             if (row.name) skipKeys.add(row.name);
             if (resultAttach === "quota") { quotaStopped = true; return false; }

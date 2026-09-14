@@ -2,7 +2,7 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { remainingCompanySlots, isCompanyQuotaError, CompanyQuotaError } from "./quota.ts";
 import { exportSearchUnits, searchRefundReason, searchShouldChargeBeforeInsert } from "./quota-ledger.ts";
-import { companiesPerMonthFor, perSearchLimitFor, companiesLimitFor, searchesLimitFor, quotaError, PLANS, teamSeatCap, clampRequestedLeads, ENGINE_SEARCH_CEILING, perSearchFromBoot } from "./platform.ts";
+import { companiesPerMonthFor, perSearchLimitFor, companiesLimitFor, searchesLimitFor, quotaError, PLANS, teamSeatCap, clampRequestedLeads, ENGINE_SEARCH_CEILING, perSearchFromBoot, SEED_ADMIN_EMAILS } from "./platform.ts";
 import { leadCountChoices } from "./targeting/spec.ts";
 
 describe("plan quotas", () => {
@@ -44,6 +44,11 @@ describe("plan quotas", () => {
     assert.equal(searchesLimitFor("free", true), -1);
     assert.equal(perSearchLimitFor("free", true), -1);
     assert.equal(teamSeatCap("free", true), 50);
+  });
+
+  it("treats seed admin emails as unlimited even on a free workspace row", () => {
+    assert.ok(SEED_ADMIN_EMAILS.includes("tajubusiness@gmail.com"));
+    assert.equal(searchesLimitFor("free", true), -1);
   });
 
   it("keeps existing records when a free workspace is already over the monthly cap", () => {

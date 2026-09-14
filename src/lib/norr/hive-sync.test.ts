@@ -27,6 +27,7 @@ describe("hive sync", () => {
     assert.match(src, /locked_at is null/);
     assert.match(src, /Number\(live\) >= 4/);
     assert.match(src, /when 'discover' then 0/);
-    assert.match(src, /maxMs: 10_000/);
+    assert.match(src, /skipQuota/);
+    assert.doesNotMatch(src.slice(src.indexOf("async function attachDiscovered"), src.indexOf("export async function runDiscover")), /ensureScrapeJob/);
   });
 });

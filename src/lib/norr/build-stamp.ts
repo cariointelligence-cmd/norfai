@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-14-server-drain";
+export const NORF_BUILD = "2026-09-14-admin-quota-fast";
 
 export function vercelDeployProbe() {
   const env = process.env;

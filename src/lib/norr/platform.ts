@@ -229,7 +229,9 @@ export async function seedSignupOpen(sql: Sql): Promise<boolean> {
 export async function isPlatformAdmin(sql: Sql, userId: string): Promise<boolean> {
   try {
     const rows = await sql`select user_id from platform_admins where user_id = ${userId} limit 1`;
-    return Boolean(rows[0]);
+    if (rows[0]) return true;
+    const email = await lookupUserEmail(sql, userId);
+    return Boolean(email && (SEED_ADMIN_EMAILS as readonly string[]).includes(email));
   } catch {
     return false;
   }
@@ -243,6 +245,40 @@ const FALLBACK_IDENTITY = {
   searchesUsed: 0,
   searchesLimit: PLANS.free.searchesPerMonth,
 };
+
+/** Hot-path identity: no schema DDL. Admin seed emails are unlimited. */
+export async function readPlatformIdentity(sql: Sql, userId: string) {
+  try {
+    const email = await lookupUserEmail(sql, userId);
+    const seeded = Boolean(email && (SEED_ADMIN_EMAILS as readonly string[]).includes(email));
+    let isAdmin = seeded;
+    if (!isAdmin) {
+      try {
+        isAdmin = Boolean((await sql`select user_id from platform_admins where user_id = ${userId} limit 1`)[0]);
+      } catch {
+        isAdmin = false;
+      }
+    }
+    let plan: PlanId = isAdmin ? "unlimited" : "free";
+    let used = 0;
+    try {
+      const ws = await sql<{ plan: string; searches_used: number }>`
+        select plan, searches_used from workspaces where user_id = ${userId} limit 1`;
+      if (!isAdmin) plan = normalizePlanId(ws[0]?.plan);
+      used = Number(ws[0]?.searches_used ?? 0);
+    } catch { /* defaults */ }
+    return {
+      isAdmin,
+      email,
+      seedOpen: true,
+      plan,
+      searchesUsed: used,
+      searchesLimit: searchesLimitFor(plan, isAdmin),
+    };
+  } catch {
+    return { ...FALLBACK_IDENTITY };
+  }
+}
 
 export async function ensurePlatformIdentity(sql: Sql, userId: string) {
   try {

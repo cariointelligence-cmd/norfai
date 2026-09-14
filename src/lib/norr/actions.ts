@@ -61,6 +61,7 @@ import {
   refundSearchQuota,
   assertCompanyQuota,
   ensurePlatformIdentity,
+  readPlatformIdentity,
   ensurePlatformSchema,
   stripeCheckoutReady,
   createStripeCheckout,
@@ -268,19 +269,16 @@ export const getBootstrap = createServerFn({ method: "GET" }).middleware([authMi
   try {
     const sql = await getSql();
     const ws = await ensureWorkspace(sql, context.userId);
-    let identity = { isAdmin: false, plan: "free" as const, searchesUsed: 0, searchesLimit: 50, seedOpen: true };
-    try {
-      identity = await Promise.race([
-        ensurePlatformIdentity(sql, context.userId),
-        new Promise<typeof identity>((resolve) => setTimeout(() => resolve(identity), 900)),
-      ]);
-    } catch { /* plan defaults */ }
+    const identity = await readPlatformIdentity(sql, context.userId);
     const [companies, people, runs, openReview, jobsRunning, contacts, sources, recentRuns, recentCompanies] = await Promise.all([
       sql`select count(*)::int as n from companies where user_id = ${context.userId} and deleted_at is null`.then((r) => r[0]),
       sql`select count(*)::int as n from people where user_id = ${context.userId} and deleted_at is null`.then((r) => r[0]),
       sql`select count(*)::int as n from search_runs where user_id = ${context.userId}`.then((r) => r[0]),
       sql`select count(*)::int as n from review_items where user_id = ${context.userId} and status = 'open'`.then((r) => r[0]).catch(() => ({ n: 0 })),
-      sql`select count(*)::int as n from jobs where user_id = ${context.userId} and status in ('queued','running')`.then((r) => r[0]).catch(() => ({ n: 0 })),
+      sql`select count(*)::int as n from jobs j
+        join search_runs r on r.id = j.run_id
+        where j.user_id = ${context.userId} and j.status = ${"running"}
+          and r.status in ('running','queued')`.then((r) => r[0]).catch(() => ({ n: 0 })),
       sql`select count(*)::int as n from contacts where user_id = ${context.userId}`.then((r) => r[0]).catch(() => ({ n: 0 })),
       sql`select source_id, state, enabled from source_health where user_id = ${context.userId}`.catch(() => []),
       sql`select id, status, created_at, stats from search_runs where user_id = ${context.userId} order by created_at desc limit 8`.catch(() => []),

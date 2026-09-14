@@ -71,6 +71,16 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
     await sql`update jobs set status = ${"cancelled"}, locked_at = null, last_error = ${"run closed"}, updated_at = now()
       where status in ('queued','running')
         and run_id in (select id from search_runs where status in ('completed','cancelled','failed'))`;
+    if (opts.userId) {
+      await sql`update jobs set status = ${"cancelled"}, locked_at = null, last_error = ${"stale search"}, updated_at = now()
+        where user_id = ${opts.userId} and status in ('queued','running')
+          and (${opts.runId ?? null}::text is null or run_id is distinct from ${opts.runId ?? null})
+          and run_id in (
+            select id from search_runs
+            where user_id = ${opts.userId} and status in ('running','queued')
+              and updated_at < now() - interval '45 minutes'
+          )`;
+    }
   } catch { /* */ }
   const maxMs = 12_000;
   let processed = 0;
