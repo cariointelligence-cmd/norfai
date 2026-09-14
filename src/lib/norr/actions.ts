@@ -830,6 +830,7 @@ export const reEnrichCompanies = createServerFn({ method: "POST" }).middleware([
     await sql`insert into search_runs (id, user_id, status, criteria)
       values (${runId}, ${context.userId}, ${"running"}, ${JSON.stringify(criteria)}::jsonb)`;
   }
+  await sql`update search_runs set status = ${"running"}, finished_at = null, pause_requested = false where id = ${runId} and user_id = ${context.userId} and status <> ${"cancelled"}`;
   for (const row of rows) {
     if (row.website && (isDirectoryHost(row.website) || isJunkCompanyWebsite(row.website))) {
       await sql`update companies set website = null, website_domain = null, updated_at = now()

@@ -764,7 +764,6 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 	await recordCapability(sql, userId, companyId, "phone", facts.phones.length ? "SUCCESS" : "NO_DATA", { evidence: { n: facts.phones.length } });
 	await recordCapability(sql, userId, companyId, "website", facts.website ? "SUCCESS" : "NO_DATA");
 	await recordCapability(sql, userId, companyId, "decisionMaker", facts.people.length ? "SUCCESS" : "NO_DATA", { evidence: { n: facts.people.length } });
-	if (emailRecovery) return;
 	if (facts.website) await bumpSource(sql, userId, catalogSource(facts.websiteSource), "enrich", { confidence: 72 });
 	else if (facts.people.length || facts.emails.length || facts.phones.length) await bumpSource(sql, userId, "website", "enrich", { confidence: 72 });
 	if (facts.sourcesChecked.includes("duckduckgo")) await bumpSource(sql, userId, "duckduckgo", "enrich", { confidence: 58 });
@@ -853,6 +852,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		await harvestNewSite(nd.profile.website, "northdata");
 		await bumpSource(sql, userId, "northdata", "enrich", { confidence: 80 });
 	}
+	if (emailRecovery) return;
 	if (depth === "deep") {
 	const li = await linkedinLookup({
 		name,

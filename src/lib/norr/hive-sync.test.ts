@@ -30,6 +30,9 @@ describe("hive sync", () => {
     assert.match(src, /Number\(live\) >= 8/);
     assert.match(src, /when 'discover' then 0/);
     assert.match(src, /finderNeeded/);
+    const rec = src.indexOf("if (emailRecovery) return");
+    const finderPersist = src.indexOf("websiteSource: \"finder\"");
+    assert.ok(finderPersist > 0 && rec > finderPersist);
     assert.match(src, /insert into jobs \(id, user_id, run_id, company_id, type, payload\)/);
     assert.doesNotMatch(src.slice(src.indexOf("async function attachDiscovered"), src.indexOf("export async function runDiscover")), /insertCompany\(/);
   });

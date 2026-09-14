@@ -1,7 +1,7 @@
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { classifyEmailTerminal, emailJobPriority, EMAIL_ENGINE_VERSION } from "./email-contact.ts";
-import { directoriesNeeded } from "./contact-plan.ts";
+import { directoriesNeeded, finderNeeded } from "./contact-plan.ts";
 import { isJobType } from "./security.ts";
 
 describe("email contact recovery", () => {
@@ -11,8 +11,10 @@ describe("email contact recovery", () => {
     assert.ok(EMAIL_ENGINE_VERSION.startsWith("email_contact"));
   });
   it("runs directories when recovering email even if a phone already exists", () => {
-    assert.equal(directoriesNeeded({ emails: 0, phones: 1 }), false);
+    assert.equal(directoriesNeeded({ emails: 0, phones: 1 }), true);
     assert.equal(directoriesNeeded({ emails: 0, phones: 1, emailRecovery: true }), true);
+    assert.equal(finderNeeded({ emails: 0, depth: "normal" }), false);
+    assert.equal(finderNeeded({ emails: 0, emailRecovery: true }), true);
   });
   it("classifies published vs inferred vs no public email", () => {
     assert.equal(classifyEmailTerminal({ published: 1, inferred: 0, domainTried: true, pagesTried: 3, website: "https://x.fi" }), "EMAIL_FOUND_PUBLISHED");
