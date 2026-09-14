@@ -648,20 +648,20 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			sourceUrl: "",
 			observations: []
 		})),
-		kauppalehtiLookup({
+		(depth === "deep" || emailRecovery ? kauppalehtiLookup({
 			name,
 			businessId: bid
-		}).catch(() => ({
+		}) : Promise.resolve({ ok: false, profile: null, sourceUrl: "", observations: [] })).catch(() => ({
 			ok: false,
 			profile: null,
 			sourceUrl: "",
 			observations: []
 		})),
-		northdataLookup({
+		(depth === "deep" || emailRecovery ? northdataLookup({
 			name,
 			businessId: bid,
 			municipality: mun
-		}).catch(() => ({
+		}) : Promise.resolve({ ok: false, profile: null, sourceUrl: "", observations: [] })).catch(() => ({
 			ok: false,
 			profile: null,
 			sourceUrl: "",
@@ -1470,7 +1470,7 @@ async function stealStaleJobs(sql, userId, runId) {
       and (
         locked_at is null
         or locked_at < now() - make_interval(secs => ${RUNTIME.jobStealSeconds})
-        or updated_at < now() - interval '15 seconds'
+        or updated_at < now() - interval '45 seconds'
       )
       and (${runId ?? null}::text is null or run_id = ${runId ?? null})`;
 }
@@ -1702,7 +1702,7 @@ export async function pumpSearch(sql, userId, runId) {
 		for (const [k, t] of pumpLocks) if (now - t > 60_000) pumpLocks.delete(k);
 	}
 	try { await stealStaleJobs(sql, userId, null); } catch { /* */ }
-	return processJobsFor(sql, userId, runId, { maxMs: 10_000, concurrency: 2, skipSchema: true });
+	return processJobsFor(sql, userId, runId, { maxMs: 10_000, concurrency: 4, skipSchema: true });
 }
 
 const kickLocks = new Map();

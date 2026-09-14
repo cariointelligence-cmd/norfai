@@ -130,7 +130,7 @@ function isWafBody(html: string): boolean {
 async function fetchFinderHttp(url: string): Promise<{ ok: boolean; html: string; text: string; url: string; status: number; waf: boolean }> {
   try {
     const res = await safeFetch(url, {
-      timeoutMs: 8000,
+      timeoutMs: 3500,
       maxBytes: 1_200_000,
       headers: {
         "User-Agent": BROWSER_UA,
@@ -152,8 +152,7 @@ async function fetchFinderPage(url: string, waitMs = 900, allowRender = true): P
   const http = await fetchFinderHttp(url);
   if (http.ok) return http;
   if (http.waf && !allowRender) {
-    const archived = await waybackHtml(url);
-    if (archived) return archived;
+    return { ...http, error: "Finder blocked" };
   }
   if (!allowRender || !playwrightAvailable()) return { ...http, error: http.status ? `HTTP ${http.status}` : "Finder blocked" };
   const rendered = await fetchRendered(url, { waitMs, timeoutMs: 16000 });
@@ -180,7 +179,7 @@ async function waybackHtml(url: string): Promise<{ ok: boolean; html: string; te
     const snap = r.ok ? r.data.archived_snapshots?.closest : null;
     if (!snap?.available || !snap.url) return null;
     const res = await safeFetch(snap.url, {
-      timeoutMs: 8000,
+      timeoutMs: 3500,
       maxBytes: 1_200_000,
       headers: { "User-Agent": BROWSER_UA, Accept: "text/html" },
     });

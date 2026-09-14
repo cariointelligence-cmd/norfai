@@ -36,7 +36,7 @@ export const RUNTIME = {
   homemadeDiscoverCap: 40,
   hydrateConcurrency: 6,
 
-  jobStealSeconds: 8,
+  jobStealSeconds: 25,
   discoverStealMinutes: 0,
 } as const;
 
