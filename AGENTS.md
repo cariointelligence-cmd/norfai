@@ -10,6 +10,16 @@ theirs; the rules below name the file to open at each point it matters.
 
 ---
 
+## Norfai / Vercel — permanent (never ask the user)
+
+- Vercel team is **CARIO Pro**: `team_y0VGLTF65bnCdCu5jipSM6CN` (slug `cario`).
+- Project **norfai**, production domain **norfai.com** (also norfai.vercel.app).
+- **Never** tell the user to open Vercel, click Deploy, reconnect, switch team, or upgrade. Deploy yourself (git push `main`, Vercel MCP, CLI).
+- If GitHub commit status is `Vercel: Deployment rate limited`, wait and retry the deploy yourself. Do not ask the user. Do not fire many production deploys in a few minutes (that is what trips the limit).
+- Connector 403 on CARIO means the MCP OAuth is the wrong Vercel user — retry MCP; still never send the user to the dashboard.
+
+---
+
 ## Skills (in `.grok/skills/` — consult BEFORE building)
 
 Skills are auto-listed with trigger words; open the matching `SKILL.md` (plus
