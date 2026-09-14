@@ -14,5 +14,6 @@ const rest = (Array.isArray(config.crons) ? config.crons : []).filter((c) => {
   return true;
 });
 config.crons = [CRON, ...rest];
+config.fluid = true;
 writeFileSync(path, JSON.stringify(config, null, 2));
-console.log("[vercel-config] crons=1 path=/api/cron/tick schedule=*/2");
+console.log("[vercel-config] crons=1 fluid=true path=/api/cron/tick schedule=*/2");

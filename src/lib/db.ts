@@ -104,6 +104,12 @@ function createNeonSql(): Promise<Sql> {
         ? { rejectUnauthorized: true }
         : undefined,
     });
+    try {
+      const vf = await import("@vercel/functions");
+      vf.attachDatabasePool?.(pool);
+    } catch {
+      /* package optional */
+    }
     return toSql(async <T>(text: string, params: unknown[]) => {
       const res = await pool.query(text, params);
       return res.rows as T[];

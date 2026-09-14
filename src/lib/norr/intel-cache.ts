@@ -1,6 +1,6 @@
 /**
  * Public-company intelligence cache. Never stores workspace notes, lists, or CRM.
- * Process-local on Vercel; coalesces identical lookups within a freshness window.
+ * L1: process-local. L2: Vercel KV / Upstash when marketplace env is present.
  */
 type Entry<T> = { at: number; ttl: number; value: T; inflight?: Promise<T> };
 
@@ -68,14 +68,26 @@ export async function cacheCoalesce<T>(key: string, ttlMs: number, fn: () => Pro
     stats.coalesced += 1;
     return existing.inflight;
   }
-  const inflight = fn().then((value) => {
+  const inflight = (async () => {
+    const { kvConfigured, kvGetJson, kvSetJson } = await import("./kv-cache.ts");
+    if (kvConfigured()) {
+      const remote = await kvGetJson<T>(`norf:ic:${key}`);
+      if (remote != null) {
+        cacheSet(key, remote, ttlMs);
+        return remote;
+      }
+    }
+    const value = await fn();
     cacheSet(key, value, ttlMs);
+    if (kvConfigured()) void kvSetJson(`norf:ic:${key}`, value, ttlMs / 1000);
+    return value;
+  })();
+  store.set(key, { at: Date.now(), ttl: ttlMs, value: undefined as T, inflight });
+  return inflight.then((value) => {
     const row = store.get(key) as Entry<T> | undefined;
     if (row) delete row.inflight;
     return value;
   });
-  store.set(key, { at: Date.now(), ttl: ttlMs, value: undefined as T, inflight });
-  return inflight;
 }
 
 export function cacheStats() {

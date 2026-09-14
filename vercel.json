@@ -1,5 +1,8 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "regions": ["arn1"],
+  "fluid": true,
+  "functionFailoverRegions": ["fra1"],
   "crons": [
     {
       "path": "/api/cron/tick",
