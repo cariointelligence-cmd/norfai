@@ -63,7 +63,7 @@ import { ytjFieldObservations } from "./sources/ytj.ts";
 import { cheapDiscoverReject } from "./cheap-filter.ts";
 import { directoriesNeeded, finderNeeded, contactPlan, contactHarvestDone } from "./contact-plan.ts";
 import { recordCapability } from "./capabilities.ts";
-import { hivePlan, hiveSkipIdentity, hiveSkipFinancial, hiveSkipSignals, hiveSourceReport } from "./hive-coordinator.ts";
+import { hivePlan, hiveSkipIdentity, hiveSkipFinancial, hiveSkipSignals, hiveSourceReport, hiveSelectEngines } from "./hive-coordinator.ts";
 
 const CRAWL_BUDGET = RUNTIME.crawlBudget;
 const DEEP_CRAWL_BUDGET = RUNTIME.deepCrawlBudget;
@@ -300,7 +300,7 @@ export async function runDiscover(sql: Sql, userId: string, runId: string, crite
   })();
   const disabled = disabledSourceIds(flags);
   const searchPlan = hivePlan({ criteria, depth, country });
-  report.push(hiveSourceReport(searchPlan));
+  report.push(hiveSourceReport(searchPlan, { country, criteria }));
 
   const finish = async (complete: boolean) => {
     const plan = planRegisterQuery(criteria);
@@ -753,6 +753,12 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 	let nd = { ok: false, profile: null, sourceUrl: "", observations: [] };
 	let superC = { emails: [] as { value: string }[], phones: [] as { value: string }[], people: [] as { fullName: string }[], website: null as string | null, sourceUrl: null as string | null, sourceId: "supercrawl" };
 	const publishedN = (facts.emails ?? []).filter((e) => e.classification === "published").length;
+	const harvestDone = contactHarvestDone({
+		emails: publishedN,
+		phones: facts.phones.length,
+		people: facts.people.length,
+		depth,
+	});
 	const needDirs = directoriesNeeded({
 		emails: publishedN,
 		phones: facts.phones.length,
@@ -761,6 +767,19 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		emailRecovery,
 	});
 	const needFinder = finderNeeded({ emails: publishedN, depth, emailRecovery });
+	const hivePick = hiveSelectEngines({
+		country,
+		industry: co.industry_code ?? null,
+		preset,
+		missing: {
+			email: publishedN < 1,
+			phone: (facts.phones ?? []).length < 1,
+			people: (facts.people ?? []).length < 1,
+		},
+		emailRecovery,
+		depth,
+	});
+	const needFleet = !hivePick.skipFleet && (needDirs || emailRecovery || !harvestDone);
 	const env = countryEnv(country);
 	const fi = env.allowFiDirectories;
 	[finderFirst, kl, nd, superC] = await Promise.all([
@@ -784,7 +803,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			sourceUrl: "",
 			observations: []
 		})),
-		(fi && (depth === "deep" || emailRecovery) ? northdataLookup({
+		(fi && (depth === "deep" || emailRecovery) && needDirs ? northdataLookup({
 			name,
 			businessId: bid,
 			municipality: mun
@@ -794,7 +813,10 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 			sourceUrl: "",
 			observations: []
 		})),
-		supercrawlContacts({ name, businessId: bid, municipality: mun, fresh: emailRecovery, country }).catch(() => ({
+		(needFleet ? supercrawlContacts({
+			name, businessId: bid, municipality: mun, fresh: emailRecovery, country,
+			limit: hivePick.limit, only: hivePick.crawlerIds,
+		}) : Promise.resolve({ emails: [], phones: [], people: [], website: null, sourceUrl: null, sourceId: "supercrawl" })).catch(() => ({
 			emails: [], phones: [], people: [], website: null, sourceUrl: null, sourceId: "supercrawl",
 		})),
 	]);

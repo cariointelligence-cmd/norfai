@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-16-enrich-live";
+export const NORF_BUILD = "2026-09-16-hive-mesh";
 
 export function vercelDeployProbe() {
   const env = process.env;

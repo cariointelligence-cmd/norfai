@@ -46,6 +46,9 @@ describe("hive sync", () => {
     assert.ok(bisAt > runEnrichAt && fastAt > bisAt, "PRH BIS must persist before website harvest");
     assert.match(src, /empty contacts retry/);
     assert.match(src, /rankDecisionMakersLocal/);
+    assert.match(src, /needFleet/);
+    assert.match(src, /hiveSelectEngines/);
+    assert.match(src, /limit: hivePick.limit, only: hivePick.crawlerIds/);
     const web = readFileSync(new URL("./sources/webdiscover.ts", import.meta.url), "utf8");
     assert.match(web, /from "\.\.\/contact-plan/);
     assert.match(web, /contactPlan\(/);

@@ -159,12 +159,13 @@ export function fleetFor(nation: Nation): FleetCrawler[] {
   return FI_FLEET;
 }
 
-export function pickFleet(nation: Nation, ctx: FleetCtx, limit = 10, skip: string[] = []): FleetCrawler[] {
+export function pickFleet(nation: Nation, ctx: FleetCtx, limit = 10, skip: string[] = [], only?: string[]): FleetCrawler[] {
   const deny = new Set(skip);
+  const allow = only?.length ? new Set(only) : null;
   return fleetFor(nation)
-    .filter((c) => c.nation === nation && !deny.has(c.id) && Boolean(c.url(ctx)))
+    .filter((c) => c.nation === nation && !deny.has(c.id) && Boolean(c.url(ctx)) && (!allow || allow.has(c.id)))
     .sort((a, b) => b.priority - a.priority)
-    .slice(0, Math.max(4, Math.min(limit, 12)));
+    .slice(0, Math.max(1, Math.min(limit, 12)));
 }
 
 function hostOk(url: string, nation: Nation): boolean {
@@ -292,10 +293,11 @@ export async function runNationFleet(opts: {
   website?: string | null;
   limit?: number;
   skip?: string[];
+  only?: string[];
 }): Promise<FleetHits> {
   const nation = nationOf(opts.country);
   const ctx: FleetCtx = { name: opts.name, businessId: opts.businessId, municipality: opts.municipality, website: opts.website };
-  const crawlers = pickFleet(nation, ctx, opts.limit ?? 8, opts.skip ?? []);
+  const crawlers = pickFleet(nation, ctx, opts.limit ?? 6, opts.skip ?? [], opts.only);
   const hits: FleetHits = { emails: [], phones: [], people: [], website: null, ran: [] };
   const pages = await poolMap(crawlers, 5, async (c) => {
     const url = c.url(ctx);

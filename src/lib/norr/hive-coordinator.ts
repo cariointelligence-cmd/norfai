@@ -1,6 +1,8 @@
 /** Hive Nerve: one execution order every search engine follows. */
 import { planSearch, type SearchPlan } from "./search-orchestrator.ts";
 import type { SearchCriteria } from "./types.ts";
+import { hiveMeshSize, hiveMeshSnapshot, hiveSelectEngines } from "./hive-mesh.ts";
+import { valuesOf } from "./criteria.ts";
 
 export const HIVE_ENGINE_ORDER = [
   "planner",
@@ -14,6 +16,8 @@ export const HIVE_ENGINE_ORDER = [
   "score",
 ] as const;
 export type HiveEngine = (typeof HIVE_ENGINE_ORDER)[number];
+
+export { hiveMeshSize, hiveSelectEngines, hiveMeshSnapshot };
 
 export function hivePlan(opts: {
   criteria?: SearchCriteria;
@@ -60,14 +64,31 @@ export function hiveSkipJob(type: string, plan: SearchPlan): boolean {
   return false;
 }
 
-export function hiveSourceReport(plan: SearchPlan) {
+function firstIndustry(criteria?: SearchCriteria): string | null {
+  if (!criteria) return null;
+  try {
+    const v = valuesOf(criteria, "industry")[0];
+    return v != null ? String(v) : null;
+  } catch {
+    return criteria.target?.industry?.codes?.[0] ?? null;
+  }
+}
+
+export function hiveSourceReport(plan: SearchPlan, opts?: { country?: string | null; criteria?: SearchCriteria }) {
+  const country = opts?.country ?? (typeof opts?.criteria?.country === "string" ? opts.criteria.country : "FI");
+  const mesh = hiveMeshSnapshot({
+    country,
+    industry: firstIndustry(opts?.criteria),
+    preset: typeof opts?.criteria?.preset === "string" ? opts.criteria.preset : null,
+  });
   return {
     source: "search_plan",
     ok: true,
     engines: plan.engines,
     mandatory: plan.mandatory,
     preferred: plan.preferred,
-    reasons: plan.reasons,
+    reasons: [...plan.reasons, `Hive mesh ${mesh.catalogSize} engines · selected ${mesh.selected} · no full fan-out`],
     stages: plan.stages,
+    hive: mesh,
   };
 }
