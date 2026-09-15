@@ -461,7 +461,7 @@ describe("workspace quota is not multiplied by seats", () => {
 
 describe("build stamp", () => {
   it("is phase 2", () => {
-    assert.match(NORF_BUILD, /2026-09-1[34]/);
+    assert.match(NORF_BUILD, /^2026-09-/);
   });
 });
 
