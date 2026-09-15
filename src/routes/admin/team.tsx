@@ -25,6 +25,29 @@ function planLabel(id: string) {
   return PLANS[id as PlanId]?.label ?? id;
 }
 
+function QuotaCell({
+  label, hint, used, cap, extra, warn,
+}: {
+  label: string;
+  hint: string;
+  used: number;
+  cap: number;
+  extra?: number;
+  warn?: boolean;
+}) {
+  const unlimited = cap < 0;
+  return (
+    <td className="px-3 py-2">
+      <div className="text-[10px] uppercase tracking-[0.12em] text-faint lg:hidden">{label}</div>
+      <div className={`whitespace-nowrap font-mono tabular ${warn ? "text-warn" : ""}`}>
+        {unlimited ? `${used} · unlimited` : `${used} / ${cap}`}
+      </div>
+      <div className="max-w-[12rem] text-[10px] leading-snug text-mute">{hint}</div>
+      {extra && extra > 0 ? <div className="text-[10px] text-mute">+{extra} extra granted</div> : null}
+    </td>
+  );
+}
+
 function AdminUsers() {
   const qc = useQueryClient();
   const [q, setQ] = useState("");
@@ -206,6 +229,9 @@ function AdminUsers() {
           <div>
             <h2 className="text-sm font-medium">Everyone on the platform</h2>
             <p className="text-xs text-mute">{counts.n} users · {counts.admins} admins</p>
+            <p className="mt-1 max-w-xl text-[11px] leading-snug text-mute">
+              Searches = hakukerrat tällä jaksolla. New companies = uudet liidit tällä jaksolla. Stored = kaikki yritykset workspaceessa.
+            </p>
           </div>
           <Input className="max-w-xs" placeholder="Search email or name" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
@@ -217,12 +243,25 @@ function AdminUsers() {
           <p className="text-sm text-mute">No users match.</p>
         ) : (
           <div className="overflow-x-auto border border-line">
-            <table className="w-full min-w-[880px] text-left text-sm">
+            <table className="w-full min-w-[1080px] text-left text-sm">
               <thead className="bg-panel text-[11px] uppercase tracking-[0.12em] text-faint">
                 <tr>
-                  {["Email", "Name", "Plan", "Admin", "Companies", "This period", "Searches", "Created", "Actions"].map((h) => (
-                    <th key={h} className="border-b border-line px-3 py-2">{h}</th>
-                  ))}
+                  <th className="border-b border-line px-3 py-2">User</th>
+                  <th className="border-b border-line px-3 py-2">Plan / role</th>
+                  <th className="border-b border-line px-3 py-2">
+                    Searches
+                    <div className="font-normal normal-case tracking-normal text-mute">used / cap this period</div>
+                  </th>
+                  <th className="border-b border-line px-3 py-2">
+                    New companies
+                    <div className="font-normal normal-case tracking-normal text-mute">this period / monthly cap</div>
+                  </th>
+                  <th className="border-b border-line px-3 py-2">
+                    Stored companies
+                    <div className="font-normal normal-case tracking-normal text-mute">workspace / stored cap</div>
+                  </th>
+                  <th className="border-b border-line px-3 py-2">Joined</th>
+                  <th className="border-b border-line px-3 py-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -255,28 +294,38 @@ function AdminUsers() {
                     <tr key={u.id} className="border-b border-line align-top last:border-0">
                       <td className="px-3 py-2">
                         <div className="break-all">{u.email}</div>
+                        <div className="text-xs text-mute">{u.name || "—"}</div>
                       </td>
-                      <td className="px-3 py-2">{u.name || "-"}</td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap items-center gap-1">
                           <Pill tone="ink">{planLabel(u.plan)}</Pill>
+                          {isAdm ? <Pill tone="good">{u.adminRole}</Pill> : <Pill>member</Pill>}
                           {u.planSource === "admin_gift" ? <Pill>gift</Pill> : null}
                           {u.planSource === "stripe" ? <Pill tone="info">stripe</Pill> : null}
                         </div>
                       </td>
-                      <td className="px-3 py-2">
-                        {u.adminRole ? <Pill tone="good">{u.adminRole}</Pill> : <span className="text-mute">No</span>}
-                      </td>
-                      <td className="px-3 py-2 font-mono tabular">{u.companies}{cCap >= 0 ? ` / ${cCap}` : ""}</td>
-                      <td className={`px-3 py-2 font-mono tabular ${overMonth ? "text-warn" : ""}`}>
-                        {u.companiesThisPeriod ?? u.companies}{mShown >= 0 ? ` / ${mShown}` : ""}
-                        {extraL > 0 ? <div className="text-[10px] text-mute">+{extraL} leads</div> : null}
-                      </td>
-                      <td className="px-3 py-2 font-mono tabular">
-                        {u.searchesUsed ?? 0}{sShown >= 0 ? ` / ${sShown}` : ""}
-                        {extraS > 0 ? <div className="text-[10px] text-mute">+{extraS} searches</div> : null}
-                      </td>
-                      <td className="px-3 py-2 text-xs text-mute">{formatWhen(u.createdAt)}</td>
+                      <QuotaCell
+                        label="Searches"
+                        hint="Searches started this billing period"
+                        used={u.searchesUsed ?? 0}
+                        cap={sShown}
+                        extra={extraS}
+                      />
+                      <QuotaCell
+                        label="New companies"
+                        hint="New leads stored this billing period"
+                        used={u.companiesThisPeriod ?? u.companies}
+                        cap={mShown}
+                        extra={extraL}
+                        warn={overMonth}
+                      />
+                      <QuotaCell
+                        label="Stored companies"
+                        hint="All companies in their workspace"
+                        used={u.companies}
+                        cap={cCap}
+                      />
+                      <td className="px-3 py-2 whitespace-nowrap text-xs text-mute">{formatWhen(u.createdAt)}</td>
                       <td className="px-3 py-2">
                         <div className="flex flex-col gap-2">
                           <div className="flex flex-wrap items-center gap-1">
