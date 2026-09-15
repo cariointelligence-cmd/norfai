@@ -90,9 +90,11 @@ export const adminFlushMail = createServerFn({ method: "POST" })
     const id = await ensurePlatformIdentity(sql, context.userId);
     if (!id.isAdmin) return { ok: false as const, error: "Admin only" };
     await requeueResendFromFailures(sql);
-    const sent = await processMailOutbox(sql, 20);
+    const { flushStuckSupportMail } = await import("./support-store.ts");
+    const recovered = await flushStuckSupportMail(sql);
+    const sent = await processMailOutbox(sql, 24);
     const sched = await runMailTick(sql);
-    return { ok: true as const, ...sent, queued: sched.queued };
+    return { ok: true as const, ...sent, recovered: recovered.recovered, queued: sched.queued };
   });
 
 export const adminSaveMailSettings = createServerFn({ method: "POST" })

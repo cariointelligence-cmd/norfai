@@ -5,6 +5,7 @@ import { nid } from "../utils.ts";
 import { boundedString } from "./security.ts";
 import { ensureMailSchema, publicMailOrigin, validEmail, SUPPORT_INBOX, processMailOutbox } from "./mailer.ts";
 import { queueCampaign } from "./mail-automations.ts";
+import { renderCampaign } from "./mail-copy.ts";
 
 export type TicketStatus = "open" | "pending" | "closed";
 export type TicketPriority = "low" | "normal" | "high";
@@ -153,7 +154,7 @@ export async function createTicket(
     }
   }
   try {
-    await processMailOutbox(sql, 12);
+    await flushStuckSupportMail(sql);
   } catch (err) {
     console.error("[norf] ticket mail flush", err);
   }
@@ -255,15 +256,123 @@ export async function addMessage(
   let mailed = 0;
   let mailError: string | undefined;
   try {
-    const flush = await processMailOutbox(sql, 12);
+    const flush = await flushStuckSupportMail(sql);
     mailed = flush.sent;
     if (flush.failed > 0 && flush.sent === 0) mailError = "Mail provider rejected the message.";
-    if (flush.sent === 0 && flush.failed === 0 && flush.skipped > 0) mailError = "Mail is not configured.";
+    if (flush.sent === 0 && flush.failed === 0) mailError = "Reply saved. Email still queued.";
   } catch (err) {
     console.error("[norf] ticket reply mail flush", err);
     mailError = "Mail flush failed.";
   }
   return { ok: true, mailed, mailError };
+}
+
+export async function flushStuckSupportMail(sql: Sql): Promise<{ recovered: number; sent: number; failed: number }> {
+  await ensureMailSchema(sql);
+  let recovered = 0;
+  const origin = publicMailOrigin();
+  try {
+    const rq = await sql<{ id: string }>`
+      update mail_outbox
+      set status = ${"queued"}, error = null, scheduled_at = now()
+      where campaign in (${"ticket_reply"}, ${"ticket_opened"}, ${"ticket_received"}, ${"ticket_admin"}, ${"ticket_closed"})
+        and status in (${"failed"}, ${"skipped"})
+        and created_at > now() - interval '21 days'
+        and coalesce(error, '') not in (${"unsubscribed"}, ${"stale"})
+      returning id`;
+    recovered += rq.length;
+  } catch (err) {
+    console.error("[norf] requeue ticket mail", err);
+  }
+  try {
+    const pending = await sql<{
+      id: string;
+      email: string;
+      to_name: string | null;
+      message_id: string | null;
+      body: string | null;
+      name: string | null;
+      public_token: string | null;
+    }>`
+      select o.id, o.email, o.to_name,
+        o.meta->>'messageId' as message_id,
+        m.body, coalesce(t.name, o.to_name) as name, t.public_token
+      from mail_outbox o
+      left join support_messages m on m.id = o.meta->>'messageId'
+      left join support_tickets t on t.id = coalesce(nullif(o.meta->>'ticketId',''), m.ticket_id)
+      where o.campaign in (${"ticket_reply"}, ${"ticket_opened"})
+        and o.status = ${"queued"}
+        and o.created_at > now() - interval '21 days'`;
+    for (const row of pending) {
+      if (!row.body || row.body.trim().length < 2) continue;
+      const rendered = renderCampaign("ticket_reply", {
+        locale: "fi",
+        name: row.name,
+        origin,
+        ticketUrl: row.public_token ? `${origin}/support/t/${row.public_token}` : undefined,
+        items: [row.body.slice(0, 4000)],
+      });
+      await sql`
+        update mail_outbox
+        set subject = ${rendered.subject.slice(0, 180)},
+            text_body = ${rendered.text},
+            html_body = ${rendered.html},
+            scheduled_at = now()
+        where id = ${row.id}`;
+      recovered += 1;
+    }
+  } catch (err) {
+    console.error("[norf] rewrite ticket mail", err);
+  }
+  try {
+    const missing = await sql<{
+      id: string;
+      body: string;
+      email: string;
+      name: string | null;
+      user_id: string | null;
+      public_token: string;
+      ticket_id: string;
+    }>`
+      select m.id, m.body, t.email, t.name, t.user_id, t.public_token, t.id as ticket_id
+      from support_messages m
+      join support_tickets t on t.id = m.ticket_id
+      where m.author_kind = ${"admin"}
+        and m.created_at > now() - interval '21 days'
+        and length(trim(m.body)) > 1
+        and not exists (
+          select 1 from mail_outbox o
+          where o.campaign in (${"ticket_reply"}, ${"ticket_opened"})
+            and (
+              coalesce(o.meta->>'messageId','') = m.id
+              or (
+                coalesce(o.meta->>'ticketId','') = t.id
+                and o.status = ${"sent"}
+                and o.created_at >= m.created_at - interval '2 minutes'
+                and o.created_at <= m.created_at + interval '45 minutes'
+              )
+            )
+        )
+      order by m.created_at asc
+      limit 40`;
+    for (const row of missing) {
+      const q = await queueCampaign(sql, {
+        campaign: "ticket_reply",
+        email: row.email,
+        userId: row.user_id,
+        name: row.name,
+        locale: "fi",
+        ticketUrl: `${origin}/support/t/${row.public_token}`,
+        items: [row.body.slice(0, 4000)],
+        meta: { ticketId: row.ticket_id, messageId: row.id, recovered: true },
+      });
+      if (q.queued) recovered += 1;
+    }
+  } catch (err) {
+    console.error("[norf] recover ticket mail", err);
+  }
+  const flush = await processMailOutbox(sql, 40);
+  return { recovered, sent: flush.sent, failed: flush.failed };
 }
 
 export async function setTicketStatus(sql: Sql, id: string, status: TicketStatus, priority?: TicketPriority) {

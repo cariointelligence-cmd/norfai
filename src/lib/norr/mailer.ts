@@ -660,7 +660,7 @@ export async function processMailOutbox(sql: Sql, limit = 8): Promise<{ sent: nu
     select id, campaign, user_id, email, to_name, subject, text_body, html_body, status, scheduled_at, sent_at, error, provider, meta, created_at
     from mail_outbox
     where status = ${"queued"} and scheduled_at <= now()
-    order by scheduled_at asc
+    order by case when campaign like ${"ticket_%"} then 0 else 1 end, scheduled_at asc
     limit ${limit}`;
   let sent = 0;
   let failed = 0;
@@ -710,8 +710,9 @@ export async function requeueResendFromFailures(sql: Sql): Promise<number> {
       where status = ${"failed"}
         and created_at > now() - interval '21 days'
         and (
-          error ~* 'domain|not verified|invalid .from|gmail\\.com|unverified'
+          error ~* 'domain|not verified|invalid .from|gmail\\.com|unverified|not configured|provider|timeout|fetch|429|5[0-9]{2}'
           or (provider = ${"resend"} and error ~* 'from')
+          or campaign in (${"ticket_reply"}, ${"ticket_opened"}, ${"ticket_received"}, ${"ticket_admin"}, ${"ticket_closed"})
         )
       returning id`;
     return rows.length;

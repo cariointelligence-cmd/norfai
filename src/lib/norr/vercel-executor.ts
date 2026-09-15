@@ -116,7 +116,9 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
   } catch { /* daily SEO posts */ }
   try {
     const { processMailOutbox } = await import("./mailer.ts");
-    await processMailOutbox(sql, 8);
+    const { flushStuckSupportMail } = await import("./support-store.ts");
+    await flushStuckSupportMail(sql);
+    await processMailOutbox(sql, 24);
   } catch { /* mail flush is best-effort */ }
   return { processed, remaining };
 }
