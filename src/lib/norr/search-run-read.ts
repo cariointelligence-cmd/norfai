@@ -15,10 +15,12 @@ export async function countRunFacts(sql: Awaited<ReturnType<typeof getSql>>, use
   const matched = Number(rc?.matched ?? 0);
   const [ct] = await sql`
     select
-      count(*) filter (where nullif(btrim(c.general_email), '') is not null)::int as found_email,
-      count(*) filter (where nullif(btrim(c.phone), '') is not null)::int as found_phone
+      count(distinct rc.company_id) filter (where nullif(btrim(e.value), '') is not null)::int as found_email,
+      count(distinct rc.company_id) filter (where nullif(btrim(ph.value), '') is not null)::int as found_phone
     from run_companies rc
     join companies c on c.id = rc.company_id
+    left join contacts e on e.company_id = rc.company_id and e.user_id = rc.user_id and e.kind = ${"email"}
+    left join contacts ph on ph.company_id = rc.company_id and ph.user_id = rc.user_id and ph.kind = ${"phone"}
     where rc.user_id = ${userId} and rc.run_id = ${runId}
       and c.deleted_at is null`;
   let foundDecisionMaker = 0;

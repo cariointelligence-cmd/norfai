@@ -642,7 +642,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		const peopleRaw = (hits.people ?? []).slice(0, 12);
 		const seenMail = new Set();
 		const emails = [];
-		const siteForMail = canonicalCompanyWebsite(hits.website) ?? canonicalCompanyWebsite(loadedCo?.website) ?? null;
+		const siteForMail = incoming ?? canonicalCompanyWebsite(loadedCo?.website) ?? null;
 		for (const e of hits.emails ?? []) {
 			const k = String(e.value ?? "").toLowerCase();
 			if (!k || seenMail.has(k)) continue;
@@ -680,9 +680,9 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 				verdict: judged,
 			});
 			websiteOut = applied.website;
-			emailsOut = applied.emails;
-			phonesOut = applied.phones;
-			peopleOut = applied.people;
+			emailsOut = applied.emails.length || !emails.length ? applied.emails : emails;
+			phonesOut = applied.phones.length || !phones.length ? applied.phones : phones;
+			peopleOut = applied.people.length || !people.length ? applied.people : people;
 			try { peopleOut = await llmRankDecisionMakers(peopleOut); } catch { /* keep deterministic order */ }
 			if (judged?.dropWebsite && websiteOut == null) {
 				await sql`update companies set website = null, website_domain = null where id = ${companyId} and user_id = ${userId}`;
@@ -712,7 +712,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 				confidence: p.confidence
 			}, { skipRefresh: true })),
 		]);
-		if (emailsOut.length || phonesOut.length) await refreshCompanyContactFields(sql, userId, companyId);
+		await refreshCompanyContactFields(sql, userId, companyId);
 	};
 	const loadedCo = await loadCompany(sql, userId, companyId);
 	if (loadedCo?.website && (isJunkCompanyWebsite(loadedCo.website) || isDirectoryHost(loadedCo.website))) {
@@ -745,9 +745,8 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 	});
 	const needFinder = finderNeeded({ emails: publishedN, depth, emailRecovery });
 	const env = countryEnv(country);
-	if (needDirs || needFinder) {
-		const fi = env.allowFiDirectories;
-		[finderFirst, kl, nd, superC] = await Promise.all([
+	const fi = env.allowFiDirectories;
+	[finderFirst, kl, nd, superC] = await Promise.all([
 		(fi && needFinder ? finderLookup({
 			name,
 			businessId: bid,
@@ -781,8 +780,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		supercrawlContacts({ name, businessId: bid, municipality: mun, fresh: emailRecovery, country }).catch(() => ({
 			emails: [], phones: [], people: [], website: null, sourceUrl: null, sourceId: "supercrawl",
 		})),
-		]);
-	}
+	]);
 	if (facts.observations.length) await insertObservations(sql, userId, "company", companyId, catalogSource(facts.websiteSource), facts.website ?? void 0, "structured_web", facts.observations);
 	if (!facts.website && facts.existingDead) await sql`update companies set website = null, website_domain = null where id = ${companyId} and user_id = ${userId}`;
 	await persistHits({

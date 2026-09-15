@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-16-empty-search-name";
+export const NORF_BUILD = "2026-09-16-enrich-truth";
 
 export function vercelDeployProbe() {
   const env = process.env;

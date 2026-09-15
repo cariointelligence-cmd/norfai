@@ -145,24 +145,13 @@ export function workLanes(
   const list = jobs ?? [];
   const live = runStatus === "running" || runStatus === "queued";
   const doneish = (st: string) => st === "done" || st === "failed" || st === "cancelled";
-  const lane = (key: string, label: string, types: string[], fallbackPct: number, hintText: string): WorkLane => {
-    const rows = list.filter((j) => types.includes(j.type || ""));
-    const total = rows.length;
-    const done = rows.filter((j) => doneish(j.status || "")).length;
-    const running = live && rows.some((j) => j.status === "queued" || j.status === "running");
-    const pct = !live && (runStatus === "completed" || runStatus === "cancelled")
-      ? 100
-      : total
-        ? Math.min(running ? 99 : 100, Math.round((100 * done) / total))
-        : live ? fallbackPct : runStatus === "completed" ? 100 : 0;
-    return { key, label, pct, hint: hintText, running };
-  };
   const matched = Math.max(0, Number(hint?.matched ?? 0));
   const want = Math.max(Number(hint?.want ?? 0), matched, 1);
   const emails = Math.max(0, Number(hint?.foundEmail ?? 0));
   const missingE = Math.max(0, Number(hint?.missingEmail ?? 0));
   const dm = Math.max(0, Number(hint?.foundDecisionMaker ?? 0));
   const missingDm = Math.max(0, Number(hint?.missingDecisionMaker ?? 0));
+  const denom = Math.max(want, matched, emails + missingE, 1);
   const discPct = live
     ? Math.min(99, Math.round((100 * matched) / want))
     : matched ? 100 : 0;
@@ -173,11 +162,37 @@ export function workLanes(
     hint: matched ? `${matched} matched` : "Register search",
     running: live && matched < want,
   };
+  const enrichRows = list.filter((j) => j.type === "enrich" || j.type === "scrape" || j.type === "crawl");
+  const enrichDone = enrichRows.filter((j) => doneish(j.status || "")).length;
+  const enrichRunning = live && enrichRows.some((j) => j.status === "queued" || j.status === "running");
+  const enrichPct = enrichRows.length
+    ? Math.min(enrichRunning ? 99 : 100, Math.round((100 * enrichDone) / Math.max(enrichRows.length, 1)))
+    : live && matched ? 8 : 0;
+  const emailPct = Math.round((100 * emails) / denom);
+  const dmPct = Math.round((100 * dm) / denom);
   return [
     companies,
-    lane("enrich", "Enrichment", ["enrich", "scrape", "crawl"], live && matched ? 18 : 0, "Websites and public pages"),
-    lane("email", "Emails", ["email"], emails + missingE ? Math.round((100 * emails) / Math.max(emails + missingE, 1)) : 0, `${emails} found · ${missingE} missing`),
-    lane("people", "Decision-makers", ["email", "enrich"], dm + missingDm ? Math.round((100 * dm) / Math.max(dm + missingDm, 1)) : 0, `${dm} found · ${missingDm} missing`),
+    {
+      key: "enrich",
+      label: "Enrichment",
+      pct: enrichPct,
+      hint: enrichRows.length ? `${enrichDone} of ${enrichRows.length} companies checked` : "Websites and public pages",
+      running: enrichRunning,
+    },
+    {
+      key: "email",
+      label: "Emails",
+      pct: Math.min(live && emailPct >= 100 ? 99 : 100, emailPct),
+      hint: `${emails} found · ${missingE} missing`,
+      running: live && emails < matched,
+    },
+    {
+      key: "people",
+      label: "Decision-makers",
+      pct: Math.min(live && dmPct >= 100 ? 99 : 100, dmPct),
+      hint: `${dm} found · ${missingDm} missing`,
+      running: live && dm < matched,
+    },
   ];
 }
 
