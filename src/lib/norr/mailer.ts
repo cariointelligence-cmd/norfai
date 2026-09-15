@@ -130,6 +130,11 @@ export function mailFrom(override?: string | null, provider?: "resend" | "smtp" 
   return SITE_MAIL_FROM;
 }
 
+export function isRetryableMailError(error: string | null | undefined): boolean {
+  if (!error) return false;
+  return /abort|timeout|fetch failed|network|econnreset|etimedout|429|5\d\d|temporar/i.test(error);
+}
+
 export function isResendFromFailure(error: string | null | undefined): boolean {
   if (!error) return false;
   return /domain|not verified|invalid [`']?from|gmail\.com|unverified/i.test(error);
@@ -656,17 +661,20 @@ export async function enqueueMail(sql: Sql, input: EnqueueMail): Promise<{ id: s
 
 export async function processMailOutbox(sql: Sql, limit = 8): Promise<{ sent: number; failed: number; skipped: number }> {
   await ensureMailSchema(sql);
+  const cap = Math.min(Math.max(limit, 1), 12);
   const rows = await sql<OutboxRow>`
     select id, campaign, user_id, email, to_name, subject, text_body, html_body, status, scheduled_at, sent_at, error, provider, meta, created_at
     from mail_outbox
     where status = ${"queued"} and scheduled_at <= now()
     order by case when campaign like ${"ticket_%"} then 0 else 1 end, scheduled_at asc
-    limit ${limit}`;
+    limit ${cap}`;
   let sent = 0;
   let failed = 0;
   let skipped = 0;
   const transport = await resolveMailer(sql);
+  const deadline = Date.now() + 22_000;
   for (const row of rows) {
+    if (Date.now() > deadline) break;
     const kind = CAMPAIGN_KIND[row.campaign as MailCampaign] ?? "marketing";
     if (kind === "marketing" && (await isUnsubscribed(sql, row.email))) {
       await sql`update mail_outbox set status = ${"skipped"}, error = ${"unsubscribed"}, sent_at = now() where id = ${row.id}`;
@@ -693,6 +701,13 @@ export async function processMailOutbox(sql: Sql, limit = 8): Promise<{ sent: nu
     if (result.ok) {
       await sql`update mail_outbox set status = ${"sent"}, sent_at = now(), provider = ${result.provider}, error = null where id = ${row.id}`;
       sent += 1;
+    } else if (isRetryableMailError(result.error)) {
+      await sql`
+        update mail_outbox
+        set status = ${"queued"}, error = ${result.error.slice(0, 400)}, provider = ${result.provider},
+            scheduled_at = now() + interval '25 seconds'
+        where id = ${row.id}`;
+      skipped += 1;
     } else {
       await sql`update mail_outbox set status = ${"failed"}, error = ${result.error.slice(0, 400)}, provider = ${result.provider} where id = ${row.id}`;
       failed += 1;
@@ -710,7 +725,7 @@ export async function requeueResendFromFailures(sql: Sql): Promise<number> {
       where status = ${"failed"}
         and created_at > now() - interval '21 days'
         and (
-          error ~* 'domain|not verified|invalid .from|gmail\\.com|unverified|not configured|provider|timeout|fetch|429|5[0-9]{2}'
+          error ~* 'domain|not verified|invalid .from|gmail\\.com|unverified|not configured|provider|timeout|abort|fetch|429|5[0-9]{2}'
           or (provider = ${"resend"} and error ~* 'from')
           or campaign in (${"ticket_reply"}, ${"ticket_opened"}, ${"ticket_received"}, ${"ticket_admin"}, ${"ticket_closed"})
         )
@@ -792,28 +807,38 @@ async function deliverResend(opts: {
   replyTo?: string;
 }): Promise<DeliverResult> {
   const key = opts.key;
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        from: opts.from,
-        to: [opts.toName ? `${opts.toName} <${opts.to}>` : opts.to],
-        subject: opts.subject,
-        html: opts.html,
-        text: opts.text,
-        reply_to: opts.replyTo || SITE_EMAIL,
-      }),
-      signal: AbortSignal.timeout(12000),
-    });
-    const json = (await res.json().catch(() => ({}))) as { id?: string; message?: string; error?: { message?: string } };
-    if (!res.ok) {
-      return { ok: false, provider: "resend", error: json.error?.message || json.message || `Resend HTTP ${res.status}` };
+  const body = JSON.stringify({
+    from: opts.from,
+    to: [opts.toName ? `${opts.toName} <${opts.to}>` : opts.to],
+    subject: opts.subject,
+    html: opts.html,
+    text: opts.text,
+    reply_to: opts.replyTo || SITE_EMAIL,
+  });
+  let last = "Resend failed";
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+        body,
+        signal: AbortSignal.timeout(attempt === 0 ? 8000 : 14000),
+      });
+      const json = (await res.json().catch(() => ({}))) as { id?: string; message?: string; error?: { message?: string } };
+      if (res.status === 429 || res.status >= 500) {
+        last = json.error?.message || json.message || `Resend HTTP ${res.status}`;
+        continue;
+      }
+      if (!res.ok) {
+        return { ok: false, provider: "resend", error: json.error?.message || json.message || `Resend HTTP ${res.status}` };
+      }
+      return { ok: true, provider: "resend" };
+    } catch (err) {
+      last = err instanceof Error ? err.message : "Resend failed";
+      if (!isRetryableMailError(last)) return { ok: false, provider: "resend", error: last };
     }
-    return { ok: true, provider: "resend" };
-  } catch (err) {
-    return { ok: false, provider: "resend", error: err instanceof Error ? err.message : "Resend failed" };
   }
+  return { ok: false, provider: "resend", error: last };
 }
 
 async function deliverSmtp(opts: {

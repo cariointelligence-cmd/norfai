@@ -276,11 +276,21 @@ export async function flushStuckSupportMail(sql: Sql): Promise<{ recovered: numb
       update mail_outbox
       set status = ${"queued"}, error = null, scheduled_at = now()
       where campaign in (${"ticket_reply"}, ${"ticket_opened"}, ${"ticket_received"}, ${"ticket_admin"}, ${"ticket_closed"})
-        and status in (${"failed"}, ${"skipped"})
-        and created_at > now() - interval '21 days'
         and coalesce(error, '') not in (${"unsubscribed"}, ${"stale"})
       returning id`;
     recovered += rq.length;
+  } catch (err) {
+    console.error("[norf] requeue ticket mail", err);
+  }
+  try {
+    const timed = await sql<{ id: string }>`
+      update mail_outbox
+      set status = ${"queued"}, error = null, scheduled_at = now()
+      where status = ${"failed"}
+        and created_at > now() - interval '21 days'
+        and error ~* 'abort|timeout'
+      returning id`;
+    recovered += timed.length;
   } catch (err) {
     console.error("[norf] requeue ticket mail", err);
   }
@@ -371,7 +381,7 @@ export async function flushStuckSupportMail(sql: Sql): Promise<{ recovered: numb
   } catch (err) {
     console.error("[norf] recover ticket mail", err);
   }
-  const flush = await processMailOutbox(sql, 40);
+  const flush = await processMailOutbox(sql, 10);
   return { recovered, sent: flush.sent, failed: flush.failed };
 }
 
