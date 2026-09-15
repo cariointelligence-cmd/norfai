@@ -35,9 +35,11 @@ export type PlatformUserRow = {
   plan: PlanId;
   planSource: string | null;
   searchesUsed: number;
+  searchesThisPeriod: number;
   adminRole: string | null;
   companies: number;
   companiesThisPeriod: number;
+  periodStart: string | null;
   giftedAt: string | null;
   bonusSearches: number;
   bonusLeads: number;
@@ -57,7 +59,10 @@ export async function listPlatformUsers(sql: Sql, granterId: string, q = ""): Pr
         w.gifted_at, pa.role as admin_role,
         (select count(*)::int from companies c where c.user_id = u.id and c.deleted_at is null) as companies,
         (select count(*)::int from companies c where c.user_id = u.id and c.deleted_at is null
-          and c.created_at >= coalesce(w.plan_period_start, now() - interval '32 days')) as companies_this_period
+          and c.created_at >= coalesce(w.plan_period_start, u."createdAt", now() - interval '32 days')) as companies_this_period,
+        (select count(*)::int from search_runs r where r.user_id = u.id
+          and r.created_at >= coalesce(w.plan_period_start, u."createdAt", now() - interval '32 days')) as searches_this_period,
+        coalesce(w.plan_period_start, u."createdAt") as period_start
       from "user" u
       left join workspaces w on w.user_id = u.id
       left join platform_admins pa on pa.user_id = u.id
@@ -91,9 +96,11 @@ export async function listPlatformUsers(sql: Sql, granterId: string, q = ""): Pr
       plan: normalizePlanId(String(r.plan ?? "free")),
       planSource: r.plan_source != null ? String(r.plan_source) : null,
       searchesUsed: Number(r.searches_used ?? 0) || 0,
+      searchesThisPeriod: Number(r.searches_this_period ?? 0) || 0,
       adminRole: r.admin_role != null ? String(r.admin_role) : null,
       companies: Number(r.companies ?? 0) || 0,
-      companiesThisPeriod: Number(r.companies_this_period ?? r.companies ?? 0) || 0,
+      companiesThisPeriod: Number(r.companies_this_period ?? 0) || 0,
+      periodStart: isoTime(r.period_start),
       giftedAt: isoTime(r.gifted_at),
       bonusSearches: Number(r.bonus_searches ?? 0) || 0,
       bonusLeads: Number(r.bonus_leads ?? 0) || 0,

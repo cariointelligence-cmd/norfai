@@ -230,7 +230,7 @@ function AdminUsers() {
             <h2 className="text-sm font-medium">Everyone on the platform</h2>
             <p className="text-xs text-mute">{counts.n} users · {counts.admins} admins</p>
             <p className="mt-1 max-w-xl text-[11px] leading-snug text-mute">
-              Searches = hakukerrat tällä jaksolla. New companies = uudet liidit tällä jaksolla. Stored = kaikki yritykset workspaceessa.
+              Searches = how many search runs exist this plan period. New companies = rows first stored after period start — they can exist without a billed search (import, list fill, or a run that did not debit). Stored = everything in the workspace. Yellow means over the monthly cap or companies without a matching search.
             </p>
           </div>
           <Input className="max-w-xs" placeholder="Search email or name" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -275,9 +275,11 @@ function AdminUsers() {
                   companies: number;
                   companiesThisPeriod?: number;
                   searchesUsed?: number;
+                  searchesThisPeriod?: number;
                   bonusSearches?: number;
                   bonusLeads?: number;
                   createdAt: string | null;
+                  periodStart?: string | null;
                 }) => {
                   const nextPlan = giftPlan[u.id] ?? u.plan;
                   const isAdm = Boolean(u.adminRole);
@@ -288,7 +290,18 @@ function AdminUsers() {
                   const sCap = searchesLimitFor(u.plan, isAdm);
                   const sShown = sCap >= 0 ? sCap + extraS : sCap;
                   const mShown = mCap >= 0 ? mCap + extraL : mCap;
-                  const overMonth = mCap >= 0 && (u.companiesThisPeriod ?? u.companies) > (mShown < 0 ? Number.POSITIVE_INFINITY : mShown);
+                  const overMonth = mCap >= 0 && (u.companiesThisPeriod ?? 0) > (mShown < 0 ? Number.POSITIVE_INFINITY : mShown);
+                  const runs = Number(u.searchesThisPeriod ?? 0);
+                  const billed = Number(u.searchesUsed ?? 0);
+                  const periodLabel = u.periodStart ? formatWhen(u.periodStart) : "this plan period";
+                  const searchHint = runs === 0 && (u.companiesThisPeriod ?? 0) > 0
+                    ? `No search run since ${periodLabel}. Companies below were stored another way (import, list fill) or a run did not debit quota.`
+                    : runs !== billed
+                      ? `${runs} runs started since ${periodLabel}. Billed counter is ${billed}.`
+                      : `Runs started since ${periodLabel}`;
+                  const newHint = runs === 0 && (u.companiesThisPeriod ?? 0) > 0
+                    ? `First stored since ${periodLabel} — not from a billed search`
+                    : `First stored since ${periodLabel}`;
                   const draft = quotaDraft[u.id] ?? { searches: "50", leads: "50" };
                   return (
                     <tr key={u.id} className="border-b border-line align-top last:border-0">
@@ -306,18 +319,19 @@ function AdminUsers() {
                       </td>
                       <QuotaCell
                         label="Searches"
-                        hint="Searches started this billing period"
-                        used={u.searchesUsed ?? 0}
+                        hint={searchHint}
+                        used={runs}
                         cap={sShown}
                         extra={extraS}
+                        warn={runs === 0 && (u.companiesThisPeriod ?? 0) > 0}
                       />
                       <QuotaCell
                         label="New companies"
-                        hint="New leads stored this billing period"
-                        used={u.companiesThisPeriod ?? u.companies}
+                        hint={newHint}
+                        used={u.companiesThisPeriod ?? 0}
                         cap={mShown}
                         extra={extraL}
-                        warn={overMonth}
+                        warn={overMonth || (runs === 0 && (u.companiesThisPeriod ?? 0) > 0)}
                       />
                       <QuotaCell
                         label="Stored companies"
