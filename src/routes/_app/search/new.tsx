@@ -99,7 +99,7 @@ function NewSearch() {
   const boot = useQuery(BOOTSTRAP_QUERY);
   const perSearch = perSearchFromBoot(boot.data);
   const [criteria, setCriteria] = useState<SearchCriteria>(starterCriteria);
-  const [name, setName] = useState("Finnish companies worth contacting");
+  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [schedule, setSchedule] = useState(false);
   const [seeds, setSeeds] = useState("");
@@ -249,7 +249,7 @@ function NewSearch() {
 
       <div className="grid max-w-3xl gap-4 sm:grid-cols-2">
         <Field label="Search name">
-          <Input value={name} onChange={(e) => setName(e.target.value)} />
+          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name this search" autoComplete="off" />
         </Field>
         <label className="flex items-center gap-2 self-end text-sm text-mute">
           <input type="checkbox" checked={schedule} onChange={(e) => setSchedule(e.target.checked)} />

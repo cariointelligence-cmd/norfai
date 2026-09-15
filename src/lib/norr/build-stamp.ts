@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-16-mail-timeout";
+export const NORF_BUILD = "2026-09-16-empty-search-name";
 
 export function vercelDeployProbe() {
   const env = process.env;
