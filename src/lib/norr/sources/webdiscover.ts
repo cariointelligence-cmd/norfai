@@ -23,6 +23,7 @@ import { runDecisionMakerFleet } from "./dm-fleet.ts";
 import { extraPathsForPreset } from "./opportunity-engines.ts";
 import { countryEnv } from "../countries/env.ts";
 import { isJunkHost } from "../junk-hosts.ts";
+import { contactPlan, contactHarvestDone } from "../contact-plan.ts";
 
 const GENERIC_TOKENS = new Set([
   "rakennus", "rakennusliike", "rakennuttaminen", "korjausrakentaminen",
@@ -622,6 +623,15 @@ export async function collectFastContacts(opts: {
       website = null;
       websiteSource = null;
     }
+    const namedEmails = emails.filter((e) => !isRoleAddress(e.value)).length;
+    const havePath = contactHarvestDone({
+      emails: emails.length,
+      namedEmails,
+      phones: phones.length,
+      people: people.length,
+      depth: opts.emailRecovery ? "deep" : opts.depth,
+    });
+    if (website && !havePath) {
     try {
       const [hyper, dm] = await Promise.all([
         hypercrawlSite({
@@ -640,6 +650,7 @@ export async function collectFastContacts(opts: {
       mergeUniquePeople(people, hyper.people);
       mergeUniquePeople(people, dm.people);
     } catch { /* first-party extra pages optional */ }
+    }
   }
   const peopleLinked = attachDecisionContacts({ people, emails, phones, website });
   /* Search snippets are URL evidence only — never company email/phone. */

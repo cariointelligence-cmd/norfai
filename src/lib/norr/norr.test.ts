@@ -1138,6 +1138,24 @@ describe("country isolation and decision contacts", () => {
     const filled = workLanes([{ type: "discover", status: "running" }], "running", { matched: 86, want: 50 });
     assert.ok((filled.find((l) => l.key === "discover")?.pct ?? 0) >= 90);
     void companies;
+    const emptyContacts = workLanes(
+      Array.from({ length: 28 }, () => ({ type: "enrich", status: "done" })),
+      "completed",
+      { matched: 28, want: 50, foundEmail: 0, missingEmail: 28, foundDecisionMaker: 0, missingDecisionMaker: 28 },
+    );
+    assert.equal(emptyContacts.find((l) => l.key === "email")?.pct, 0);
+    assert.equal(emptyContacts.find((l) => l.key === "people")?.pct, 0);
+    const mid = workLanes(
+      [
+        { type: "discover", status: "running" },
+        ...Array.from({ length: 28 }, () => ({ type: "enrich", status: "done" })),
+      ],
+      "running",
+      { matched: 28, want: 50, foundEmail: 0, missingEmail: 28, foundDecisionMaker: 0, missingDecisionMaker: 28 },
+    );
+    assert.ok((mid.find((l) => l.key === "enrich")?.pct ?? 100) < 100);
+    assert.equal(mid.find((l) => l.key === "email")?.pct, 0);
+    assert.equal(mid.find((l) => l.key === "people")?.pct, 0);
   });
   it("ranks a CEO above a random employee locally without inventing contacts", () => {
     const ranked = rankDecisionMakersLocal([

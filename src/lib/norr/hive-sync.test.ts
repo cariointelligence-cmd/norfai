@@ -40,6 +40,16 @@ describe("hive sync", () => {
     assert.match(src, /skipDiscover = opts\?\.skipDiscover \|\| discoverSlots <= 0/);
     assert.match(src, /resumeEnrichIfStarved/);
     assert.match(src, /pruneSidecarJobs/);
+    const runEnrichAt = src.indexOf("async function runEnrich");
+    const bisAt = src.indexOf("prhBisLookup(bid", runEnrichAt);
+    const fastAt = src.indexOf("collectFastContacts", runEnrichAt);
+    assert.ok(bisAt > runEnrichAt && fastAt > bisAt, "PRH BIS must persist before website harvest");
+    assert.match(src, /empty contacts retry/);
+    assert.match(src, /rankDecisionMakersLocal/);
+    const web = readFileSync(new URL("./sources/webdiscover.ts", import.meta.url), "utf8");
+    assert.match(web, /from "\.\.\/contact-plan/);
+    assert.match(web, /contactPlan\(/);
+    assert.match(web, /contactHarvestDone\(/);
   });
 
   it("run stats count the full run not the first page", () => {

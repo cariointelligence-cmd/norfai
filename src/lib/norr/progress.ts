@@ -152,6 +152,7 @@ export function workLanes(
   const dm = Math.max(0, Number(hint?.foundDecisionMaker ?? 0));
   const missingDm = Math.max(0, Number(hint?.missingDecisionMaker ?? 0));
   const denom = Math.max(want, matched, emails + missingE, 1);
+  const discoverLive = live && (matched < want || list.some((j) => j.type === "discover" && !doneish(j.status || "")));
   const discPct = live
     ? Math.min(99, Math.round((100 * matched) / want))
     : matched ? 100 : 0;
@@ -165,9 +166,13 @@ export function workLanes(
   const enrichRows = list.filter((j) => j.type === "enrich" || j.type === "scrape" || j.type === "crawl");
   const enrichDone = enrichRows.filter((j) => doneish(j.status || "")).length;
   const enrichRunning = live && enrichRows.some((j) => j.status === "queued" || j.status === "running");
-  const enrichPct = enrichRows.length
-    ? Math.min(enrichRunning ? 99 : 100, Math.round((100 * enrichDone) / Math.max(enrichRows.length, 1)))
+  const enrichDenom = Math.max(enrichRows.length, matched, discoverLive ? want : 0, 1);
+  const enrichRaw = enrichRows.length || matched
+    ? Math.round((100 * enrichDone) / enrichDenom)
     : live && matched ? 8 : 0;
+  const enrichPct = live && (discoverLive || enrichRunning)
+    ? Math.min(99, Math.max(enrichRows.length ? 4 : 0, enrichRaw))
+    : (enrichRows.length || matched ? Math.min(100, enrichRaw) : 0);
   const emailPct = Math.round((100 * emails) / denom);
   const dmPct = Math.round((100 * dm) / denom);
   return [
@@ -177,7 +182,7 @@ export function workLanes(
       label: "Enrichment",
       pct: enrichPct,
       hint: enrichRows.length ? `${enrichDone} of ${enrichRows.length} companies checked` : "Websites and public pages",
-      running: enrichRunning,
+      running: enrichRunning || discoverLive,
     },
     {
       key: "email",

@@ -49,8 +49,7 @@ import { attachDecisionContacts } from "./sources/decision-contacts.ts";
 import { countryEnv } from "./countries/env.ts";
 import { linkedinLookup } from "./sources/linkedin.ts";
 import { grokBudgetRemaining, grokContactSearch } from "./sources/groksearch.ts";
-import { llmFilterIdentity, applyLlmVerdict } from "./hive-llm.ts";
-import { llmRankDecisionMakers } from "./hive-assist.ts";
+import { rankDecisionMakersLocal } from "./hive-assist.ts";
 import { federatedCompanySearch } from "./sources/discovery.ts";
 import { homemadeRegisterDiscover } from "./sources/directories.ts";
 import { acceptDiscovered, looksLikeCompanyName } from "./sources/register-gate.ts";
@@ -663,31 +662,7 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		let emailsOut = emails;
 		let phonesOut = phones;
 		let peopleOut = people;
-		try {
-			const judged = await llmFilterIdentity({
-				name,
-				businessId: bid,
-				website: websiteOut || siteForMail,
-				emails: emailsOut.map((e) => e.value),
-				phones: phonesOut.map((p) => p.value),
-				people: peopleOut.map((p) => p.fullName ?? p.full_name ?? ""),
-			});
-			const applied = applyLlmVerdict({
-				website: websiteOut,
-				emails: emailsOut,
-				phones: phonesOut,
-				people: peopleOut,
-				verdict: judged,
-			});
-			websiteOut = applied.website;
-			emailsOut = applied.emails.length || !emails.length ? applied.emails : emails;
-			phonesOut = applied.phones.length || !phones.length ? applied.phones : phones;
-			peopleOut = applied.people.length || !people.length ? applied.people : people;
-			try { peopleOut = await llmRankDecisionMakers(peopleOut); } catch { /* keep deterministic order */ }
-			if (judged?.dropWebsite && websiteOut == null) {
-				await sql`update companies set website = null, website_domain = null where id = ${companyId} and user_id = ${userId}`;
-			}
-		} catch { /* deterministic persist still runs */ }
+		peopleOut = rankDecisionMakersLocal(peopleOut);
 		if (websiteOut && websiteOut !== incoming) {
 			await sql`update companies set website = ${websiteOut}, website_domain = ${normalizeDomain(websiteOut)} where id = ${companyId} and user_id = ${userId}`;
 		}
@@ -719,18 +694,60 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		await sql`update companies set website = null, website_domain = null where id = ${companyId} and user_id = ${userId}`;
 		loadedCo.website = null;
 	}
-	const site = canonicalCompanyWebsite(loadedCo?.website);
-	const facts = await collectFastContacts({
-		name,
-		municipality: mun,
+	let site = canonicalCompanyWebsite(loadedCo?.website);
+	const bisEmails = [];
+	const bisPhones = [];
+	if (bid && country === "FI") {
+		try {
+			const bis = await prhBisLookup(bid, { timeoutMs: 3500 });
+			if (bis.ok) {
+				bisEmails.push(...(bis.data.contacts ?? []).filter((c) => c.kind === "email"));
+				bisPhones.push(...(bis.data.contacts ?? []).filter((c) => c.kind === "phone"));
+				await persistHits({
+					website: bis.data.website,
+					websiteSource: "ytj",
+					people: [],
+					emails: bisEmails,
+					phones: bisPhones,
+				});
+				const bisSite = canonicalCompanyWebsite(bis.data.website ?? null);
+				if (bisSite) site = bisSite;
+				if (bis.observations?.length) {
+					await insertObservations(sql, userId, "company", companyId, "ytj", bis.sourceUrl, "official_register", bis.observations);
+				}
+			}
+		} catch { /* official register first; harvest still runs */ }
+	}
+	let facts = {
 		website: site,
-		street,
-		businessId: bid,
-		country,
-		depth: emailRecovery ? "deep" : depth,
-		emailRecovery,
-		preset,
-	});
+		websiteSource: site ? "existing" : null,
+		emails: [...bisEmails],
+		phones: [...bisPhones],
+		people: [],
+		observations: [],
+		sourcesChecked: [],
+		finderProfileUrl: null,
+		existingDead: false,
+	};
+	try {
+		const fast = await collectFastContacts({
+			name,
+			municipality: mun,
+			website: site,
+			street,
+			businessId: bid,
+			country,
+			depth: emailRecovery ? "deep" : depth,
+			emailRecovery,
+			preset,
+		});
+		facts = {
+			...fast,
+			emails: [...bisEmails, ...(fast.emails ?? [])],
+			phones: [...bisPhones, ...(fast.phones ?? [])],
+			website: fast.website || site,
+		};
+	} catch { /* harvest must not wipe register contacts already persisted */ }
 	let finderFirst = { ok: false, profile: null, sourceUrl: "", observations: [] };
 	let kl = { ok: false, profile: null, sourceUrl: "", observations: [] };
 	let nd = { ok: false, profile: null, sourceUrl: "", observations: [] };
@@ -829,23 +846,6 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 				}
 			} catch { /* MX optional */ }
 		}
-	}
-	if (bid && country === "FI" && (!facts.emails.length || !facts.phones.length || !facts.people.length)) {
-		try {
-			const bis = await prhBisLookup(bid, { timeoutMs: 3500 });
-			if (bis.ok) {
-				await persistHits({
-					website: bis.data.website,
-					websiteSource: "ytj",
-					people: [],
-					emails: (bis.data.contacts ?? []).filter((c) => c.kind === "email"),
-					phones: (bis.data.contacts ?? []).filter((c) => c.kind === "phone"),
-				});
-				if (bis.observations?.length) {
-					await insertObservations(sql, userId, "company", companyId, "ytj", bis.sourceUrl, "official_register", bis.observations);
-				}
-			}
-		} catch { /* BIS is optional contact fill */ }
 	}
 	await recordCapability(sql, userId, companyId, "email", facts.emails.length ? "SUCCESS" : "NO_DATA", { evidence: { n: facts.emails.length } });
 	await recordCapability(sql, userId, companyId, "phone", facts.phones.length ? "SUCCESS" : "NO_DATA", { evidence: { n: facts.phones.length } });
@@ -1059,7 +1059,9 @@ async function runEnrich(sql, userId, runId, companyId, _opts) {
 		companyId
 	});
 	try { await runScore(sql, userId, runId, companyId); } catch { /* score after contacts; extra job not required */ }
-	await sql`update companies set record_status = ${"enriched"}, last_verified_at = now() where id = ${companyId} and user_id = ${userId} and record_status = 'discovered'`;
+	if (facts.emails.length || facts.phones.length || facts.people.length) {
+		await sql`update companies set record_status = ${"enriched"}, last_verified_at = now() where id = ${companyId} and user_id = ${userId} and record_status = 'discovered'`;
+	}
 	await bumpSource(sql, userId, "ytj", "enrich", { confidence: 90 });
 }
 async function upsertPerson(sql, userId, companyId, p) {
@@ -1750,11 +1752,28 @@ async function processNextJob(sql, userId, runId, opts) {
         where id = ${job.id} and user_id = ${userId}`;
 			return { did: true, type: job.type, error: "Unknown job type" };
 		}
-		await sql`update jobs set status = ${"done"}, updated_at = now() where id = ${job.id} and user_id = ${userId}`;
 		if ((job.type === "enrich" || job.type === "email") && job.company_id) {
-			await sql`update companies set record_status = ${"enriched"}, updated_at = now()
-        where id = ${job.company_id} and user_id = ${userId} and coalesce(record_status, ${"discovered"}) = ${"discovered"}`;
+			let hasOutreach = false;
+			try {
+				const [row] = await sql`
+          select
+            exists(select 1 from contacts ct where ct.user_id = ${userId} and ct.company_id = ${job.company_id} and ct.kind in ('email','phone')) as c,
+            exists(select 1 from people p where p.user_id = ${userId} and p.company_id = ${job.company_id} and p.deleted_at is null) as p`;
+				hasOutreach = Boolean(row?.c || row?.p);
+			} catch { /* */ }
+			const retry = Number(job.payload && typeof job.payload === "object" ? job.payload.contactRetry ?? 0 : 0);
+			if (!hasOutreach && job.type === "enrich" && retry < 1) {
+				const payload = { ...(job.payload && typeof job.payload === "object" ? job.payload : {}), contactRetry: 1 };
+				await sql`update jobs set status = ${"queued"}, attempts = greatest(attempts - 1, 0), run_after = now(), last_error = ${"empty contacts retry"}, payload = ${JSON.stringify(payload)}::jsonb, locked_at = null, updated_at = now()
+          where id = ${job.id} and user_id = ${userId}`;
+				return { did: true, type: job.type, incomplete: true };
+			}
+			if (hasOutreach || retry >= 1 || job.type === "email") {
+				await sql`update companies set record_status = ${"enriched"}, updated_at = now()
+          where id = ${job.company_id} and user_id = ${userId} and coalesce(record_status, ${"discovered"}) = ${"discovered"}`;
+			}
 		}
+		await sql`update jobs set status = ${"done"}, updated_at = now() where id = ${job.id} and user_id = ${userId}`;
 		if (job.company_id && job.run_id && job.type === "scrape") {
 			await enqueueScore(sql, userId, job.run_id, job.company_id);
 		}
