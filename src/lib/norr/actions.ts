@@ -2216,19 +2216,27 @@ export const getAdminActivity = createServerFn({ method: "GET" }).middleware([au
 });
 
 export const adminDrainQueue = createServerFn({ method: "POST" }).middleware([authMiddleware]).handler(async ({ context }) => {
-  const sql = await ctxSql(context);
+  const sql = await rawSql(context);
   if (!(await ensurePlatformIdentity(sql, context.userId)).isAdmin) return { ok: false, error: "Admin only", pruned: 0 };
-  const { snapshotQueueDepth, applyQueueImmune } = await import("./queue-monitor.ts");
+  const { snapshotQueueDepth, applyQueueImmune, sweepDeadQueue } = await import("./queue-monitor.ts");
+  const swept = await sweepDeadQueue(sql);
   const snap = await snapshotQueueDepth(sql);
   const act = await applyQueueImmune(sql, snap);
-  dispatchVercelExecution({ reason: "admin.drain" });
+  const { runVercelDrain } = await import("./vercel-executor.ts");
+  const drain = await runVercelDrain({ reason: "admin.drain" });
   await persistSecurityEvent(sql, {
     userId: context.userId,
     action: "admin.queue.drain",
     risk: "normal",
-    detail: { pruned: act.pruned },
+    detail: { pruned: act.pruned + swept.cancelled, remaining: drain.remaining },
   });
-  return { ok: true, pruned: act.pruned, stolen: act.stolen, depth: snap.depth };
+  return {
+    ok: true,
+    pruned: act.pruned + swept.cancelled,
+    stolen: act.stolen + swept.stolen,
+    depth: drain.remaining,
+    processed: drain.processed,
+  };
 });
 
 export const adminListPosts = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {

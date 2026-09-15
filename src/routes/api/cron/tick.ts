@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ensureWorker, triggerWorkerTick } from "@/lib/norr/worker";
 import { safeEqual } from "@/lib/norr/security";
-import { dispatchVercelExecution } from "@/lib/norr/vercel-executor.ts";
+import { dispatchVercelExecution, runVercelDrain } from "@/lib/norr/vercel-executor.ts";
 import { scheduleBackground } from "@/lib/norr/hybrid.ts";
 
 export const Route = createFileRoute("/api/cron/tick")({
@@ -25,9 +25,10 @@ async function handle({ request }: { request: Request }) {
     return new Response("unauthorized", { status: 401 });
   }
   ensureWorker();
-  dispatchVercelExecution({ reason: "cron.tick" });
+  const result = await runVercelDrain({ reason: "cron.tick" });
+  if (result.remaining > 0) dispatchVercelExecution({ reason: "cron.follow", depth: 1 });
   scheduleBackground(() => triggerWorkerTick());
-  return new Response(JSON.stringify({ ok: true, kicked: true }), {
+  return new Response(JSON.stringify({ ok: true, kicked: true, ...result }), {
     status: 200,
     headers: { "content-type": "application/json" },
   });

@@ -19,15 +19,15 @@ describe("vercel hybrid", () => {
     assert.equal(vercelRuntimeInfo().legacyBackend, "retired");
   });
 
-  it("does not void-run a drain on Vercel without waitUntil", async () => {
+  it("still runs background work if waitUntil is missing", async () => {
     const prev = process.env.VERCEL;
     process.env.VERCEL = "1";
     let ran = false;
     scheduleBackground(async () => {
       ran = true;
     });
-    await new Promise((r) => setTimeout(r, 20));
-    assert.equal(ran, false);
+    await new Promise((r) => setTimeout(r, 30));
+    assert.equal(ran, true);
     if (prev === undefined) delete process.env.VERCEL;
     else process.env.VERCEL = prev;
   });

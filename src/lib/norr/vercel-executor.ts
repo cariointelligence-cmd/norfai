@@ -68,19 +68,19 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
   const { processJobsFor, processDueSchedules } = await import("./pipeline.ts");
   const sql = await getSql();
   try {
+    const { sweepDeadQueue, applyQueueImmune, snapshotQueueDepth } = await import("./queue-monitor.ts");
+    await sweepDeadQueue(sql);
+    const snap = await snapshotQueueDepth(sql);
+    await applyQueueImmune(sql, snap);
+  } catch { /* */ }
+  try {
     await sql`update jobs set status = ${"cancelled"}, locked_at = null, last_error = ${"run closed"}, updated_at = now()
       where status in ('queued','running')
-        and run_id in (select id from search_runs where status in ('completed','cancelled','failed'))`;
-    if (opts.userId) {
-      await sql`update jobs set status = ${"cancelled"}, locked_at = null, last_error = ${"stale search"}, updated_at = now()
-        where user_id = ${opts.userId} and status in ('queued','running')
-          and (${opts.runId ?? null}::text is null or run_id is distinct from ${opts.runId ?? null})
-          and run_id in (
-            select id from search_runs
-            where user_id = ${opts.userId} and status in ('running','queued')
-              and updated_at < now() - interval '45 minutes'
-          )`;
-    }
+        and (
+          run_id is null
+          or run_id in (select id from search_runs where status in ('completed','cancelled','failed'))
+          or not exists (select 1 from search_runs r where r.id = jobs.run_id)
+        )`;
   } catch { /* */ }
   const maxMs = 22_000;
   let processed = 0;

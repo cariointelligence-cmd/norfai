@@ -328,6 +328,50 @@ export async function snapshotQueueDepth(sql: Sql): Promise<QueueSnapshot> {
   return aggregateQueueRows(rows, { childCrawls, staleRunning, users, runs });
 }
 
+export async function sweepDeadQueue(sql: Sql): Promise<{ cancelled: number; closed: number; stolen: number }> {
+  let cancelled = 0;
+  let closed = 0;
+  let stolen = 0;
+  try {
+    const dead = await sql<{ id: string }>`
+      update jobs j set status = ${"cancelled"}, last_error = ${"no live search"},
+        locked_at = null, updated_at = now()
+      where j.status in ('queued','running')
+        and (
+          j.run_id is null
+          or not exists (
+            select 1 from search_runs r
+            where r.id = j.run_id and r.status in ('running','queued')
+          )
+        )
+      returning j.id`;
+    cancelled += dead.length;
+  } catch { /* */ }
+  try {
+    const stale = await sql<{ id: string }>`
+      update jobs set status = ${"queued"}, locked_at = null, run_after = now(),
+        last_error = ${"stolen stale lock"}, updated_at = now()
+      where status = ${"running"}
+        and locked_at is not null
+        and locked_at < now() - interval '40 seconds'
+      returning id`;
+    stolen += stale.length;
+  } catch { /* */ }
+  try {
+    const done = await sql<{ id: string }>`
+      update search_runs r set status = ${"completed"}, finished_at = coalesce(finished_at, now())
+      where r.status in ('running','queued')
+        and r.updated_at < now() - interval '90 seconds'
+        and not exists (
+          select 1 from jobs j
+          where j.run_id = r.id and j.status in ('queued','running')
+        )
+      returning r.id`;
+    closed += done.length;
+  } catch { /* */ }
+  return { cancelled, closed, stolen };
+}
+
 export async function applyQueueImmune(
   sql: Sql,
   snap: QueueSnapshot,
@@ -335,14 +379,11 @@ export async function applyQueueImmune(
   let pruned = 0;
   let stolen = 0;
   try {
-    await sql`update search_runs r set status = ${"running"}, finished_at = null
-      where r.status = ${"completed"}
-        and exists (
-          select 1 from jobs j
-          where j.run_id = r.id
-            and j.status in ('queued','running')
-            and j.type in ('discover','enrich','email')
-        )`;
+    const sweep = await sweepDeadQueue(sql);
+    pruned += sweep.cancelled;
+    stolen += sweep.stolen;
+  } catch { /* */ }
+  try {
     const orphans = await sql<{ id: string }>`
       update jobs j set status = ${"cancelled"}, last_error = ${"run already finished"},
         locked_at = null, updated_at = now()

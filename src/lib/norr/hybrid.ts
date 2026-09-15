@@ -65,14 +65,15 @@ export function scheduleBackground(task: () => Promise<unknown>): void {
     waitUntil(run());
     return;
   }
-  if (process.env.VERCEL) {
-    if (!process.env.NODE_TEST_CONTEXT) {
-      void import(/* @vite-ignore */ "@vercel/functions")
-        .then((vf) => {
-          if (typeof vf.waitUntil === "function") vf.waitUntil(run());
-        })
-        .catch(() => undefined);
-    }
+  if (process.env.VERCEL && !process.env.NODE_TEST_CONTEXT) {
+    void import(/* @vite-ignore */ "@vercel/functions")
+      .then((vf) => {
+        if (typeof vf.waitUntil === "function") vf.waitUntil(run());
+        else void run();
+      })
+      .catch(() => {
+        void run();
+      });
     return;
   }
   void run();
