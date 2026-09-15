@@ -40,7 +40,8 @@ function AdminSupport() {
         toast.error(r.error);
         return;
       }
-      toast.message("Reply queued to the customer email");
+      if (r.mailed > 0) toast.message(`Reply emailed to the customer`);
+      else toast.error(r.mailError || "Reply saved, but email did not send. Check Admin → Mail.");
       setReply("");
       void qc.invalidateQueries({ queryKey: ["admin-ticket", selected] });
       void qc.invalidateQueries({ queryKey: ["admin-tickets"] });

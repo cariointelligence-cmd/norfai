@@ -185,7 +185,7 @@ export const adminReplyTicket = createServerFn({ method: "POST" })
     if (data.status || data.priority) {
       await setTicketStatus(sql, data.ticketId, data.status ?? "pending", data.priority);
     }
-    return { ok: true as const };
+    return { ok: true as const, mailed: r.mailed, mailError: r.mailError };
   });
 
 export const adminSetTicket = createServerFn({ method: "POST" })

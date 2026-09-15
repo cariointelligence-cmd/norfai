@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-16-admin-quota-ui";
+export const NORF_BUILD = "2026-09-16-support-mail";
 
 export function vercelDeployProbe() {
   const env = process.env;

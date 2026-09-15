@@ -128,6 +128,7 @@ export async function createTicket(
       name,
       locale: input.locale,
       ticketUrl: customerUrl,
+      items: [body.slice(0, 4000)],
       meta: { ticketId: id, origin: "admin", kind },
     });
   } else {
@@ -214,7 +215,7 @@ export async function addMessage(
     authorEmail?: string | null;
     locale?: string | null;
   },
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; mailed: number; mailError?: string } | { ok: false; error: string }> {
   await ensureMailSchema(sql);
   const body = boundedString(opts.body, 8000).replace(/\u0000/g, "").trim();
   if (body.length < 2) return { ok: false, error: "Message is too short." };
@@ -235,6 +236,7 @@ export async function addMessage(
       name: ticket.name,
       locale: opts.locale,
       ticketUrl: `${origin}/support/t/${ticket.public_token}`,
+      items: [body.slice(0, 4000)],
       meta: { ticketId: ticket.id, messageId: id },
     });
   } else {
@@ -250,12 +252,18 @@ export async function addMessage(
       });
     }
   }
+  let mailed = 0;
+  let mailError: string | undefined;
   try {
-    await processMailOutbox(sql, 8);
+    const flush = await processMailOutbox(sql, 12);
+    mailed = flush.sent;
+    if (flush.failed > 0 && flush.sent === 0) mailError = "Mail provider rejected the message.";
+    if (flush.sent === 0 && flush.failed === 0 && flush.skipped > 0) mailError = "Mail is not configured.";
   } catch (err) {
     console.error("[norf] ticket reply mail flush", err);
+    mailError = "Mail flush failed.";
   }
-  return { ok: true };
+  return { ok: true, mailed, mailError };
 }
 
 export async function setTicketStatus(sql: Sql, id: string, status: TicketStatus, priority?: TicketPriority) {

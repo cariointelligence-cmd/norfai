@@ -679,7 +679,8 @@ export async function processMailOutbox(sql: Sql, limit = 8): Promise<{ sent: nu
       continue;
     }
     if (transport.provider === "none") {
-      skipped += 1;
+      await sql`update mail_outbox set status = ${"failed"}, error = ${"Mail provider is not configured"}, sent_at = now() where id = ${row.id}`;
+      failed += 1;
       continue;
     }
     const result = await deliverWith(transport, {

@@ -23,7 +23,12 @@ function wrapHtml(opts: { title: string; bodyHtml: string; footerHtml: string })
 }
 
 function p(s: string): string {
-  return `<p style="margin:0 0 12px;">${s}</p>`;
+  const amp = "&" + "amp;";
+  const lt = "&" + "lt;";
+  const gt = "&" + "gt;";
+  const quot = "&" + "quot;";
+  const safe = s.replace(/&/g, amp).replace(/</g, lt).replace(/>/g, gt).replace(/"/g, quot);
+  return `<p style="margin:0 0 12px;white-space:pre-wrap;">${safe}</p>`;
 }
 
 function cta(href: string, label: string): string {
@@ -425,30 +430,44 @@ export function renderCampaign(campaign: MailCampaign, ctx: CopyCtx): RenderedMa
         ],
         { href: ctx.ticketUrl || `${origin}/admin/support`, label: "Open in admin" },
       );
-    case "ticket_reply":
+    case "ticket_reply": {
+      const quote = (ctx.items ?? []).map((x) => String(x).trim()).filter(Boolean).slice(0, 8);
       return pack(
         fi ? "Vastaus tukipyyntöösi" : "A reply to your request",
         fi ? "Norf vastasi tukipyyntöösi" : "Norf replied to your support request",
         fi
-          ? ["Tiimi vastasi. Lue koko ketju linkistä. Voit jatkaa samaan tikettiin."]
-          : ["The team replied. Read the thread from the link. You can continue on the same ticket."],
-        { href: ctx.ticketUrl || tickets, label: fi ? "Lue vastaus" : "Read the reply" },
+          ? [
+              "Tiimi vastasi tukipyyntöösi:",
+              ...quote,
+              "Voit jatkaa samaan tikettiin linkistä. Älä lähetä salasanoja tähän ketjuun.",
+            ]
+          : [
+              "The team replied to your request:",
+              ...quote,
+              "Continue on the same ticket from the link. Do not send passwords on this thread.",
+            ],
+        { href: ctx.ticketUrl || tickets, label: fi ? "Lue ketju ja vastaa" : "Read the thread and reply" },
       );
-    case "ticket_opened":
+    }
+    case "ticket_opened": {
+      const quote = (ctx.items ?? []).map((x) => String(x).trim()).filter(Boolean).slice(0, 8);
       return pack(
         fi ? "Norf avasi ketjun kanssasi" : "Norf opened a thread with you",
         fi ? "Norf avasi tukipyynnön / vaatimuksen kanssasi" : "Norf opened a support request with you",
         fi
           ? [
-              "Tiimi avasi ketjun. Lue viesti linkistä ja vastaa samaan tikettiin.",
-              "Älä lähetä salasanoja tai Stripe-avaimia tähän ketjuun.",
+              "Tiimi avasi ketjun kanssasi:",
+              ...quote,
+              "Vastaa samaan tikettiin linkistä. Älä lähetä salasanoja tai Stripe-avaimia tähän ketjuun.",
             ]
           : [
-              "The team opened a thread with you. Read it from the link and reply on the same ticket.",
-              "Do not send passwords or Stripe keys on this thread.",
+              "The team opened a thread with you:",
+              ...quote,
+              "Reply on the same ticket from the link. Do not send passwords or Stripe keys on this thread.",
             ],
         { href: ctx.ticketUrl || tickets, label: fi ? "Avaa ketju" : "Open the thread" },
       );
+    }
     case "ticket_closed":
       return pack(
         fi ? "Tukipyyntö suljettu" : "Support request closed",
