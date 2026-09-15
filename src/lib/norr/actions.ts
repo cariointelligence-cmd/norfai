@@ -2677,6 +2677,15 @@ export const removeFromList = createServerFn({ method: "POST" }).middleware([aut
   return { ok: true };
 });
 
+export const getVisitorFeed = createServerFn({ method: "GET" }).middleware([authMiddleware]).handler(async ({ context }) => {
+  const sql = await rawSql(context);
+  const id = await readPlatformIdentity(sql, context.userId);
+  if (!id.isAdmin) return { ok: false as const, error: "Admin only", sessions: [], hits: [], last24h: 0, identified24h: 0 };
+  const { listVisitorFeed } = await import("./visitor-store.ts");
+  const feed = await listVisitorFeed(sql, 250);
+  return { ok: true as const, ...feed };
+});
+
 export const adminListUsers = createServerFn({ method: "GET" }).middleware([authMiddleware]).validator((d) => d ?? {}).handler(async ({ context, data }) => {
   const sql = await ctxSql(context);
   return listPlatformUsers(sql, context.userId, boundedString(data?.q ?? "", 80));

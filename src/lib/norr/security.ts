@@ -670,6 +670,7 @@ export const ENDPOINT_CLASS: Record<string, "PUBLIC" | "AUTHENTICATED" | "PRIVIL
   "adminGrantQuota": "ADMIN",
   "adminGrantAdmin": "ADMIN",
   "getSecurityCenter": "ADMIN",
+  "getVisitorFeed": "ADMIN",
   "/api/gsc/callback": "PUBLIC",
   "getSeoDashboard": "ADMIN",
   "adminListTickets": "ADMIN",

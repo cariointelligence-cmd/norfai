@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/lib/auth/provider";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { CanonicalHost } from "@/components/canonical-host";
+import { VisitorBeacon } from "@/components/visitor-beacon";
 import { I18nProvider } from "@/components/i18n-provider";
 import { Toaster } from "sonner";
 import appCss from "../styles.css?url";
@@ -57,6 +58,7 @@ export const Route = createRootRoute({
       <body className="bg-canvas text-ink">
         <PreviewHostBridge />
         <CanonicalHost />
+        <VisitorBeacon />
         <AuthProvider>
           <I18nProvider>
           <QueryClientProvider client={queryClient}>

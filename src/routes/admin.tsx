@@ -23,6 +23,7 @@ const NAV = [
   { to: "/admin", label: "Overview" },
   { to: "/admin/search", label: "Search health" },
   { to: "/admin/activity", label: "Activity" },
+  { to: "/admin/visitors", label: "Visitors" },
   { to: "/admin/security", label: "Security" },
   { to: "/admin/data-network", label: "Data network" },
   { to: "/admin/seo", label: "SEO and GEO" },
