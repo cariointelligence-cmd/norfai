@@ -666,15 +666,15 @@ describe("source catalogue", () => {
 describe("production runtime", () => {
   it("keeps async parallelism in the normal production band", () => {
     assert.equal(isProductionRuntime(), true);
-    assert.equal(RUNTIME.jobConcurrency, 16);
-    assert.equal(RUNTIME.jobConcurrencyCap, 16);
+    assert.equal(RUNTIME.jobConcurrency, 24);
+    assert.equal(RUNTIME.jobConcurrencyCap, 32);
     assert.equal(RUNTIME.harvestPageConcurrency, 4);
     assert.equal(RUNTIME.crawlBudget, 6);
     assert.equal(RUNTIME.deepCrawlBudget, 12);
     assert.equal(RUNTIME.findCompanyQueryCap, 4);
     assert.equal(clampConcurrency(1), 1);
-    assert.equal(clampConcurrency(99), 16);
-    assert.equal(clampConcurrency(undefined), 16);
+    assert.equal(clampConcurrency(99), 32);
+    assert.equal(clampConcurrency(undefined), 24);
     assert.equal(RUNTIME.homemadeDiscoverCap, 40);
     assert.equal(RUNTIME.hydrateConcurrency, 6);
     assert.ok(RUNTIME.tickMaxMs >= RUNTIME.discoverBudgetMs);

@@ -1,4 +1,4 @@
-export const NORF_BUILD = "2026-09-16-queue-sweep";
+export const NORF_BUILD = "2026-09-16-queue-10k";
 
 export function vercelDeployProbe() {
   const env = process.env;

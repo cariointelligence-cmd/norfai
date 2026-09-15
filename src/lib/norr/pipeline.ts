@@ -1612,25 +1612,19 @@ async function stealStaleJobs(sql, userId, runId) {
 async function claimNextJob(sql, userId, runId, opts) {
 	const skipDiscover = Boolean(opts?.skipDiscover);
 	if (runId && !skipDiscover) {
-		const discLive = (await sql`select count(*)::int as n from jobs where user_id = ${userId} and type = ${"discover"} and status = ${"running"}`)[0]?.n ?? 0;
-		if (Number(discLive) < 2) {
-			const disc = (await sql`
+		const claimedDisc = (await sql`
+      update jobs set status = ${"running"}, attempts = attempts + 1, locked_at = now(), updated_at = now()
+      where id = (
         select id from jobs
-        where user_id = ${userId} and type = ${"discover"} and status = 'queued' and run_after <= now()
+        where user_id = ${userId} and type = ${"discover"} and status = ${"queued"} and run_after <= now()
           and run_id = ${runId}
-        order by created_at asc limit 1`)[0];
-			if (disc) {
-				const claimed = (await sql`
-          update jobs set status = ${"running"}, attempts = attempts + 1, locked_at = now(), updated_at = now()
-          where id = ${disc.id} and user_id = ${userId} and status = ${"queued"}
-          returning id, type, company_id, run_id, payload`)[0];
-				if (claimed) return claimed;
-			}
-		}
+        order by created_at asc
+        for update skip locked
+        limit 1
+      )
+      returning id, type, company_id, run_id, payload`)[0];
+		if (claimedDisc) return claimedDisc;
 	}
-	const live = (await sql`select count(*)::int as n from jobs where user_id = ${userId} and status = ${"running"}
-      and (${runId ?? null}::text is null or run_id = ${runId ?? null})`)[0]?.n ?? 0;
-	if (Number(live) >= 16) return null;
 	let skipHeavy = false;
 	if (runId) {
 		const coreLive = (await sql`select count(*)::int as n from jobs
@@ -1639,36 +1633,36 @@ async function claimNextJob(sql, userId, runId, opts) {
         and status in ('queued','running')`)[0]?.n ?? 0;
 		skipHeavy = Number(coreLive) > 0;
 	}
-	const job = (await sql`
-    select id from jobs
-    where user_id = ${userId} and status = 'queued' and run_after <= now()
-      and (${runId ?? null}::text is null or run_id = ${runId ?? null})
-      and (${!skipDiscover} or type <> ${"discover"})
-      and (${!skipHeavy} or type in (${"discover"}, ${"enrich"}, ${"email"}))
-      and (
-        run_id is null
-        or type = ${"email"}
-        or exists (
-          select 1 from search_runs r
-          where r.id = jobs.run_id and r.user_id = ${userId}
-            and r.status in ('running','queued')
-        )
-      )
-    order by case type
-        when 'discover' then 0
-        when 'email' then 1
-        when 'enrich' then 2
-        when 'scrape' then 3
-        when 'score' then 4
-        when 'crawl' then 5
-        when 'signals' then 6
-        else 7 end, created_at asc
-      limit 1`)[0];
-	if (!job) return null;
 	const claimed = (await sql`
-      update jobs set status = ${"running"}, attempts = attempts + 1, locked_at = now(), updated_at = now()
-      where id = ${job.id} and user_id = ${userId} and status = ${"queued"}
-      returning id, type, company_id, run_id, payload`)[0];
+    update jobs set status = ${"running"}, attempts = attempts + 1, locked_at = now(), updated_at = now()
+    where id = (
+      select id from jobs
+      where user_id = ${userId} and status = ${"queued"} and run_after <= now()
+        and (${runId ?? null}::text is null or run_id = ${runId ?? null})
+        and (${!skipDiscover} or type <> ${"discover"})
+        and (${!skipHeavy} or type in (${"discover"}, ${"enrich"}, ${"email"}))
+        and (
+          run_id is null
+          or type = ${"email"}
+          or exists (
+            select 1 from search_runs r
+            where r.id = jobs.run_id and r.user_id = ${userId}
+              and r.status in ('running','queued')
+          )
+        )
+      order by case type
+          when 'discover' then 0
+          when 'email' then 1
+          when 'enrich' then 2
+          when 'scrape' then 3
+          when 'score' then 4
+          when 'crawl' then 5
+          when 'signals' then 6
+          else 7 end, created_at asc
+      for update skip locked
+      limit 1
+    )
+    returning id, type, company_id, run_id, payload`)[0];
 	return claimed ?? null;
 }
 

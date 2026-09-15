@@ -92,7 +92,7 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
   if (targetUser && targetRun) {
     processed = await processJobsFor(sql, targetUser, targetRun, {
       maxMs,
-      concurrency: 16,
+      concurrency: 24,
       skipSchema: true,
     });
     if (opts.userId && opts.userId === targetUser) {
@@ -102,6 +102,14 @@ export async function drainBatch(opts: DrainRequest): Promise<{ processed: numbe
     try { await processDueSchedules(sql, opts.userId); } catch { /* */ }
   }
   const remaining = await countDueJobs(targetUser, targetRun);
+  if (remaining > 80) {
+    scheduleBackground(() => invokeVercelDrain({
+      userId: targetUser,
+      runId: targetRun,
+      depth: (opts.depth ?? 0) + 1,
+      reason: `${opts.reason ?? "drain"}.fanout`,
+    }));
+  }
   try {
     const { maybeAutoPublishBlogs } = await import("./platform.ts");
     await maybeAutoPublishBlogs(sql);

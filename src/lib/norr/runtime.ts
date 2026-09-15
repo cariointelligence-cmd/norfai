@@ -4,8 +4,8 @@
  * band: not serial, not a burst that burns search engines or one host.
  */
 export const RUNTIME = {
-  jobConcurrency: 16,
-  jobConcurrencyCap: 16,
+  jobConcurrency: 24,
+  jobConcurrencyCap: 32,
   workerJobConcurrency: 16,
   workerMaxMs: 28_000,
   workerUserLimit: 8,
@@ -60,7 +60,7 @@ export function isProductionRuntime(cfg: RuntimeConfig = RUNTIME): boolean {
   return (
     cfg.jobConcurrency >= 8 &&
     cfg.jobConcurrency <= cfg.jobConcurrencyCap &&
-    cfg.jobConcurrencyCap <= 16 &&
+    cfg.jobConcurrencyCap <= 32 &&
     cfg.workerUserConcurrency >= 2 &&
     cfg.workerUserConcurrency <= 8 &&
     cfg.harvestPageConcurrency >= 3 &&

@@ -68,6 +68,9 @@ const OPS_STMTS = [
     `alter table jobs add column if not exists lease_until timestamptz`,
     `alter table jobs add column if not exists generation integer not null default 1`,
     `alter table jobs add column if not exists capability text`,
+    `create index if not exists jobs_live_global_idx on jobs (status, run_after) where status in ('queued','running')`,
+    `create index if not exists jobs_live_run_global_idx on jobs (run_id, status) where status in ('queued','running')`,
+    `create index if not exists jobs_queued_claim_idx on jobs (user_id, run_after, created_at) where status = 'queued'`,
     `create table if not exists worker_queue_snapshots (
       id text primary key,
       taken_at timestamptz not null default now(),

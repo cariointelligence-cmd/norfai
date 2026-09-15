@@ -336,14 +336,18 @@ export async function sweepDeadQueue(sql: Sql): Promise<{ cancelled: number; clo
     const dead = await sql<{ id: string }>`
       update jobs j set status = ${"cancelled"}, last_error = ${"no live search"},
         locked_at = null, updated_at = now()
-      where j.status in ('queued','running')
-        and (
-          j.run_id is null
-          or not exists (
-            select 1 from search_runs r
-            where r.id = j.run_id and r.status in ('running','queued')
+      where j.id in (
+        select j2.id from jobs j2
+        where j2.status in ('queued','running')
+          and (
+            j2.run_id is null
+            or not exists (
+              select 1 from search_runs r
+              where r.id = j2.run_id and r.status in ('running','queued')
+            )
           )
-        )
+        limit 4000
+      )
       returning j.id`;
     cancelled += dead.length;
   } catch { /* */ }
