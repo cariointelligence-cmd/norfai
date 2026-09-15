@@ -221,7 +221,7 @@ function emptyResult(): VercelProvisionResult {
   };
 }
 
-export async function provisionCarioNorfai(): Promise<VercelProvisionResult> {
+export async function provisionCarioNorfai(opts?: { force?: boolean }): Promise<VercelProvisionResult> {
   const empty = emptyResult();
   if (!empty.tokenPresent) {
     empty.error = "VERCEL_TOKEN absent in this runtime";
@@ -319,47 +319,37 @@ export async function provisionCarioNorfai(): Promise<VercelProvisionResult> {
     `/v6/deployments?projectId=${encodeURIComponent(empty.projectId)}&teamId=${encodeURIComponent(cario.id)}&limit=8`,
   );
   const deps: any[] = existing.json?.deployments ?? [];
-  const inFlight = deps.find((d) =>
-    ["READY", "INITIALIZING", "BUILDING", "QUEUED", "PENDING"].includes(String(d?.readyState || d?.state || "")),
+  const building = deps.find((d) =>
+    ["INITIALIZING", "BUILDING", "QUEUED", "PENDING"].includes(String(d?.readyState || d?.state || "")),
   );
   const ready = deps.find((d) => d?.readyState === "READY" || d?.state === "READY");
-  if (ready) {
+  const force = Boolean(opts?.force) || process.env.NORF_FORCE_VERCEL_DEPLOY === "1";
+
+  if (building && !force) {
     empty.deployment = {
-      id: ready.uid || ready.id || null,
-      url: ready.url || null,
-      readyState: ready.readyState || ready.state || null,
-      created: false,
-    };
-    if (empty.deployment.id) {
-      for (const alias of ["www.norfai.com", "norfai.com"]) {
-        await vercelApi(
-          `/v2/deployments/${encodeURIComponent(empty.deployment.id)}/aliases?teamId=${encodeURIComponent(cario.id)}`,
-          { method: "POST", body: JSON.stringify({ alias }) },
-        );
-      }
-    }
-  } else if (inFlight) {
-    empty.deployment = {
-      id: inFlight.uid || inFlight.id || null,
-      url: inFlight.url || null,
-      readyState: inFlight.readyState || inFlight.state || null,
+      id: building.uid || building.id || null,
+      url: building.url || null,
+      readyState: building.readyState || building.state || null,
       created: false,
     };
   } else {
-    const createdDep = await vercelApi(`/v13/deployments?teamId=${encodeURIComponent(cario.id)}`, {
-      method: "POST",
-      body: JSON.stringify({
-        name: PROJECT_NAME,
-        project: empty.projectId,
-        target: "production",
-        gitSource: {
-          type: "github",
-          org: "cariointelligence-cmd",
-          repo: "norfai",
-          ref: "main",
-        },
-      }),
-    });
+    const createdDep = await vercelApi(
+      `/v13/deployments?forceNew=1&skipAutoDetectionConfirmation=1&teamId=${encodeURIComponent(cario.id)}`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          name: PROJECT_NAME,
+          project: empty.projectId,
+          target: "production",
+          gitSource: {
+            type: "github",
+            org: "cariointelligence-cmd",
+            repo: "norfai",
+            ref: "main",
+          },
+        }),
+      },
+    );
     if (createdDep.ok) {
       empty.deployment = {
         id: createdDep.json?.id || createdDep.json?.uid || null,
@@ -367,14 +357,35 @@ export async function provisionCarioNorfai(): Promise<VercelProvisionResult> {
         readyState: createdDep.json?.readyState || "QUEUED",
         created: true,
       };
-    } else {
+    } else if (building) {
       empty.deployment = {
-        id: deps[0]?.uid || null,
-        url: deps[0]?.url || null,
-        readyState: deps[0]?.readyState || null,
+        id: building.uid || building.id || null,
+        url: building.url || null,
+        readyState: building.readyState || building.state || null,
         created: false,
       };
       if (!empty.error) empty.error = `deploy: ${apiError(createdDep.json, createdDep.status)}`;
+    } else if (ready) {
+      empty.deployment = {
+        id: ready.uid || ready.id || null,
+        url: ready.url || null,
+        readyState: ready.readyState || ready.state || null,
+        created: false,
+      };
+      if (!empty.error) empty.error = `deploy: ${apiError(createdDep.json, createdDep.status)}`;
+    } else {
+      empty.deployment = { id: null, url: null, readyState: null, created: false };
+      if (!empty.error) empty.error = `deploy: ${apiError(createdDep.json, createdDep.status)}`;
+    }
+  }
+
+  const aliasId = empty.deployment?.id || ready?.uid || ready?.id;
+  if (aliasId && (empty.deployment?.readyState === "READY" || ready)) {
+    for (const alias of ["www.norfai.com", "norfai.com"]) {
+      await vercelApi(
+        `/v2/deployments/${encodeURIComponent(aliasId)}/aliases?teamId=${encodeURIComponent(cario.id)}`,
+        { method: "POST", body: JSON.stringify({ alias }) },
+      );
     }
   }
 

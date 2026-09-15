@@ -1,0 +1,70 @@
+name: Vercel production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: vercel-production
+  cancel-in-progress: false
+
+jobs:
+  cutover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Queue CARIO production from main
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VERCEL_TOKEN:-}" ]; then
+            echo "VERCEL_TOKEN GitHub secret is missing"
+            exit 1
+          fi
+          TEAM="team_y0VGLTF65bnCdCu5jipSM6CN"
+          curl -sS "https://api.vercel.com/v9/projects?teamId=${TEAM}&limit=50" \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" > /tmp/projects.json
+          PROJECT=$(python3 - <<'PY'
+          import json, sys
+          data = json.load(open("/tmp/projects.json"))
+          ps = data.get("projects") or []
+          p = next((x for x in ps if x.get("name") == "norfai"), None)
+          if not p:
+              print(json.dumps(data.get("error") or data, default=str)[:500], file=sys.stderr)
+              sys.exit(1)
+          print(p["id"])
+          PY
+          )
+          echo "project ${PROJECT}"
+          python3 - <<PY
+          import json
+          open("/tmp/deploy-body.json","w").write(json.dumps({
+            "name": "norfai",
+            "project": "${PROJECT}",
+            "target": "production",
+            "gitSource": {
+              "type": "github",
+              "org": "cariointelligence-cmd",
+              "repo": "norfai",
+              "ref": "main"
+            }
+          }))
+          PY
+          curl -sS -X POST \
+            "https://api.vercel.com/v13/deployments?forceNew=1&skipAutoDetectionConfirmation=1&teamId=${TEAM}" \
+            -H "Authorization: Bearer ${VERCEL_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/deploy-body.json > /tmp/deploy.json
+          python3 - <<'PY'
+          import json, sys
+          d = json.load(open("/tmp/deploy.json"))
+          ident = d.get("id") or d.get("uid")
+          err = d.get("error") or {}
+          print("deployment", ident, "state", d.get("readyState"), "url", d.get("url"))
+          if err:
+              print("error", err.get("code"), err.get("message"), file=sys.stderr)
+          if not ident:
+              sys.exit(1)
+          PY

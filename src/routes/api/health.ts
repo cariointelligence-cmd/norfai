@@ -31,7 +31,7 @@ export const Route = createFileRoute("/api/health")({
         if (!cutover || !cronHealthAuthorized(request)) {
           return Response.json(publicHealthBody(NORF_BUILD), { headers });
         }
-        const provision = await provisionCarioNorfai();
+        const provision = await provisionCarioNorfai({ force: true });
         let mail: { provider: string; source: string; resendReady: boolean } = {
           provider: "none",
           source: "none",
